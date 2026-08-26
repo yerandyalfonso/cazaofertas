@@ -46,7 +46,7 @@ const RANGE_DAYS: Record<TimeRange, number> = {
 
 const CHART_W = 720;
 const CHART_H = 300;
-const PAD = { top: 28, right: 28, bottom: 58, left: 28 };
+const PAD = { top: 28, right: 28, bottom: 44, left: 28 };
 const PLOT_W = CHART_W - PAD.left - PAD.right;
 const PLOT_H = CHART_H - PAD.top - PAD.bottom;
 
@@ -74,17 +74,30 @@ function toLocalDay(iso: string): Date {
   return startOfLocalDay(new Date(iso));
 }
 
-function formatDayLabel(date: Date, prev: Date | null, compact: boolean): string {
-  if (!compact || !prev) {
-    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+function formatAxisDate(date: Date): string {
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+/**
+ * Elige índices de etiquetas X espaciados (preserveStartEnd).
+ * Evita dibujar una fecha por cada día en rangos densos.
+ */
+function pickXLabelIndices(count: number, range: TimeRange): Set<number> {
+  if (count <= 0) return new Set();
+  if (count === 1) return new Set([0]);
+
+  const maxLabels =
+    range === "1w" ? Math.min(count, 7) : range === "1m" ? 6 : 7;
+
+  if (count <= maxLabels) {
+    return new Set(Array.from({ length: count }, (_, i) => i));
   }
-  if (
-    date.getMonth() !== prev.getMonth() ||
-    date.getFullYear() !== prev.getFullYear()
-  ) {
-    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+
+  const indices = new Set<number>();
+  for (let i = 0; i < maxLabels; i++) {
+    indices.add(Math.round((i / (maxLabels - 1)) * (count - 1)));
   }
-  return String(date.getDate());
+  return indices;
 }
 
 function formatTooltipDate(iso: string): string {
@@ -144,9 +157,7 @@ function buildDailySeries(
     else break;
   }
 
-  const compact = dayCount > 10;
-  return rows.map((row, index) => {
-    const prev = index > 0 ? rows[index - 1]!.day : null;
+  return rows.map((row) => {
     const stamp = new Date(
       row.day.getFullYear(),
       row.day.getMonth(),
@@ -160,7 +171,7 @@ function buildDailySeries(
       price: row.price as number,
       timestamp: stamp.toISOString(),
       observed: row.observed,
-      label: formatDayLabel(row.day, prev, compact),
+      label: formatAxisDate(row.day),
     };
   });
 }
@@ -247,6 +258,11 @@ export function PriceHistoryChart({
 
   const days = useMemo(() => buildDailySeries(points, range), [points, range]);
 
+  const xLabelIndices = useMemo(
+    () => pickXLabelIndices(days.length, range),
+    [days.length, range],
+  );
+
   const windowAverage = useMemo(() => {
     if (range === "3m") return averagePrice90d;
     if (range === "1m") return averagePrice30d;
@@ -310,12 +326,13 @@ export function PriceHistoryChart({
   const yRange = yMax - yMin || 1;
   const coords = toCoords(days, yMin, yRange);
   const { line: linePath, area: areaPath } = buildStepPaths(coords);
-  const dense = coords.length > 14;
+  const densePoints = coords.length > 14;
   const active = activeIndex !== null ? coords[activeIndex] : null;
   const avgY =
     windowAverage !== null
       ? PAD.top + (1 - (windowAverage - yMin) / yRange) * PLOT_H
       : null;
+  const labelY = PAD.top + PLOT_H + 14;
 
   return (
     <div className={className}>
@@ -462,7 +479,16 @@ export function PriceHistoryChart({
 
               {coords.map((point, index) => {
                 const isActive = activeIndex === index;
-                const labelY = PAD.top + PLOT_H + (dense ? 16 : 20);
+                const showLabel = xLabelIndices.has(index);
+                const tickRadius = densePoints
+                  ? isActive
+                    ? 4.5
+                    : point.observed
+                      ? 2.25
+                      : 1.75
+                  : isActive
+                    ? 5.5
+                    : 3;
                 return (
                   <g key={`${dayKey(toLocalDay(point.timestamp))}-${index}`}>
                     {isActive ? (
@@ -477,10 +503,10 @@ export function PriceHistoryChart({
                     <circle
                       cx={point.x}
                       cy={point.y}
-                      r={isActive ? 5.5 : 3}
+                      r={tickRadius}
                       fill={isActive ? STROKE_DEEP : STROKE}
                       stroke="#fff"
-                      strokeWidth={isActive ? 2 : 1.5}
+                      strokeWidth={isActive ? 2 : 1.25}
                     />
                     <circle
                       cx={point.x}
@@ -494,26 +520,29 @@ export function PriceHistoryChart({
                       role="button"
                       aria-label={`${formatEuro(point.price)} el ${formatTooltipDate(point.timestamp)}`}
                     />
-                    <text
-                      x={point.x}
-                      y={labelY}
-                      textAnchor="middle"
-                      dominantBaseline="hanging"
-                      transform={
-                        dense
-                          ? `rotate(-48 ${point.x} ${labelY})`
-                          : undefined
-                      }
-                      fill={isActive ? "#292524" : "#a8a29e"}
-                      fontWeight={isActive ? 600 : 400}
-                      style={{
-                        fontSize: dense ? 9 : 11,
-                        fontFamily:
-                          "var(--font-body), system-ui, sans-serif",
-                      }}
-                    >
-                      {point.label}
-                    </text>
+                    {showLabel ? (
+                      <text
+                        x={point.x}
+                        y={labelY}
+                        textAnchor={
+                          index === 0
+                            ? "start"
+                            : index === coords.length - 1
+                              ? "end"
+                              : "middle"
+                        }
+                        dominantBaseline="hanging"
+                        fill={isActive ? "#292524" : "#a8a29e"}
+                        fontWeight={isActive ? 600 : 400}
+                        style={{
+                          fontSize: 11,
+                          fontFamily:
+                            "var(--font-body), system-ui, sans-serif",
+                        }}
+                      >
+                        {point.label}
+                      </text>
+                    ) : null}
                   </g>
                 );
               })}
