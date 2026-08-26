@@ -1,0 +1,23 @@
+---
+description: Git commit author identity for Vercel/GitHub deploys
+alwaysApply: true
+---
+
+# Git commit author
+
+When creating git commits (including empty redeploy commits), always set author and committer via environment variables for that command only — do **not** run `git config`:
+
+- Name: `yerandyalfonso`
+- Email: `yerandy.alfonso@gmail.com`
+
+Example:
+
+```bash
+GIT_AUTHOR_NAME="yerandyalfonso" \
+GIT_AUTHOR_EMAIL="yerandy.alfonso@gmail.com" \
+GIT_COMMITTER_NAME="yerandyalfonso" \
+GIT_COMMITTER_EMAIL="yerandy.alfonso@gmail.com" \
+git commit ...
+```
+
+This email must match the GitHub account so Vercel does not block deployments.
