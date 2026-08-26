@@ -167,7 +167,8 @@ export function ArticleQuickImport({
                 Pega aquí el borrador completo con etiquetas{" "}
                 <code className="rounded bg-stone-100 px-1">[TÍTULO]</code>,{" "}
                 <code className="rounded bg-stone-100 px-1">[EXTRACTO]</code>,{" "}
-                <code className="rounded bg-stone-100 px-1">[IMAGEN]</code>,
+                <code className="rounded bg-stone-100 px-1">[IMAGEN]</code>,{" "}
+                <code className="rounded bg-stone-100 px-1">[IMAGEN PRINCIPAL]</code>,
                 etc.
               </p>
             </div>

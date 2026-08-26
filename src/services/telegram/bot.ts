@@ -5,6 +5,7 @@ import {
 } from "@/lib/affiliate";
 import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
+import { absoluteUrl } from "@/lib/site";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -201,9 +202,24 @@ export function buildDealAlertText(deal: DealCandidate): string {
     lines.push(`📁 ${escapeHtml(deal.categoryName)}`);
   }
 
-  lines.push("", `🔗 <a href="${escapeHtml(deal.affiliateUrl)}">Ver en Amazon</a>`);
-
   return lines.join("\n");
+}
+
+/** Botones: oferta afiliada + ficha en CazaOferta (si hay slug). */
+export function buildOfferActionMarkup(options: {
+  affiliateUrl: string;
+  productSlug?: string | null;
+}): InlineKeyboardMarkup {
+  const row: InlineKeyboardButton[] = [
+    { text: "🛒 Ver oferta", url: options.affiliateUrl },
+  ];
+  if (options.productSlug?.trim()) {
+    row.push({
+      text: "🌐 Ver en la web",
+      url: absoluteUrl(`/producto/${options.productSlug.trim()}`),
+    });
+  }
+  return { inline_keyboard: [row] };
 }
 
 export function buildStartMenuMarkup(): InlineKeyboardMarkup {
@@ -260,11 +276,10 @@ export async function sendDealAlertMessage(options: {
     chatId: options.chatId,
     text: buildDealAlertText(options.deal),
     disableWebPagePreview: false,
-    replyMarkup: {
-      inline_keyboard: [
-        [{ text: "🛒 Ver oferta en Amazon", url: options.deal.affiliateUrl }],
-      ],
-    },
+    replyMarkup: buildOfferActionMarkup({
+      affiliateUrl: options.deal.affiliateUrl,
+      productSlug: options.deal.productSlug,
+    }),
   });
 }
 

@@ -19,6 +19,8 @@ export interface DealCandidate {
   dealLevel: DealLevel;
   affiliateUrl: string;
   nearHistoricalLow: boolean;
+  /** Slug público `/producto/[slug]` para el botón “Ver en la web”. */
+  productSlug?: string | null;
   /** Score 0–100 del motor de chollos (opcional para canal). */
   score?: number;
   dealLabel?: string;

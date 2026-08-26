@@ -11,6 +11,7 @@ import { ensureProductFromAmazonUrl } from "@/services/products";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
+  buildOfferActionMarkup,
 } from "@/services/telegram/bot";
 
 export interface UserUrlAlertsResult {
@@ -230,6 +231,16 @@ export async function runUserUrlAlerts(options?: {
         ((previousKnown - currentPrice) / previousKnown) * 100,
       );
 
+      let productSlug: string | null = null;
+      if (productId) {
+        const { data: linked } = await client
+          .from("products")
+          .select("slug")
+          .eq("id", productId)
+          .maybeSingle();
+        productSlug = linked?.slug ?? null;
+      }
+
       await sendTelegramMessage({
         chatId: user.telegram_id,
         text: [
@@ -240,11 +251,10 @@ export async function runUserUrlAlerts(options?: {
           `Ahora: <b>${formatEuro(currentPrice)}</b> (−${discountPct}%)`,
         ].join("\n"),
         disableWebPagePreview: false,
-        replyMarkup: {
-          inline_keyboard: [
-            [{ text: "🛒 Ver en Amazon", url: affiliateUrl }],
-          ],
-        },
+        replyMarkup: buildOfferActionMarkup({
+          affiliateUrl,
+          productSlug,
+        }),
       });
 
       result.notified += 1;

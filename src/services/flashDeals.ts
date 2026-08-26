@@ -51,6 +51,7 @@ async function maybeNotifyFlashChannel(
     dealLabel: string;
     amazonUrl: string;
     affiliateUrl?: string | null;
+    productSlug?: string | null;
   },
 ): Promise<"sent" | "skipped" | "failed"> {
   const deal: DealCandidate = {
@@ -66,6 +67,7 @@ async function maybeNotifyFlashChannel(
     dealLevel: options.dealLevel,
     score: options.score,
     dealLabel: options.dealLabel,
+    productSlug: options.productSlug ?? null,
     affiliateUrl: generateAffiliateUrl({
       amazon_url: options.amazonUrl,
       affiliate_url: options.affiliateUrl,
@@ -124,6 +126,7 @@ interface CatalogRow {
   id: string;
   asin: string;
   title: string;
+  slug: string;
   amazon_url: string;
   affiliate_url: string | null;
   current_price: number | string;
@@ -166,7 +169,7 @@ export async function runFlashDealsCheck(options?: {
   const { data: catalogRows, error: catalogError } = await client
     .from("products")
     .select(
-      "id, asin, title, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
+      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
     );
 
   if (catalogError) {
@@ -319,7 +322,7 @@ export async function runFlashDealsCheck(options?: {
             last_checked_at: now,
             updated_at: now,
           })
-          .select("id, asin, title")
+          .select("id, asin, title, slug")
           .single();
 
         if (insertError) {
@@ -328,7 +331,7 @@ export async function runFlashDealsCheck(options?: {
             const { data: raced } = await client
               .from("products")
               .select(
-                "id, asin, title, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
+                "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
               )
               .eq("asin", item.asin)
               .maybeSingle();
@@ -396,6 +399,7 @@ export async function runFlashDealsCheck(options?: {
           id: insertedRow.id,
           asin: insertedRow.asin,
           title: insertedRow.title,
+          slug: insertedRow.slug ?? slug,
           amazon_url: amazonUrl,
           affiliate_url: null,
           current_price: price,
@@ -419,6 +423,7 @@ export async function runFlashDealsCheck(options?: {
             dealLevel: scoring.level,
             dealLabel: scoring.label,
             amazonUrl,
+            productSlug: slug,
           });
           if (channelStatus === "sent") channelNotificationsSent += 1;
           if (channelStatus === "skipped") channelNotificationsSkipped += 1;
@@ -522,6 +527,7 @@ export async function runFlashDealsCheck(options?: {
               dealLabel: scoring.label,
               amazonUrl,
               affiliateUrl: existing!.affiliate_url,
+              productSlug: existing!.slug,
             });
             if (channelStatus === "sent") channelNotificationsSent += 1;
             if (channelStatus === "skipped") channelNotificationsSkipped += 1;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
+import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 const display = Fraunces({
@@ -13,12 +14,21 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: "CazaOferta — Revista de chollos Amazon",
     template: "%s · CazaOferta",
   },
   description:
     "Ofertas reales de Amazon España, puntuadas por bajada y mínimo histórico. Alertas por Telegram.",
+  openGraph: {
+    type: "website",
+    locale: "es_ES",
+    siteName: "CazaOferta",
+    title: "CazaOferta — Revista de chollos Amazon",
+    description:
+      "Ofertas reales de Amazon España, puntuadas por bajada y mínimo histórico.",
+  },
 };
 
 export default function RootLayout({

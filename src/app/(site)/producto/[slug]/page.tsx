@@ -30,11 +30,33 @@ export async function generateMetadata({
   const product = await getProductBySlug(slug);
   if (!product) return { title: "Producto no encontrado" };
 
+  const title = product.title;
+  const description =
+    product.description ??
+    `${product.title} · precio actual ${formatEuro(product.currentPrice)}`;
+  const image = product.imageUrl;
+
   return {
-    title: product.title,
-    description:
-      product.description ??
-      `${product.title} · precio actual ${formatEuro(product.currentPrice)}`,
+    title,
+    description,
+    alternates: { canonical: `/producto/${slug}` },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: `/producto/${slug}`,
+      siteName: "CazaOferta",
+      locale: "es_ES",
+      images: image
+        ? [{ url: image, alt: title }]
+        : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 

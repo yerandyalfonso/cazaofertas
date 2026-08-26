@@ -31,6 +31,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
       "[CITA]: … (opcional, pull-quote)",
+      "[IMAGEN PRINCIPAL]: https://…/portada.jpg | Texto OG (opcional)",
       "[IMAGEN]: https://…/foto.jpg | Texto alternativo",
       "[H2]: Primera impresión",
       "[PÁRRAFO]: …",
@@ -47,6 +48,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     sample: `[TÍTULO]: Análisis: auriculares ANC por menos de 100 €
 [EXTRACTO]: Cancelación usable sin pagar precio de lanzamiento. Cuándo comprar y cuándo esperar.
 [CITA]: Compra por señal de precio, no por el reclamo de marketing.
+[IMAGEN PRINCIPAL]: https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1200 | Portada: auriculares ANC
 [IMAGEN]: https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1200 | Auriculares inalámbricos sobre mesa
 [H2]: Primera impresión
 [PÁRRAFO]: Contexto del producto, a quién va dirigido y qué problema resuelve en el uso diario.
@@ -72,6 +74,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
       "[CITA]: … (opcional)",
+      "[IMAGEN PRINCIPAL]: https://…/portada.jpg | Texto OG (opcional)",
       "[IMAGEN]: https://…/foto.jpg | Texto alternativo",
       "[INTRODUCCIÓN]: …",
       "[H2]: Criterios (opcional)",
@@ -86,6 +89,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     sample: `[TÍTULO]: Guía rápida: cómo elegir una freidora de aire
 [EXTRACTO]: Capacidad, limpieza y programas que sí importan antes de mirar el cartel de descuento.
 [CITA]: Define el uso real antes de mirar el porcentaje de oferta.
+[IMAGEN PRINCIPAL]: https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=1200 | Portada guía freidora
 [IMAGEN]: https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=1200 | Freidora de aire en encimera
 [INTRODUCCIÓN]: Esta guía resume los criterios que usamos en CazaOferta para no comprar por impulso en Amazon.
 [H2]: Criterios que importan
@@ -108,6 +112,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
       "[CITA]: … (opcional)",
+      "[IMAGEN PRINCIPAL]: https://…/portada.jpg | Texto OG (opcional)",
       "[IMAGEN]: https://…/foto.jpg | Texto alternativo",
       "[PRECIO ANTERIOR]: 79,99 €",
       "[PRECIO OFERTA]: 49,99 €",
@@ -118,6 +123,7 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     sample: `[TÍTULO]: Chollo flash: monitor 27" QHD a mínimo reciente
 [EXTRACTO]: Bajada clara frente al precio de las últimas semanas. Stock limitado y conviene actuar rápido.
 [CITA]: Si el score es alto y el precio toca mínimo, actúa rápido.
+[IMAGEN PRINCIPAL]: https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200 | Portada chollo monitor
 [IMAGEN]: https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=1200 | Monitor gaming sobre escritorio
 [PRECIO ANTERIOR]: 279,00 €
 [PRECIO OFERTA]: 199,00 €
@@ -230,6 +236,15 @@ function classifyTag(normalized: string): string {
     normalized === "foto"
   ) {
     return "image";
+  }
+  if (
+    normalized === "imagen principal" ||
+    normalized === "imagen destacada" ||
+    normalized === "cover" ||
+    normalized === "featured image" ||
+    normalized === "og image"
+  ) {
+    return "featuredImage";
   }
   if (
     normalized === "puntos clave" ||
@@ -386,6 +401,17 @@ export function parseQuickImport(
       case "pullQuote":
         pullQuote = content.replace(/\s+/g, " ").trim();
         break;
+      case "featuredImage": {
+        const parsed = parseImageTag(content);
+        if (!parsed) {
+          warnings.push(
+            "Etiqueta [IMAGEN PRINCIPAL] inválida. Usa: [IMAGEN PRINCIPAL]: https://…/foto.jpg | Descripción",
+          );
+          break;
+        }
+        featuredImage = parsed.src;
+        break;
+      }
       case "priceBefore":
         priceBefore = content.split(/\n/)[0]?.trim() ?? content;
         break;

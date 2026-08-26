@@ -341,6 +341,7 @@ export async function runPriceDetection(
             dealLevel: scoring.level,
             score: scoring.score,
             dealLabel: dealScoringService.getLabel(scoring.level),
+            productSlug: product.slug,
             affiliateUrl:
               generateAffiliateUrl({
                 amazon_url: product.amazon_url,

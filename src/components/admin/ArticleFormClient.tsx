@@ -182,7 +182,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     if (result.category) setCategory(result.category);
     setBlocks(result.blocks);
     if (result.featuredImage) {
-      setFeaturedImage((current) => current.trim() || result.featuredImage);
+      setFeaturedImage(result.featuredImage);
     }
     if (!seoTitle && result.title) setSeoTitle(result.title);
     if (!seoDescription && result.excerpt) setSeoDescription(result.excerpt);
