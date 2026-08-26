@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { runFlashDealsCheck } from "@/services/flashDeals";
 
@@ -8,6 +9,8 @@ export const maxDuration = 300;
 /** Proxy admin → cron discovery-first (insert novedades + update precio). */
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const body = (await request.json().catch(() => ({}))) as {
       limit?: number;
       feedUrls?: string[];

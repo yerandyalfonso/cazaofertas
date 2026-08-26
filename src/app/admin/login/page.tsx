@@ -46,8 +46,9 @@ export default function AdminLoginForm() {
           Acceso admin
         </h1>
         <p className="mt-2 text-sm text-stone-600">
-          Usa <code className="rounded bg-stone-100 px-1">ADMIN_PASSWORD</code>{" "}
-          o, en local sin configurar, cualquier valor si el acceso está abierto.
+          Introduce la contraseña de administrador (
+          <code className="rounded bg-stone-100 px-1">ADMIN_PASSWORD</code> o{" "}
+          <code className="rounded bg-stone-100 px-1">CRON_SECRET</code>).
         </p>
         <label className="mt-6 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
           Contraseña

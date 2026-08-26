@@ -1,4 +1,8 @@
-import { generateAffiliateUrl } from "@/lib/affiliate";
+import {
+  extractAsin,
+  generateAffiliateUrl,
+  looksLikeAmazonUrl,
+} from "@/lib/affiliate";
 import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { createSupabaseServiceClient } from "@/lib/supabase";
@@ -279,7 +283,13 @@ export async function sendChannelDealAlert(
 async function handleCreateAlert(chatId: number): Promise<void> {
   await sendTelegramMessage({
     chatId,
-    text: "Escribe la palabra clave del producto que quieres cazar.",
+    text: [
+      "🔔 <b>Nueva alerta</b>",
+      "",
+      "Envía:",
+      "• Una <b>palabra clave</b> (ej: airpods, silla gaming)",
+      "• O pega la <b>URL de Amazon</b> del producto que quieres vigilar",
+    ].join("\n"),
   });
 }
 
@@ -431,6 +441,7 @@ const EMPTY_ALERTS_MESSAGE =
 interface UserAlertRow {
   id: string;
   keyword: string | null;
+  url: string | null;
   brand: string | null;
   min_discount_percentage: number | null;
   max_price: number | null;
@@ -442,6 +453,9 @@ interface UserAlertRow {
 function formatAlertLine(index: number, alert: UserAlertRow): string {
   const parts: string[] = [];
 
+  if (alert.url) {
+    parts.push(`🔗 URL Amazon`);
+  }
   if (alert.keyword) {
     parts.push(`🔑 ${escapeHtml(alert.keyword)}`);
   }
@@ -476,7 +490,8 @@ function formatAlertLine(index: number, alert: UserAlertRow): string {
 function buildDeleteAlertsMarkup(alerts: UserAlertRow[]): InlineKeyboardMarkup {
   return {
     inline_keyboard: alerts.map((alert) => {
-      const label = alert.keyword?.trim() || "alerta";
+      const label =
+        alert.keyword?.trim() || (alert.url ? "URL Amazon" : "alerta");
       const truncated =
         label.length > 40 ? `${label.slice(0, 37)}…` : label;
 
@@ -525,7 +540,7 @@ async function fetchUserAlerts(telegramId: number): Promise<{
     const { data: alerts, error: alertsError } = await client
       .from("alerts")
       .select(
-        "id, keyword, brand, min_discount_percentage, max_price, min_price, is_active, product_id, category_id",
+        "id, keyword, url, brand, min_discount_percentage, max_price, min_price, is_active, product_id, category_id",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -570,7 +585,7 @@ async function fetchUserAlerts(telegramId: number): Promise<{
 }
 
 /**
- * Guarda una alerta por palabra clave a partir de un mensaje de texto del usuario.
+ * Guarda una alerta por palabra clave o URL de Amazon.
  * Usa el cliente service_role para saltar RLS.
  */
 export async function handleNewAlert(message: TelegramMessage): Promise<void> {
@@ -588,15 +603,26 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (!rawText) {
     await sendTelegramMessage({
       chatId,
-      text: "Escribe una palabra clave para crear la alerta.",
+      text: "Envía una palabra clave o pega una URL de Amazon para crear la alerta.",
     });
     return;
   }
 
-  const keyword = rawText.slice(0, 120);
+  const isUrlAlert = looksLikeAmazonUrl(rawText);
+  const asin = isUrlAlert ? extractAsin(rawText) : null;
+
+  if (isUrlAlert && !asin) {
+    await sendTelegramMessage({
+      chatId,
+      text: "No pude extraer el ASIN de esa URL. Pega un enlace de producto de Amazon (con /dp/…).",
+    });
+    return;
+  }
+
+  const keyword = isUrlAlert ? null : rawText.slice(0, 120);
+  const url = isUrlAlert ? rawText.slice(0, 500) : null;
 
   try {
-    // Service role: bypasa RLS en users/alerts.
     const client = createSupabaseServiceClient();
 
     const { data: user, error: userError } = await client
@@ -633,9 +659,10 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
       .insert({
         user_id: user.id,
         keyword,
+        url,
         is_active: true,
       })
-      .select("id, keyword")
+      .select("id, keyword, url")
       .single();
 
     if (insertError) {
@@ -643,6 +670,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
         telegramId,
         userId: user.id,
         keyword,
+        url,
         code: insertError.code,
         message: insertError.message,
         details: insertError.details,
@@ -655,14 +683,19 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
       return;
     }
 
+    const confirmation = inserted?.url
+      ? `✅ Alerta de URL creada. Te avisaré cuando baje el precio de ese producto.\n<code>${escapeHtml(inserted.url.slice(0, 80))}${inserted.url.length > 80 ? "…" : ""}</code>`
+      : `✅ Alerta creada para: ${escapeHtml(inserted?.keyword ?? keyword ?? "")}`;
+
     await sendTelegramMessage({
       chatId,
-      text: `✅ Alerta creada para: ${escapeHtml(inserted?.keyword ?? keyword)}`,
+      text: confirmation,
     });
   } catch (error) {
     console.error("[telegram] handleNewAlert: excepción inesperada", {
       telegramId,
       keyword,
+      url,
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -710,7 +743,7 @@ async function handleDeleteAlert(options: {
     .delete()
     .eq("id", options.alertId)
     .eq("user_id", user.id)
-    .select("id, keyword")
+    .select("id, keyword, url")
     .maybeSingle();
 
   if (deleteError) {
@@ -738,7 +771,11 @@ async function handleDeleteAlert(options: {
   }
 
   const confirmation = `🗑️ Alerta eliminada${
-    deleted.keyword ? `: <b>${escapeHtml(deleted.keyword)}</b>` : "."
+    deleted.keyword
+      ? `: <b>${escapeHtml(deleted.keyword)}</b>`
+      : deleted.url
+        ? " de URL."
+        : "."
   }`;
 
   if (options.messageId !== undefined) {

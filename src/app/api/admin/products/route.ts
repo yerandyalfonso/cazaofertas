@@ -4,6 +4,7 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { toNumber } from "@/lib/money";
 import { createSupabaseServiceClient } from "@/lib/supabase";
@@ -20,8 +21,10 @@ function slugify(value: string): string {
     .slice(0, 80);
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const client = createSupabaseServiceClient();
 
     const { data, error } = await client
@@ -91,6 +94,8 @@ export async function GET() {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const { searchParams } = new URL(request.url);
     const body = (await request.json().catch(() => ({}))) as {
       id?: string;
@@ -127,6 +132,8 @@ export async function DELETE(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const body = (await request.json()) as {
       amazonUrl?: string;
       title?: string;

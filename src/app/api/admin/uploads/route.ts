@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
@@ -9,6 +10,8 @@ const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const formData = await request.formData();
     const file = formData.get("file");
 

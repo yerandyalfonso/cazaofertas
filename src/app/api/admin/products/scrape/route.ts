@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { previewAmazonProductPage } from "@/providers/price";
 
@@ -7,6 +8,8 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const body = (await request.json().catch(() => ({}))) as {
       amazonUrl?: string;
       url?: string;

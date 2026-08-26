@@ -200,6 +200,9 @@ export type Database = {
           product_id: string | null;
           brand: string | null;
           keyword: string | null;
+          url: string | null;
+          last_checked_at: string | null;
+          last_known_price: number | null;
           min_discount_percentage: number | null;
           max_price: number | null;
           min_price: number | null;
@@ -214,6 +217,9 @@ export type Database = {
           product_id?: string | null;
           brand?: string | null;
           keyword?: string | null;
+          url?: string | null;
+          last_checked_at?: string | null;
+          last_known_price?: number | null;
           min_discount_percentage?: number | null;
           max_price?: number | null;
           min_price?: number | null;
@@ -228,6 +234,9 @@ export type Database = {
           product_id?: string | null;
           brand?: string | null;
           keyword?: string | null;
+          url?: string | null;
+          last_checked_at?: string | null;
+          last_known_price?: number | null;
           min_discount_percentage?: number | null;
           max_price?: number | null;
           min_price?: number | null;

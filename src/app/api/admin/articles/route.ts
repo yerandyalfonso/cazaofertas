@@ -4,6 +4,7 @@ import {
   isArticleDocument,
   type ArticleDocument,
 } from "@/lib/admin-article-editor";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseContent } from "@/services/blog";
@@ -63,8 +64,10 @@ function normalizeContentPayload(raw: unknown): {
   return { content: { html: "" }, readingHint: "" };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const client = createSupabaseServiceClient();
     const { data, error } = await client
       .from("articles")
@@ -155,6 +158,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const body = (await request.json()) as {
       title?: string;
       slug?: string;

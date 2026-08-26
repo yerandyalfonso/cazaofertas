@@ -4,6 +4,7 @@ import {
   isArticleDocument,
   type ArticleDocument,
 } from "@/lib/admin-article-editor";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseContent } from "@/services/blog";
@@ -65,8 +66,10 @@ function normalizeContentPayload(raw: unknown): {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const { id } = await context.params;
     const client = createSupabaseServiceClient();
     const { data, error } = await client
@@ -146,6 +149,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const { id } = await context.params;
     const body = (await request.json()) as {
       title?: string;
@@ -245,8 +250,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: NextRequest, context: RouteContext) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const { id } = await context.params;
     const client = createSupabaseServiceClient();
     const { error } = await client.from("articles").delete().eq("id", id);

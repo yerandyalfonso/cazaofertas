@@ -293,8 +293,8 @@ export default async function HomePage() {
               Recibe solo las ofertas que te interesan.
             </h2>
             <p className="max-w-md text-sm leading-relaxed text-stone-300">
-              Crea alertas por producto, categoría o marca. Sin ruido: solo
-              bajadas que pasan el filtro de score.
+              Crea alertas por palabra clave o pegando la URL de Amazon. Sin
+              ruido: solo bajadas que pasan el filtro de score.
             </p>
             <a
               href={TELEGRAM_BOT_URL}

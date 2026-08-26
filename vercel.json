@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/flash-deals",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/user-alerts",
+      "schedule": "0 0 * * *"
     }
   ]
 }

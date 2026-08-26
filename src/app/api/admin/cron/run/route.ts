@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
 import { createSupabaseServiceClient } from "@/lib/supabase";
@@ -6,8 +7,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const client = createSupabaseServiceClient();
 
     const { data, error } = await client
@@ -41,6 +44,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
     const body = (await request.json().catch(() => ({}))) as {
       limit?: number;
       notify?: boolean;

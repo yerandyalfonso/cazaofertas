@@ -44,6 +44,16 @@ export function extractAsin(value: string): string | null {
   return null;
 }
 
+/** Detecta si el texto es (o contiene) una URL de producto Amazon con ASIN. */
+export function looksLikeAmazonUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const asin = extractAsin(trimmed);
+  if (!asin) return false;
+  if (/https?:\/\//i.test(trimmed)) return true;
+  return /amazon\.|amzn\./i.test(trimmed);
+}
+
 export function generateAmazonUrl(asin: string): string {
   const domain = getMarketplaceDomain();
   return `https://${domain}/dp/${asin}`;
