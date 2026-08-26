@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
     const result = await runAmazonPriceCheck({
       asins,
       notify: body.notify ?? false,
+      // HTML = precio visible en Amazon (Keepa/Creators suelen ir retrasados en flash).
+      provider: "html",
+      delayMs: 700,
     });
 
     return NextResponse.json(result);

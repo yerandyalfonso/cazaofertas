@@ -68,10 +68,35 @@ function firstPriceFromSelectors(
   return null;
 }
 
+/** Fallback cuando `.a-offscreen` viene vacío pero hay whole+fraction. */
+function priceFromWholeFraction(
+  $: cheerio.CheerioAPI,
+  rootSelector: string,
+): number | null {
+  const roots = $(rootSelector);
+  for (let i = 0; i < roots.length; i += 1) {
+    const root = roots.eq(i);
+    if (root.hasClass("a-text-price")) continue;
+    const whole = root.find(".a-price-whole").first().text();
+    const fraction = root.find(".a-price-fraction").first().text();
+    if (!whole) continue;
+    const combined = `${whole.replace(/[^\d.,]/g, "")}${
+      fraction ? `,${fraction.replace(/[^\d]/g, "")}` : ""
+    }`;
+    const price = parseAmazonPriceText(combined);
+    if (price !== null) return price;
+  }
+  return null;
+}
+
 function priceFromPageScripts(html: string): number | null {
   const patterns = [
+    // Preferir precio a pagar (flash / apex), no el primer priceAmount suelto.
+    /"priceToPay"\s*:\s*\{[^}]{0,120}?"amount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /"priceToPay"[\s\S]{0,160}?"value"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /"buyingPrice"\s*:\s*\{[^}]{0,80}?"amount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /apex-pricetopay-value[\s\S]{0,200}?([\d.,]+)\s*€/i,
     /"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
-    /"price"\s*:\s*"([0-9]+(?:[.,][0-9]+)?)"/,
     /"displayPrice"\s*:\s*"([^"]+)"/,
     /data-a-color="price"[^>]*>[\s\S]*?([\d.,]+)\s*€/,
   ];
@@ -103,6 +128,7 @@ function availabilityFromHtml($: cheerio.CheerioAPI): ProductAvailability {
 function listPriceFromPageScripts(html: string): number | null {
   const patterns = [
     /"basisPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
+    /"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
     /"listPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
     /"typicalPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
     /"wasPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
@@ -143,12 +169,13 @@ function detectFlashDeal($: cheerio.CheerioAPI, html: string): boolean {
     $("[data-feature-name='dealBadge']").text(),
     $(".dealBadge").text(),
     $("#dealBadgeSupportingText").text(),
+    $("[id*='dealBadge']").text(),
   ]
     .join(" ")
     .toLowerCase();
 
   if (
-    /oferta\s*flash|lightning\s*deal|oferta\s*rel[aá]mpago|deal of the day|oferta del d[ií]a|precio\s*rel[aá]mpago/.test(
+    /oferta\s*flash|lightning\s*deal|oferta\s*rel[aá]mpago|deal of the day|oferta del d[ií]a|precio\s*rel[aá]mpago|ventas\s*r[aá]pidas|oferta\s*con\s*ventas/.test(
       badgeText,
     )
   ) {
@@ -156,7 +183,7 @@ function detectFlashDeal($: cheerio.CheerioAPI, html: string): boolean {
   }
 
   if (
-    /isLightningDeal["\s:]*true|dealType["\s:]*["']LIGHTNING|lightningDeal|OFERTA\s*FLASH/i.test(
+    /isLightningDeal["\s:]*true|dealType["\s:]*["']LIGHTNING|lightningDeal|OFERTA\s*FLASH|ventas\s*r[aá]pidas/i.test(
       html,
     )
   ) {
@@ -166,6 +193,10 @@ function detectFlashDeal($: cheerio.CheerioAPI, html: string): boolean {
   return false;
 }
 
+/**
+ * Precio actual (a pagar) vs referencia (precio recomendado / lista).
+ * Evita tomar el «mínimo 30 días» como lista y precios de widgets secundarios.
+ */
 export function extractPriceFromAmazonHtml(html: string): {
   price: number | null;
   listPrice: number | null;
@@ -178,9 +209,14 @@ export function extractPriceFromAmazonHtml(html: string): {
 } {
   const $ = cheerio.load(html);
 
-  // Precio de oferta / flash (actual), evitando el tachado a-text-price.
   const price =
     firstPriceFromSelectors($, [
+      // Apex / «precio a pagar» (ofertas flash / ventas rápidas)
+      "#corePrice_feature_div .apex-pricetopay-value span.a-offscreen",
+      "#corePriceDisplay_desktop_feature_div .apex-pricetopay-value span.a-offscreen",
+      "#apex_desktop .apex-pricetopay-value span.a-offscreen",
+      ".priceToPay span.a-offscreen",
+      "span.a-price.priceToPay:not(.a-text-price) span.a-offscreen",
       "#corePrice_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
       "#corePriceDisplay_desktop_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
       "#apex_desktop span.a-price:not(.a-text-price) span.a-offscreen",
@@ -189,23 +225,28 @@ export function extractPriceFromAmazonHtml(html: string): {
       "#priceblock_ourprice",
       "span.a-price.aok-align-center:not(.a-text-price) .a-offscreen",
       "#tp_price_block_total_price_ww span.a-offscreen",
-    ]) ?? priceFromPageScripts(html);
+    ]) ??
+    priceFromWholeFraction(
+      $,
+      "#corePrice_feature_div .apex-pricetopay-value, #corePriceDisplay_desktop_feature_div .priceToPay, #apex_desktop .apex-pricetopay-value, .priceToPay",
+    ) ??
+    priceFromPageScripts(html);
 
-  // Precio anterior / lista / tachado (referencia Amazon).
+  // Lista / «precio recomendado». Excluir srpPriceBlockAUI (mínimo 30 días).
   let listPrice =
     firstPriceFromSelectors($, [
-      "#corePrice_feature_div span.a-price.a-text-price span.a-offscreen",
-      "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price span.a-offscreen",
-      "#apex_desktop span.a-price.a-text-price span.a-offscreen",
-      'span.a-price.a-text-price[data-a-strike="true"] span.a-offscreen',
-      ".a-price.a-text-price .a-offscreen",
-      "#listPrice",
+      "#corePrice_feature_div .apex-basisprice-value span.a-offscreen",
+      "#corePriceDisplay_desktop_feature_div .apex-basisprice-value span.a-offscreen",
+      "#apex_desktop .apex-basisprice-value span.a-offscreen",
       ".basisPrice .a-offscreen",
+      "#corePrice_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+      "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+      "#apex_desktop span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+      'span.a-price.a-text-price[data-a-strike="true"]:not(.srpPriceBlockAUI) span.a-offscreen',
+      "#listPrice",
       "#price .a-text-strike",
-      "span[data-a-strike='true'] .a-offscreen",
     ]) ?? listPriceFromPageScripts(html);
 
-  // Si el badge de ahorro existe y no hay lista, reconstruir referencia.
   const badgeDiscount = discountFromSavingsBadge($);
   if (
     (listPrice === null || (price !== null && listPrice <= price)) &&
@@ -216,6 +257,25 @@ export function extractPriceFromAmazonHtml(html: string): {
       Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
     if (reconstructed > price) {
       listPrice = reconstructed;
+    }
+  }
+
+  // Si la «lista» parece el mínimo 30d (muy cerca del precio), preferir badge.
+  if (
+    price !== null &&
+    listPrice !== null &&
+    badgeDiscount !== null &&
+    listPrice > price
+  ) {
+    const impliedList =
+      Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
+    const fromListPct = ((listPrice - price) / listPrice) * 100;
+    // Badge −32% pero lista implica ~5% → lista era el mínimo 30 días.
+    if (
+      Math.abs(fromListPct - badgeDiscount) > 8 &&
+      Math.abs(impliedList - listPrice) / impliedList > 0.08
+    ) {
+      listPrice = impliedList;
     }
   }
 

@@ -141,6 +141,31 @@ function availabilityFrom(value: string | undefined): ProductAvailability {
   return ProductAvailability.IN_STOCK;
 }
 
+/**
+ * Referencia para UI/descuento:
+ * 1) lista Amazon del quote (precio recomendado)
+ * 2) previous_price guardado si sigue por encima del actual
+ * 3) current anterior (caída vs última lectura)
+ */
+function resolveReferencePrice(options: {
+  nextPrice: number;
+  amazonList: number | null;
+  storedPrevious: number | null;
+  storedCurrent: number;
+}): number {
+  const { nextPrice, amazonList, storedPrevious, storedCurrent } = options;
+  if (amazonList !== null && amazonList > nextPrice) {
+    return roundMoney(amazonList);
+  }
+  if (storedPrevious !== null && storedPrevious > nextPrice) {
+    return roundMoney(storedPrevious);
+  }
+  if (storedCurrent > nextPrice) {
+    return roundMoney(storedCurrent);
+  }
+  return nextPrice;
+}
+
 async function loadScoringContext(
   client: TypedSupabaseClient,
   productId: string,
@@ -275,13 +300,34 @@ export async function runPriceDetection(
       try {
         const storedPrice = requireNumber(product.current_price);
         const nextPrice = roundMoney(quote.price);
+        const amazonList = toNumber(quote.previousPrice ?? null);
+        const storedPrevious = toNumber(product.previous_price);
+        const referencePrice = resolveReferencePrice({
+          nextPrice,
+          amazonList,
+          storedPrevious,
+          storedCurrent: storedPrice,
+        });
+        const discountPercentage =
+          quote.discountPercentage != null &&
+          Number.isFinite(quote.discountPercentage) &&
+          quote.discountPercentage > 0
+            ? roundMoney(quote.discountPercentage)
+            : calculateDiscountPercentage(referencePrice, nextPrice);
+        const priceChanged = nextPrice !== storedPrice;
+        const now = new Date().toISOString();
 
-        if (nextPrice === storedPrice) {
+        // Aunque el precio no cambie, refrescar referencia Amazon + descuento.
+        if (!priceChanged) {
           const { error: touchError } = await client
             .from("products")
             .update({
-              last_checked_at: new Date().toISOString(),
+              previous_price:
+                referencePrice > nextPrice ? referencePrice : storedPrevious,
+              discount_percentage: discountPercentage,
+              last_checked_at: now,
               availability: availabilityFrom(quote.availability),
+              updated_at: now,
             })
             .eq("id", product.id);
 
@@ -293,11 +339,6 @@ export async function runPriceDetection(
           continue;
         }
 
-        const previousPrice = storedPrice;
-        const discountPercentage = calculateDiscountPercentage(
-          previousPrice,
-          nextPrice,
-        );
         const previousLowest = toNumber(product.lowest_price);
         const previousHighest = toNumber(product.highest_price);
         const lowestPrice =
@@ -306,18 +347,20 @@ export async function runPriceDetection(
             : roundMoney(Math.min(previousLowest, nextPrice));
         const highestPrice =
           previousHighest === null
-            ? nextPrice
-            : roundMoney(Math.max(previousHighest, nextPrice));
+            ? Math.max(nextPrice, referencePrice)
+            : roundMoney(
+                Math.max(previousHighest, nextPrice, referencePrice),
+              );
 
         const category = categoryOf(product);
         const scoringContext = await loadScoringContext(
           client,
           product.id,
-          previousPrice,
+          storedPrice,
         );
         const scoring = dealScoringService.score({
           currentPrice: nextPrice,
-          previousPrice,
+          previousPrice: referencePrice > nextPrice ? referencePrice : storedPrice,
           lowestPrice: previousLowest,
           discountPercentage,
           categorySlug: category?.slug ?? "general",
@@ -325,11 +368,11 @@ export async function runPriceDetection(
           previousPriceAgeHours: scoringContext.previousPriceAgeHours,
         });
 
-        const now = new Date().toISOString();
         const { error: updateError } = await client
           .from("products")
           .update({
-            previous_price: previousPrice,
+            previous_price:
+              referencePrice > nextPrice ? referencePrice : storedPrice,
             current_price: nextPrice,
             lowest_price: lowestPrice,
             highest_price: highestPrice,
@@ -378,7 +421,8 @@ export async function runPriceDetection(
             categoryId: category?.id ?? product.category_id,
             categoryName: category?.name ?? null,
             currentPrice: nextPrice,
-            previousPrice,
+            previousPrice:
+              referencePrice > nextPrice ? referencePrice : storedPrice,
             discountPercentage,
             dealLevel: scoring.level,
             score: scoring.score,
