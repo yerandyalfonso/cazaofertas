@@ -140,6 +140,32 @@ export async function clearWizardDraft(telegramId: number): Promise<void> {
   }
 }
 
+function navRow(includeBack: boolean): InlineKeyboardButton[] {
+  const row: InlineKeyboardButton[] = [];
+  if (includeBack) {
+    row.push({ text: "⬅️ Atrás", callback_data: "wiz:back" });
+  }
+  row.push({ text: "❌ Cancelar", callback_data: "wiz:cancel" });
+  return row;
+}
+
+/** Numeración estable del wizard (1–4 + confirmación). */
+export function wizardStepLabel(step: WizardStep): string {
+  switch (step) {
+    case "pick_mode":
+      return "paso 1/4";
+    case "pick_category":
+    case "await_text":
+      return "paso 2/4";
+    case "pick_discount":
+      return "paso 3/4";
+    case "pick_max_price":
+      return "paso 4/4";
+    case "confirm":
+      return "confirmación";
+  }
+}
+
 export function buildWizardModeMarkup(): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
@@ -151,7 +177,7 @@ export function buildWizardModeMarkup(): InlineKeyboardMarkup {
         { text: "🏷️ Marca", callback_data: "wiz:mode:brand" },
         { text: "🔗 URL Amazon", callback_data: "wiz:mode:url" },
       ],
-      [{ text: "❌ Cancelar", callback_data: "wiz:cancel" }],
+      navRow(false),
     ],
   };
 }
@@ -161,7 +187,7 @@ export function buildWizardCategoryMarkup(): InlineKeyboardMarkup {
     { text: cat.label, callback_data: `wiz:cat:${cat.slug}` },
   ]);
   rows.push([{ text: "🌐 Cualquier categoría", callback_data: "wiz:cat:any" }]);
-  rows.push([{ text: "❌ Cancelar", callback_data: "wiz:cancel" }]);
+  rows.push(navRow(true));
   return { inline_keyboard: rows };
 }
 
@@ -175,7 +201,7 @@ export function buildWizardDiscountMarkup(): InlineKeyboardMarkup {
     rows.push(row);
   }
   rows.push([{ text: "Sin mínimo", callback_data: "wiz:disc:any" }]);
-  rows.push([{ text: "❌ Cancelar", callback_data: "wiz:cancel" }]);
+  rows.push(navRow(true));
   return { inline_keyboard: rows };
 }
 
@@ -189,23 +215,28 @@ export function buildWizardMaxPriceMarkup(): InlineKeyboardMarkup {
     rows.push(row);
   }
   rows.push([{ text: "Sin límite", callback_data: "wiz:price:any" }]);
-  rows.push([{ text: "❌ Cancelar", callback_data: "wiz:cancel" }]);
+  rows.push(navRow(true));
   return { inline_keyboard: rows };
 }
 
 export function buildWizardConfirmMarkup(): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
-      [
-        { text: "✅ Crear alerta", callback_data: "wiz:confirm" },
-        { text: "❌ Cancelar", callback_data: "wiz:cancel" },
-      ],
+      [{ text: "✅ Crear alerta", callback_data: "wiz:confirm" }],
+      navRow(true),
     ],
   };
 }
 
+export function buildWizardCancelOnlyMarkup(): InlineKeyboardMarkup {
+  return { inline_keyboard: [navRow(true)] };
+}
+
 export function formatWizardSummary(draft: AlertWizardDraft): string {
-  const lines = ["📋 <b>Resumen de la alerta</b>", ""];
+  const lines = [
+    `📋 <b>Resumen — ${wizardStepLabel("confirm")}</b>`,
+    "",
+  ];
 
   if (draft.mode === "category") {
     lines.push(

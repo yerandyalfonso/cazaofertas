@@ -69,9 +69,15 @@ async function upsertTelegramUser(options: {
   }
 }
 
-function extractCommand(text: string): string | null {
-  const match = text.trim().match(/^\/([a-zA-Z0-9_]+)(?:@\w+)?/);
-  return match?.[1]?.toLowerCase() ?? null;
+function extractCommand(text: string): { command: string; args: string } | null {
+  const match = text
+    .trim()
+    .match(/^\/([a-zA-Z0-9_]+)(?:@\w+)?(?:\s+([\s\S]+))?$/);
+  if (!match?.[1]) return null;
+  return {
+    command: match[1].toLowerCase(),
+    args: match[2]?.trim() ?? "",
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -111,19 +117,20 @@ export async function POST(request: NextRequest) {
       username: message.from.username,
     });
 
-    const command = extractCommand(message.text);
+    const parsed = extractCommand(message.text);
 
-    if (command) {
-      const handled = await handleTelegramCommand(command, {
+    if (parsed) {
+      const handled = await handleTelegramCommand(parsed.command, {
         chatId: message.chat.id,
         telegramId: message.from.id,
+        args: parsed.args,
       });
       if (handled) {
         return NextResponse.json({ ok: true });
       }
       await sendTelegramMessage({
         chatId: message.chat.id,
-        text: `El comando /${command} no está disponible. Usa /help.`,
+        text: `El comando /${parsed.command} no está disponible. Usa /help.`,
       });
       return NextResponse.json({ ok: true });
     }

@@ -75,21 +75,34 @@ export function CronAdminClient() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [running, setRunning] = useState(false);
   const [runningFlash, setRunningFlash] = useState(false);
-  const [limit, setLimit] = useState("10");
+  const [limit, setLimit] = useState("5");
   const [flashLimit, setFlashLimit] = useState("20");
   const [error, setError] = useState<string | null>(null);
+
+  async function readJsonSafe<T>(response: Response): Promise<T | null> {
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(
+        response.status === 504 || response.status === 408
+          ? "Timeout del servidor. Baja el límite (p. ej. 3–5) e inténtalo de nuevo."
+          : `Respuesta no válida del servidor (HTTP ${response.status}). ${text.slice(0, 120)}`,
+      );
+    }
+  }
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/cron/run");
-      const data = (await response.json()) as CronStatus & {
-        ok?: boolean;
-        error?: string;
-      };
-      if (!response.ok || data.ok === false) {
-        const message = data.error ?? "No se pudo cargar el estado.";
+      const data = await readJsonSafe<
+        CronStatus & { ok?: boolean; error?: string }
+      >(response);
+      if (!response.ok || !data || data.ok === false) {
+        const message = data?.error ?? "No se pudo cargar el estado.";
         setError(message);
         toast.error(message);
         return;
@@ -99,9 +112,11 @@ export function CronAdminClient() {
         withAmazonUrl: data.withAmazonUrl,
         lastCheckedAt: data.lastCheckedAt,
       });
-    } catch {
-      setError("Error de red al cargar estado.");
-      toast.error("Error de red al cargar estado.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error de red al cargar estado.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoadingStatus(false);
     }
@@ -121,25 +136,35 @@ export function CronAdminClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          limit: Number.isFinite(parsedLimit) ? parsedLimit : 10,
-          notify: true,
+          limit: Number.isFinite(parsedLimit) ? parsedLimit : 5,
+          notify: false,
+          provider: "html",
         }),
       });
-      const data = (await response.json()) as CronRunResult;
+      const data = await readJsonSafe<CronRunResult>(response);
+      if (!data) {
+        throw new Error("Sin respuesta del servidor.");
+      }
       setResult(data);
       if (!response.ok || !data.ok) {
         const message = data.error ?? "La revisión falló.";
         setError(message);
         toast.error(message);
       } else {
+        const scrapeErrors = data.stats?.errors?.length ?? 0;
         toast.success(
-          `Cron precios OK · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados.`,
+          `Catálogo revisado · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados` +
+            (scrapeErrors > 0 ? ` · ${scrapeErrors} con error de scrape` : ""),
         );
       }
       await loadStatus();
-    } catch {
-      setError("Error de red al ejecutar el cron.");
-      toast.error("Error de red al ejecutar el cron.");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Error de red al ejecutar el cron.";
+      setError(message);
+      toast.error(message);
     } finally {
       setRunning(false);
     }
@@ -160,7 +185,10 @@ export function CronAdminClient() {
           notify: true,
         }),
       });
-      const data = (await response.json()) as FlashRunResult;
+      const data = await readJsonSafe<FlashRunResult>(response);
+      if (!data) {
+        throw new Error("Sin respuesta del servidor.");
+      }
       setFlashResult(data);
       if (!response.ok || !data.ok) {
         const message = data.error ?? "El cron de Ofertas Flash falló.";
@@ -172,9 +200,13 @@ export function CronAdminClient() {
         );
       }
       await loadStatus();
-    } catch {
-      setError("Error de red al ejecutar Ofertas Flash.");
-      toast.error("Error de red al ejecutar Ofertas Flash.");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Error de red al ejecutar Ofertas Flash.";
+      setError(message);
+      toast.error(message);
     } finally {
       setRunningFlash(false);
     }
@@ -190,8 +222,8 @@ export function CronAdminClient() {
           Monitorización / Cron
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Revisa precios del catálogo o lanza el descubrimiento de Ofertas Flash
-          (Gold Box / Deals) con auto-alta en Supabase.
+          Dos trabajos distintos: revisar precios del catálogo vigilado, o
+          descubrir Ofertas Flash nuevas para el canal.
         </p>
       </header>
 
@@ -232,57 +264,72 @@ export function CronAdminClient() {
         </div>
       </section>
 
-      <section className="mt-8 flex flex-wrap items-end gap-4 border border-stone-300 bg-white p-6">
-        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-          Límite de productos
-          <input
-            type="number"
-            min="1"
-            max="50"
-            value={limit}
-            onChange={(event) => setLimit(event.target.value)}
-            className="mt-2 block h-11 w-28 border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={running || runningFlash}
-          onClick={() => void runCron()}
-          className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
-        >
-          {running ? "Ejecutando…" : "Ejecutar revisión de precios ahora"}
-        </button>
+      <section className="mt-8 border border-stone-300 bg-white p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+          Acción primaria
+        </p>
+        <h2 className="mt-2 font-display text-2xl text-ink">
+          Revisar catálogo vigilado
+        </h2>
+        <p className="mt-1 max-w-xl text-sm text-stone-600">
+          Scrapea Amazon HTML de productos ya en el catálogo. Usa un límite bajo
+          (3–5) para evitar timeouts en Vercel.
+        </p>
+        <div className="mt-5 flex flex-wrap items-end gap-4">
+          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Límite de productos
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={limit}
+              onChange={(event) => setLimit(event.target.value)}
+              className="mt-2 block h-11 w-28 border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={running || runningFlash}
+            onClick={() => void runCron()}
+            className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
+          >
+            {running ? "Revisando…" : "Revisar precios ahora"}
+          </button>
+        </div>
       </section>
 
-      <section className="mt-4 flex flex-wrap items-end gap-4 border border-amber-200 bg-amber-50/40 p-6">
-        <div className="min-w-[12rem] flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
-            Ofertas Flash
-          </p>
-          <p className="mt-1 max-w-xl text-sm text-stone-600">
-            Descubre ASINs en Gold Box / Deals (o simulación), inserta novedades
-            en el catálogo y solo actualiza el precio de los que ya existan.
-          </p>
+      <section className="mt-4 border border-amber-200 bg-amber-50/40 p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+          Secundaria
+        </p>
+        <h2 className="mt-2 font-display text-2xl text-ink">
+          Descubrir flash / canal
+        </h2>
+        <p className="mt-1 max-w-xl text-sm text-stone-600">
+          Descubre ASINs en Gold Box / Deals, inserta novedades y publica en el
+          canal si el score es alto.
+        </p>
+        <div className="mt-5 flex flex-wrap items-end gap-4">
+          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Límite
+            <input
+              type="number"
+              min="1"
+              max="40"
+              value={flashLimit}
+              onChange={(event) => setFlashLimit(event.target.value)}
+              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={running || runningFlash}
+            onClick={() => void runFlashCron()}
+            className="inline-flex h-11 items-center border border-amber-900 bg-amber-900 px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-amber-900 disabled:opacity-60"
+          >
+            {runningFlash ? "Descubriendo…" : "Lanzar Ofertas Flash"}
+          </button>
         </div>
-        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-          Límite
-          <input
-            type="number"
-            min="1"
-            max="40"
-            value={flashLimit}
-            onChange={(event) => setFlashLimit(event.target.value)}
-            className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={running || runningFlash}
-          onClick={() => void runFlashCron()}
-          className="inline-flex h-11 items-center bg-amber-800 px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-amber-900 disabled:opacity-60"
-        >
-          {runningFlash ? "Escaneando Flash…" : "Ejecutar Ofertas Flash ahora"}
-        </button>
       </section>
 
       {flashResult?.ok ? (

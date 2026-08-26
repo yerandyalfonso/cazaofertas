@@ -17,6 +17,9 @@ export async function runAmazonPriceCheck(options?: {
   notify?: boolean;
   /** Si se indica, solo se comprueban estos ASINs. */
   asins?: string[];
+  /** Override del proveedor (admin puede forzar html para fiabilidad). */
+  provider?: "html" | "keepa" | "creators" | "auto";
+  delayMs?: number;
 }): Promise<AmazonPriceCheckResult> {
   const client = createSupabaseServiceClient();
   const { data: products, error } = await client
@@ -47,14 +50,21 @@ export async function runAmazonPriceCheck(options?: {
       : undefined,
   );
 
+  if (asins.length === 0) {
+    throw new Error(
+      "No hay productos con URL de Amazon para revisar. Añade ASINs en el catálogo.",
+    );
+  }
+
   const scopedUrlMap = new Map(
     asins.map((asin) => [asin, urlByAsin.get(asin)!] as const),
   );
 
   const resolved = resolvePriceProvider({
     urlByAsin: scopedUrlMap,
-    delayMs: 1_400,
+    delayMs: options?.delayMs ?? 900,
     timeoutMs: 12_000,
+    force: options?.provider,
   });
 
   const stats = await runPriceDetection({
@@ -63,7 +73,7 @@ export async function runAmazonPriceCheck(options?: {
     source: resolved.source,
     onlyWithAmazonUrl: true,
     asinAllowList: asins,
-    batchSize: resolved.id === "html" ? 3 : 8,
+    batchSize: resolved.id === "html" ? 2 : 8,
     notify: options?.notify ?? true,
   });
 

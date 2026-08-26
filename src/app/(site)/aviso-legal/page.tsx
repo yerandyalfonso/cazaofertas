@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Aviso legal",
   description: "Aviso legal e información de afiliación de CazaOferta.",
-};
+  path: "/aviso-legal",
+});
 
 export default function AvisoLegalPage() {
   return (

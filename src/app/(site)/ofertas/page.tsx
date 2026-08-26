@@ -1,24 +1,51 @@
 import type { Metadata } from "next";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
-import { DealCard } from "@/components/DealCard";
-import { getActiveProducts, getTopDealProducts } from "@/lib/catalog";
+import { JsonLd } from "@/components/JsonLd";
+import { OffersCatalog } from "@/components/OffersCatalog";
+import {
+  getActiveProducts,
+  getCategories,
+  getTopDealProducts,
+  TELEGRAM_BOT_URL,
+} from "@/lib/catalog";
+import { buildPageMetadata, itemListJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Ofertas",
-  description: "Chollos de Amazon España ordenados por deal score.",
+  ...buildPageMetadata({
+    title: "Ofertas Amazon España",
+    description:
+      "Chollos de Amazon España ordenados por deal score, descuento y mínimo histórico.",
+    path: "/ofertas",
+  }),
 };
 
 export const revalidate = 300;
 
 export default async function OffersPage() {
-  const [topDeals, products] = await Promise.all([
-    getTopDealProducts(12),
-    getActiveProducts(24),
+  const [topDeals, products, categories] = await Promise.all([
+    getTopDealProducts(24),
+    getActiveProducts(48),
+    getCategories(),
   ]);
-  const list = topDeals.length > 0 ? topDeals : products;
+
+  const byId = new Map<string, (typeof products)[number]>();
+  for (const product of [...topDeals, ...products]) {
+    byId.set(product.id, product);
+  }
+  const list = [...byId.values()].sort((a, b) => b.dealScore - a.dealScore);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
+      <JsonLd
+        data={itemListJsonLd({
+          name: "Ofertas Amazon España",
+          path: "/ofertas",
+          items: list.slice(0, 40).map((product) => ({
+            name: product.title,
+            path: `/producto/${product.slug}`,
+          })),
+        })}
+      />
       <header className="max-w-2xl">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
           Ofertas
@@ -34,19 +61,28 @@ export default async function OffersPage() {
       </header>
 
       {list.length > 0 ? (
-        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {list.map((product, index) => (
-            <DealCard
-              key={product.id}
-              product={product}
-              featured={index === 0}
-            />
-          ))}
-        </div>
+        <OffersCatalog
+          products={list}
+          categories={categories.map((c) => ({
+            slug: c.slug,
+            name: c.name,
+          }))}
+        />
       ) : (
-        <p className="mt-12 border border-dashed border-stone-300 bg-white/70 px-5 py-8 text-sm text-stone-600">
-          No hay ofertas todavía. Ejecuta el seed para poblar el catálogo.
-        </p>
+        <div className="mt-12 border border-dashed border-stone-300 bg-white/70 px-5 py-8">
+          <p className="text-sm text-stone-600">
+            Estamos cazando ofertas ahora mismo. Vuelve en un rato o activa
+            alertas en Telegram para no perdértelas.
+          </p>
+          <a
+            href={TELEGRAM_BOT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex h-10 items-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
+          >
+            Abrir Telegram
+          </a>
+        </div>
       )}
     </div>
   );

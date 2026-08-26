@@ -48,6 +48,25 @@ export function DealCard({
             discountPercentage={product.discountPercentage}
             size="sm"
           />
+          <div className="flex items-center gap-2 pt-0.5">
+            <a
+              href={buildTrackedAffiliatePath({
+                productId: product.id,
+                source: "deal_card_compact",
+              })}
+              rel="noopener noreferrer sponsored"
+              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-900 underline-offset-2 hover:underline"
+            >
+              Amazon
+            </a>
+            <span className="text-stone-300">·</span>
+            <Link
+              href={`/producto/${product.slug}`}
+              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500 underline-offset-2 hover:text-ink hover:underline"
+            >
+              Detalle
+            </Link>
+          </div>
         </div>
       </article>
     );
@@ -119,6 +138,9 @@ export function DealCard({
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
               Score {Math.round(product.dealScore)}
+            </p>
+            <p className="sr-only">
+              El score combina descuento, mínimo histórico y estabilidad.
             </p>
             <a
               href={buildTrackedAffiliatePath({

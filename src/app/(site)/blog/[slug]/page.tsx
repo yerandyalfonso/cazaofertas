@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogArticleView } from "@/components/blog/BlogArticleView";
+import { JsonLd } from "@/components/JsonLd";
+import {
+  articleJsonLd,
+  breadcrumbJsonLd,
+  buildPageMetadata,
+} from "@/lib/seo";
 import {
   getArticleBySlug,
   getArticleSlugs,
@@ -22,35 +28,24 @@ export async function generateMetadata({
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
   const result = await getArticleBySlug(slug);
-  if (!result) return { title: "Artículo no encontrado" };
+  if (!result) {
+    return {
+      title: "Artículo no encontrado",
+      robots: { index: false, follow: true },
+    };
+  }
 
   const { post } = result;
-  const title = post.title;
-  const description = post.excerpt;
-  const image = post.coverImage;
+  const title = post.seoTitle?.trim() || post.title;
+  const description = post.seoDescription?.trim() || post.excerpt;
 
-  return {
+  return buildPageMetadata({
     title,
     description,
-    alternates: { canonical: `/blog/${slug}` },
-    openGraph: {
-      type: "article",
-      title,
-      description,
-      url: `/blog/${slug}`,
-      siteName: "CazaOferta",
-      locale: "es_ES",
-      images: image
-        ? [{ url: image, alt: post.coverAlt || title }]
-        : undefined,
-    },
-    twitter: {
-      card: image ? "summary_large_image" : "summary",
-      title,
-      description,
-      images: image ? [image] : undefined,
-    },
-  };
+    path: `/blog/${slug}`,
+    image: post.coverImage,
+    type: "article",
+  });
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
@@ -58,7 +53,21 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const result = await getArticleBySlug(slug);
   if (!result) notFound();
 
+  const { post, products } = result;
+
   return (
-    <BlogArticleView post={result.post} products={result.products} />
+    <>
+      <JsonLd
+        data={[
+          articleJsonLd(post),
+          breadcrumbJsonLd([
+            { name: "Inicio", path: "/" },
+            { name: "Blog", path: "/blog" },
+            { name: post.title, path: `/blog/${post.slug}` },
+          ]),
+        ]}
+      />
+      <BlogArticleView post={post} products={products} />
+    </>
   );
 }

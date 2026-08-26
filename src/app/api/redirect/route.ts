@@ -109,7 +109,9 @@ export async function GET(request: NextRequest) {
       asin: product.asin,
     });
 
-    return NextResponse.redirect(destination, 302);
+    const response = NextResponse.redirect(destination, 302);
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
   } catch (error) {
     console.error("[redirect]", error);
     return NextResponse.json(

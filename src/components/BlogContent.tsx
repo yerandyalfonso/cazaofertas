@@ -145,8 +145,7 @@ export function BlogContent({
                 key={key}
                 className="border border-dashed border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-500"
               >
-                Producto no disponible en el catálogo (
-                <code>{block.slug}</code>). Ejecuta el seed.
+                Producto no disponible en el catálogo por ahora.
               </p>
             );
           }
@@ -176,8 +175,7 @@ export function BlogContent({
                 key={key}
                 className="border border-dashed border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-500"
               >
-                Las fichas de producto aún no están en el catálogo. Ejecuta{" "}
-                <code>npm run seed</code>.
+                Las fichas de producto aún no están en el catálogo.
               </p>
             );
           }

@@ -1,12 +1,41 @@
-import { TELEGRAM_BOT_URL } from "@/lib/catalog";
+import { telegramAlertForCategorySlug, telegramAlertForKeyword } from "@/lib/telegram-links";
 import { telegramHintForCategory } from "@/lib/blog-templates";
 
 interface TelegramCategoryCtaProps {
   category: string;
+  categorySlug?: string | null;
 }
 
-export function TelegramCategoryCta({ category }: TelegramCategoryCtaProps) {
+const CATEGORY_SLUG_HINTS: Record<string, string> = {
+  tecnología: "tecnologia",
+  tecnologia: "tecnologia",
+  hogar: "hogar",
+  moda: "moda",
+  belleza: "belleza",
+  deportes: "deportes",
+  juguetes: "juguetes",
+  informática: "informatica",
+  informatica: "informatica",
+  ofertas: "tecnologia",
+  guías: "tecnologia",
+  guias: "tecnologia",
+  análisis: "tecnologia",
+  analisis: "tecnologia",
+  comparativas: "tecnologia",
+};
+
+export function TelegramCategoryCta({
+  category,
+  categorySlug,
+}: TelegramCategoryCtaProps) {
   const hint = telegramHintForCategory(category);
+  const slug =
+    categorySlug ??
+    CATEGORY_SLUG_HINTS[category.trim().toLowerCase()] ??
+    null;
+  const href = slug
+    ? telegramAlertForCategorySlug(slug)
+    : telegramAlertForKeyword(hint);
 
   return (
     <section className="overflow-hidden border border-stone-300 bg-ink text-paper">
@@ -19,18 +48,18 @@ export function TelegramCategoryCta({ category }: TelegramCategoryCtaProps) {
             ¿Quieres avisos solo de {category.toLowerCase()}?
           </h2>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-300">
-            En el bot, crea una alerta con la keyword{" "}
-            <span className="text-paper">“{hint}”</span> (o la marca que
-            sigues). Te avisamos cuando el score de la oferta merezca la pena.
+            Abre el bot y continúa el wizard con esta categoría (o la keyword{" "}
+            <span className="text-paper">“{hint}”</span>). Te avisamos cuando el
+            score merezca la pena.
           </p>
         </div>
         <a
-          href={TELEGRAM_BOT_URL}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex h-12 shrink-0 items-center justify-center bg-paper px-6 text-xs font-semibold uppercase tracking-[0.14em] text-ink transition hover:bg-amber-200"
         >
-          Abrir bot Telegram
+          Crear alerta Telegram
         </a>
       </div>
     </section>

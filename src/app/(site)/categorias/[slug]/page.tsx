@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { JsonLd } from "@/components/JsonLd";
 import { ProductCard } from "@/components/ProductCard";
 import { getActiveProducts, getCategories } from "@/lib/catalog";
+import {
+  breadcrumbJsonLd,
+  buildPageMetadata,
+  categorySeoCopy,
+  itemListJsonLd,
+} from "@/lib/seo";
+import { telegramAlertForCategorySlug } from "@/lib/telegram-links";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -21,17 +29,30 @@ export async function generateMetadata({
   const { slug } = await params;
   const categories = await getCategories();
   const category = categories.find((item) => item.slug === slug);
-  return {
-    title: category?.name ?? "Categoría",
-    description: category?.description ?? undefined,
-  };
+  if (!category) {
+    return {
+      title: "Categoría no encontrada",
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const copy = categorySeoCopy(category.slug, category.name);
+  const description =
+    category.description?.trim() ||
+    copy.intro.slice(0, 160);
+
+  return buildPageMetadata({
+    title: `Ofertas de ${category.name} en Amazon`,
+    description,
+    path: `/categorias/${slug}`,
+  });
 }
 
 export default async function CategoryDetailPage({ params }: CategoryPageProps) {
   const { slug } = await params;
   const [categories, products] = await Promise.all([
     getCategories(),
-    getActiveProducts(40),
+    getActiveProducts(48),
   ]);
   const category = categories.find((item) => item.slug === slug);
   if (!category) notFound();
@@ -39,10 +60,30 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
   const filtered = products.filter(
     (product) => product.category?.slug === slug,
   );
+  const copy = categorySeoCopy(category.slug, category.name);
+  const intro = category.description?.trim() || copy.intro;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
-      <nav className="mb-8 text-sm text-stone-500">
+      <JsonLd
+        data={[
+          breadcrumbJsonLd([
+            { name: "Inicio", path: "/" },
+            { name: "Categorías", path: "/categorias" },
+            { name: category.name, path: `/categorias/${category.slug}` },
+          ]),
+          itemListJsonLd({
+            name: `Ofertas de ${category.name}`,
+            path: `/categorias/${category.slug}`,
+            items: filtered.map((product) => ({
+              name: product.title,
+              path: `/producto/${product.slug}`,
+            })),
+          }),
+        ]}
+      />
+
+      <nav className="mb-8 text-sm text-stone-500" aria-label="Migas de pan">
         <Link href="/categorias" className="hover:text-ink">
           Categorías
         </Link>
@@ -50,16 +91,29 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
         <span className="text-ink">{category.name}</span>
       </nav>
 
-      <header className="max-w-2xl">
+      <header className="max-w-3xl">
         <h1 className="font-display text-4xl tracking-tight text-ink md:text-5xl">
-          {category.name}
+          Ofertas de {category.name}
         </h1>
-        {category.description ? (
-          <p className="mt-4 text-base leading-relaxed text-stone-600">
-            {category.description}
-          </p>
-        ) : null}
+        <p className="mt-4 text-base leading-relaxed text-stone-600">{intro}</p>
       </header>
+
+      <section className="mt-8 max-w-3xl border-t border-stone-300 pt-8">
+        <h2 className="font-display text-2xl tracking-tight text-ink">
+          Cómo elegimos estas ofertas
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-stone-600">
+          {copy.howWePick}
+        </p>
+        <a
+          href={telegramAlertForCategorySlug(category.slug)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 inline-flex h-10 items-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
+        >
+          Alerta Telegram · {category.name}
+        </a>
+      </section>
 
       {filtered.length > 0 ? (
         <div className="mt-12 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
@@ -69,7 +123,8 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
         </div>
       ) : (
         <p className="mt-12 text-sm text-stone-600">
-          No hay productos activos en esta categoría.
+          Todavía no hay productos activos en esta categoría. Vuelve pronto o
+          crea una alerta para enterarte al momento.
         </p>
       )}
     </div>

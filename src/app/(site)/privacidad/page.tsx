@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Política de privacidad",
   description:
     "Cómo trata CazaOferta los datos personales y el uso del bot de Telegram.",
-};
+  path: "/privacidad",
+});
 
 export default function PrivacidadPage() {
   return (

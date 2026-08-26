@@ -37,6 +37,34 @@ interface CategoryOption {
   slug: string;
 }
 
+
+function freshnessMeta(lastCheckedAt: string | null): {
+  label: string;
+  className: string;
+} {
+  if (!lastCheckedAt) {
+    return { label: "Nunca", className: "text-rose-700" };
+  }
+  const ageMs = Date.now() - new Date(lastCheckedAt).getTime();
+  const hours = ageMs / 3_600_000;
+  if (hours < 6) {
+    return {
+      label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+      className: "text-teal-800",
+    };
+  }
+  if (hours < 48) {
+    return {
+      label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+      className: "text-amber-800",
+    };
+  }
+  return {
+    label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+    className: "text-rose-700",
+  };
+}
+
 const emptyForm = {
   amazonUrl: "",
   title: "",
@@ -638,20 +666,21 @@ export default function ProductsAdminClient() {
               <th className="px-4 py-3 font-semibold">Referencia</th>
               <th className="px-4 py-3 font-semibold">Score</th>
               <th className="px-4 py-3 font-semibold">Categoría</th>
+              <th className="px-4 py-3 font-semibold">Última revisión</th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-stone-500">
+                <td colSpan={8} className="px-4 py-8 text-stone-500">
                   Cargando…
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-stone-500">
-                  No hay productos. Crea uno o ejecuta el seed.
+                <td colSpan={8} className="px-4 py-8 text-stone-500">
+                  No hay productos todavía. Añade el primero con «Nuevo producto».
                 </td>
               </tr>
             ) : (
@@ -689,6 +718,16 @@ export default function ProductsAdminClient() {
                     {product.category?.name ?? "—"}
                   </td>
                   <td className="px-4 py-3">
+                    {(() => {
+                      const fresh = freshnessMeta(product.lastCheckedAt);
+                      return (
+                        <span className={`text-xs leading-snug ${fresh.className}`}>
+                          {fresh.label}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <a
                         href={buildTrackedAffiliatePath({
@@ -713,17 +752,18 @@ export default function ProductsAdminClient() {
                       </button>
                       <button
                         type="button"
-                        title="Actualizar precio"
-                        aria-label="Actualizar precio"
+                        title="Revisar precio ahora"
+                        aria-label="Revisar precio ahora"
                         disabled={updatingAsin === product.asin}
                         onClick={() => void onUpdatePrice(product)}
-                        className={iconBtnClass}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-teal-800 bg-teal-50 px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-teal-900 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {updatingAsin === product.asin ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <RefreshCw className="h-3.5 w-3.5" />
                         )}
+                        Revisar
                       </button>
                       <button
                         type="button"

@@ -1,5 +1,6 @@
 import {
   extractAsin,
+  generateAmazonUrl,
   looksLikeAmazonUrl,
 } from "@/lib/affiliate";
 import { buildTrackedAffiliateUrl } from "@/lib/affiliate-tracking";
@@ -7,10 +8,12 @@ import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { absoluteUrl } from "@/lib/site";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { parseTelegramStartPayload } from "@/lib/telegram-links";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { ensureProductFromAmazonUrl } from "@/services/products";
 import {
+  buildWizardCancelOnlyMarkup,
   buildWizardCategoryMarkup,
   buildWizardConfirmMarkup,
   buildWizardDiscountMarkup,
@@ -21,6 +24,7 @@ import {
   getWizardDraft,
   resolveCategoryId,
   saveWizardDraft,
+  wizardStepLabel,
   WIZARD_CATEGORIES,
   type AlertWizardDraft,
 } from "@/services/telegram/alertWizard";
@@ -261,11 +265,11 @@ export function buildCategoriesMenuMarkup(): InlineKeyboardMarkup {
 }
 
 export const START_WELCOME_TEXT = [
-  "🔥 Amazon Deals",
+  "🎯 CazaOferta",
   "",
-  "Encuentra las mejores ofertas de Amazon España.",
+  "Chollos reales de Amazon España, con historial de precios y alertas a medida.",
   "",
-  "Puedes crear alertas personalizadas y recibir únicamente los productos que te interesan.",
+  "Crea alertas y te avisamos solo cuando caiga lo que te interesa.",
 ].join("\n");
 
 const CATEGORIES_MENU_TEXT = [
@@ -286,14 +290,20 @@ const SETTINGS_TEXT = [
 
 export async function handleTelegramCommand(
   command: string,
-  options: { chatId: number; telegramId: number },
+  options: { chatId: number; telegramId: number; args?: string },
 ): Promise<boolean> {
-  const { chatId, telegramId } = options;
+  const { chatId, telegramId, args = "" } = options;
 
   switch (command) {
-    case "start":
+    case "start": {
+      const payload = parseTelegramStartPayload(args);
+      if (payload) {
+        await startWizardFromDeepLink(chatId, telegramId, payload);
+        return true;
+      }
       await sendStartWelcome(chatId);
       return true;
+    }
     case "help":
       await sendTelegramMessage({
         chatId,
@@ -381,7 +391,7 @@ async function handleCreateAlert(chatId: number, telegramId?: number): Promise<v
   await sendTelegramMessage({
     chatId,
     text: [
-      "🔔 <b>Nueva alerta — paso 1/4</b>",
+      `🔔 <b>Nueva alerta — ${wizardStepLabel("pick_mode")}</b>`,
       "",
       "¿Qué quieres vigilar?",
       "Elige una opción con los botones:",
@@ -398,6 +408,77 @@ export async function startAlertWizard(
   await handleCreateAlert(chatId, telegramId);
 }
 
+async function startWizardFromDeepLink(
+  chatId: number,
+  telegramId: number,
+  payload: { type: "asin" | "cat" | "kw"; value: string },
+): Promise<void> {
+  if (payload.type === "asin") {
+    const url = generateAmazonUrl(payload.value);
+    await saveWizardDraft(telegramId, {
+      step: "pick_discount",
+      mode: "url",
+      url,
+      keyword: payload.value,
+    });
+    await sendTelegramMessage({
+      chatId,
+      text: [
+        `🎯 <b>Alerta para ASIN ${payload.value}</b>`,
+        "",
+        `📉 <b>${wizardStepLabel("pick_discount")}</b>`,
+        "",
+        "¿A partir de qué descuento quieres que te avise?",
+      ].join("\n"),
+      replyMarkup: buildWizardDiscountMarkup(),
+    });
+    return;
+  }
+
+  if (payload.type === "cat") {
+    const cat =
+      WIZARD_CATEGORIES.find((c) => c.slug === payload.value) ??
+      ({ label: payload.value, slug: payload.value } as const);
+    const resolved = await resolveCategoryId(payload.value);
+    await saveWizardDraft(telegramId, {
+      step: "pick_discount",
+      mode: "category",
+      categorySlug: payload.value,
+      categoryId: resolved?.id ?? null,
+      categoryLabel: resolved?.name ?? cat.label,
+    });
+    await sendTelegramMessage({
+      chatId,
+      text: [
+        `📂 <b>Alerta · ${resolved?.name ?? cat.label}</b>`,
+        "",
+        `📉 <b>${wizardStepLabel("pick_discount")}</b>`,
+        "",
+        "¿A partir de qué descuento quieres que te avise?",
+      ].join("\n"),
+      replyMarkup: buildWizardDiscountMarkup(),
+    });
+    return;
+  }
+
+  await saveWizardDraft(telegramId, {
+    step: "pick_discount",
+    mode: "keyword",
+    keyword: payload.value,
+  });
+  await sendTelegramMessage({
+    chatId,
+    text: [
+      `🔤 <b>Alerta · «${payload.value}»</b>`,
+      "",
+      `📉 <b>${wizardStepLabel("pick_discount")}</b>`,
+      "",
+      "¿A partir de qué descuento quieres que te avise?",
+    ].join("\n"),
+    replyMarkup: buildWizardDiscountMarkup(),
+  });
+}
+
 async function advanceWizardAfterTarget(
   chatId: number,
   telegramId: number,
@@ -407,12 +488,121 @@ async function advanceWizardAfterTarget(
   await sendTelegramMessage({
     chatId,
     text: [
-      "📉 <b>Paso: descuento mínimo</b>",
+      `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
       "",
       "¿A partir de qué descuento quieres que te avise?",
     ].join("\n"),
     replyMarkup: buildWizardDiscountMarkup(),
   });
+}
+
+async function promptWizardMode(chatId: number, telegramId: number): Promise<void> {
+  await saveWizardDraft(telegramId, { step: "pick_mode" });
+  await sendTelegramMessage({
+    chatId,
+    text: [
+      `🔔 <b>Nueva alerta — ${wizardStepLabel("pick_mode")}</b>`,
+      "",
+      "¿Qué quieres vigilar?",
+    ].join("\n"),
+    replyMarkup: buildWizardModeMarkup(),
+  });
+}
+
+async function promptWizardTarget(
+  chatId: number,
+  telegramId: number,
+  draft: AlertWizardDraft,
+): Promise<void> {
+  if (draft.mode === "category") {
+    await saveWizardDraft(telegramId, {
+      ...draft,
+      step: "pick_category",
+    });
+    await sendTelegramMessage({
+      chatId,
+      text: [
+        `📂 <b>${wizardStepLabel("pick_category")} · categoría</b>`,
+        "",
+        "Elige una categoría o «Cualquier categoría»:",
+      ].join("\n"),
+      replyMarkup: buildWizardCategoryMarkup(),
+    });
+    return;
+  }
+
+  const mode = draft.mode ?? "keyword";
+  await saveWizardDraft(telegramId, {
+    ...draft,
+    step: "await_text",
+    mode,
+  });
+  const prompt =
+    mode === "keyword"
+      ? "Escribe la <b>palabra clave</b> (ej: airpods, silla gaming):"
+      : mode === "brand"
+        ? "Escribe la <b>marca</b> exacta (ej: Sony, Samsung):"
+        : "Pega la <b>URL de Amazon</b> del producto:";
+  await sendTelegramMessage({
+    chatId,
+    text: [
+      `✏️ <b>${wizardStepLabel("await_text")} · detalle</b>`,
+      "",
+      prompt,
+    ].join("\n"),
+    replyMarkup: buildWizardCancelOnlyMarkup(),
+  });
+}
+
+async function handleWizardBack(
+  chatId: number,
+  telegramId: number,
+): Promise<void> {
+  const draft = await getWizardDraft(telegramId);
+  if (!draft) {
+    await promptWizardMode(chatId, telegramId);
+    return;
+  }
+
+  switch (draft.step) {
+    case "pick_mode":
+      await clearWizardDraft(telegramId);
+      await sendStartWelcome(chatId);
+      return;
+    case "pick_category":
+    case "await_text":
+      await promptWizardMode(chatId, telegramId);
+      return;
+    case "pick_discount":
+      await promptWizardTarget(chatId, telegramId, draft);
+      return;
+    case "pick_max_price":
+      await saveWizardDraft(telegramId, { ...draft, step: "pick_discount" });
+      await sendTelegramMessage({
+        chatId,
+        text: [
+          `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
+          "",
+          "¿A partir de qué descuento quieres que te avise?",
+        ].join("\n"),
+        replyMarkup: buildWizardDiscountMarkup(),
+      });
+      return;
+    case "confirm":
+      await saveWizardDraft(telegramId, { ...draft, step: "pick_max_price" });
+      await sendTelegramMessage({
+        chatId,
+        text: [
+          `💶 <b>${wizardStepLabel("pick_max_price")} · precio máximo</b>`,
+          "",
+          "¿Cuál es el precio máximo que te interesa?",
+        ].join("\n"),
+        replyMarkup: buildWizardMaxPriceMarkup(),
+      });
+      return;
+    default:
+      await promptWizardMode(chatId, telegramId);
+  }
 }
 
 async function handleWizardCallback(options: {
@@ -434,39 +624,27 @@ async function handleWizardCallback(options: {
     return true;
   }
 
+  if (data === "wiz:back") {
+    await handleWizardBack(chatId, telegramId);
+    return true;
+  }
+
   if (data.startsWith("wiz:mode:")) {
     const mode = data.slice("wiz:mode:".length) as AlertWizardDraft["mode"];
     if (mode === "category") {
-      await saveWizardDraft(telegramId, {
+      await promptWizardTarget(chatId, telegramId, {
         step: "pick_category",
         mode: "category",
-      });
-      await sendTelegramMessage({
-        chatId,
-        text: [
-          "📂 <b>Paso: categoría</b>",
-          "",
-          "Elige una categoría o «Cualquier categoría»:",
-        ].join("\n"),
-        replyMarkup: buildWizardCategoryMarkup(),
+        updatedAt: new Date().toISOString(),
       });
       return true;
     }
 
     if (mode === "keyword" || mode === "brand" || mode === "url") {
-      await saveWizardDraft(telegramId, {
+      await promptWizardTarget(chatId, telegramId, {
         step: "await_text",
         mode,
-      });
-      const prompt =
-        mode === "keyword"
-          ? "Escribe la <b>palabra clave</b> (ej: airpods, silla gaming):"
-          : mode === "brand"
-            ? "Escribe la <b>marca</b> exacta (ej: Sony, Samsung):"
-            : "Pega la <b>URL de Amazon</b> del producto:";
-      await sendTelegramMessage({
-        chatId,
-        text: ["✏️ <b>Paso: detalle</b>", "", prompt].join("\n"),
+        updatedAt: new Date().toISOString(),
       });
       return true;
     }
@@ -522,7 +700,7 @@ async function handleWizardCallback(options: {
     await sendTelegramMessage({
       chatId,
       text: [
-        "💶 <b>Paso: precio máximo</b>",
+        `💶 <b>${wizardStepLabel("pick_max_price")} · precio máximo</b>`,
         "",
         "¿Cuál es el precio máximo que te interesa?",
       ].join("\n"),
@@ -646,6 +824,7 @@ async function commitWizardAlert(options: {
     "✅ <b>Alerta creada</b>",
     "",
     formatWizardSummary({ ...draft, step: "confirm" })
+      .replace(/^📋 <b>Resumen — confirmación<\/b>\n\n/, "")
       .replace("📋 <b>Resumen de la alerta</b>\n\n", "")
       .replace("\n\n¿Confirmas?", ""),
   ];

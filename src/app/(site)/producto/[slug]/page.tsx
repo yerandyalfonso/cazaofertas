@@ -4,16 +4,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { Badge } from "@/components/Badge";
+import { JsonLd } from "@/components/JsonLd";
 import { Price } from "@/components/Price";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
+import { ProductStickyBuyBar } from "@/components/ProductStickyBuyBar";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import {
   getActiveProducts,
   getPriceHistory,
   getProductBySlug,
-  TELEGRAM_BOT_URL,
 } from "@/lib/catalog";
 import { formatEuro } from "@/lib/money";
+import {
+  breadcrumbJsonLd,
+  buildPageMetadata,
+  productJsonLd,
+} from "@/lib/seo";
+import { telegramAlertForAsin } from "@/lib/telegram-links";
 import { ProductAvailability } from "@/types";
 
 function availabilityLabel(value: ProductAvailability): string {
@@ -45,34 +52,24 @@ export async function generateMetadata({
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Producto no encontrado" };
+  if (!product) {
+    return {
+      title: "Producto no encontrado",
+      robots: { index: false, follow: true },
+    };
+  }
 
   const title = product.title;
   const description =
     product.description ??
-    `${product.title} · precio actual ${formatEuro(product.currentPrice)}`;
-  const image = product.imageUrl;
+    `${product.title} · precio actual ${formatEuro(product.currentPrice)} en Amazon España. Historial y deal score en CazaOferta.`;
 
-  return {
+  return buildPageMetadata({
     title,
     description,
-    alternates: { canonical: `/producto/${slug}` },
-    openGraph: {
-      type: "website",
-      title,
-      description,
-      url: `/producto/${slug}`,
-      siteName: "CazaOferta",
-      locale: "es_ES",
-      images: image ? [{ url: image, alt: title }] : undefined,
-    },
-    twitter: {
-      card: image ? "summary_large_image" : "summary",
-      title,
-      description,
-      images: image ? [image] : undefined,
-    },
-  };
+    path: `/producto/${slug}`,
+    image: product.imageUrl,
+  });
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
@@ -92,7 +89,25 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10 md:px-8 md:py-14">
-      <nav className="mb-8 text-sm text-stone-500">
+      <JsonLd
+        data={[
+          productJsonLd(product),
+          breadcrumbJsonLd([
+            { name: "Inicio", path: "/" },
+            { name: "Ofertas", path: "/ofertas" },
+            ...(product.category
+              ? [
+                  {
+                    name: product.category.name,
+                    path: `/categorias/${product.category.slug}`,
+                  },
+                ]
+              : []),
+            { name: product.title, path: `/producto/${product.slug}` },
+          ]),
+        ]}
+      />
+      <nav className="mb-8 text-sm text-stone-500" aria-label="Migas de pan">
         <Link href="/" className="hover:text-ink">
           Inicio
         </Link>
@@ -100,6 +115,17 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         <Link href="/ofertas" className="hover:text-ink">
           Catálogo
         </Link>
+        {product.category ? (
+          <>
+            <span className="mx-2">/</span>
+            <Link
+              href={`/categorias/${product.category.slug}`}
+              className="hover:text-ink"
+            >
+              {product.category.name}
+            </Link>
+          </>
+        ) : null}
         <span className="mx-2">/</span>
         <span className="text-ink">{product.title}</span>
       </nav>
@@ -152,6 +178,10 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             Deal score{" "}
             <strong className="text-ink">{Math.round(product.dealScore)}</strong>
             {product.dealLabel ? ` · ${product.dealLabel}` : null}
+          </p>
+          <p className="text-xs leading-relaxed text-stone-500">
+            El score combina descuento, cercanía al mínimo histórico y
+            estabilidad del precio.
           </p>
 
           <AffiliateDisclosure />
@@ -219,7 +249,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </p>
           ) : null}
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 pb-20 md:pb-0">
             <a
               href={buildTrackedAffiliatePath({
                 productId: product.id,
@@ -231,7 +261,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               Ir a Amazon
             </a>
             <a
-              href={TELEGRAM_BOT_URL}
+              href={telegramAlertForAsin(product.asin)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 items-center border border-stone-400 px-6 text-xs font-semibold uppercase tracking-[0.16em] text-ink transition hover:border-ink"
@@ -260,6 +290,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           />
         </div>
       </section>
+
+      <ProductStickyBuyBar
+        productId={product.id}
+        asin={product.asin}
+        currentPrice={product.currentPrice}
+        previousPrice={product.previousPrice}
+      />
     </div>
   );
 }

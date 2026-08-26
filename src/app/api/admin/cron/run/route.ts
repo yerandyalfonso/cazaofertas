@@ -50,18 +50,23 @@ export async function POST(request: NextRequest) {
       limit?: number;
       notify?: boolean;
       asins?: string[];
+      provider?: "html" | "keepa" | "creators" | "auto";
     };
 
     const result = await runAmazonPriceCheck({
-      limit: body.limit,
-      notify: body.notify ?? true,
+      limit: body.limit ?? 5,
+      notify: body.notify ?? false,
       asins: body.asins,
+      provider: body.provider ?? "html",
+      delayMs: 700,
     });
 
     return NextResponse.json(result);
   } catch (error) {
+    const message = formatEnvError(error);
+    console.error("[admin/cron/run]", message);
     return NextResponse.json(
-      { ok: false, error: formatEnvError(error) },
+      { ok: false, error: message },
       { status: 500 },
     );
   }

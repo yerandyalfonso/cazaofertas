@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { buildPageMetadata } from "@/lib/seo";
 import {
   getFeaturedArticles,
   getPublishedArticles,
 } from "@/services/blog";
 
 export const metadata: Metadata = {
-  title: "Blog",
-  description:
-    "Guías, comparativas y métodos para cazar ofertas reales en Amazon España.",
+  ...buildPageMetadata({
+    title: "Blog de ofertas y comparativas",
+    description:
+      "Guías, comparativas y métodos para cazar ofertas reales en Amazon España.",
+    path: "/blog",
+  }),
 };
 
 export const revalidate = 300;
@@ -37,11 +41,8 @@ export default async function BlogPage() {
           </h1>
         </header>
         <div className="mt-12 border border-dashed border-stone-300 bg-white/70 px-6 py-12 text-sm text-stone-600">
-          Todavía no hay artículos publicados. Ejecuta{" "}
-          <code className="rounded bg-stone-200 px-1.5 py-0.5">
-            npm run seed:blog
-          </code>
-          .
+          Pronto publicaremos nuevas guías y comparativas. Mientras tanto,
+          revisa las ofertas o crea una alerta en Telegram.
         </div>
       </div>
     );

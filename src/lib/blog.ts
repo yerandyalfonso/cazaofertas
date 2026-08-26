@@ -23,6 +23,9 @@ export interface BlogPost {
   slug: string;
   title: string;
   excerpt: string;
+  /** Override SEO (admin). */
+  seoTitle?: string | null;
+  seoDescription?: string | null;
   category: string;
   readingTime: string;
   publishedAt: string;

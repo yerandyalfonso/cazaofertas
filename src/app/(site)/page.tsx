@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { DealCard } from "@/components/DealCard";
@@ -6,11 +7,23 @@ import {
   getActiveProducts,
   getCategories,
   getTopDealProducts,
-  TELEGRAM_BOT_URL,
 } from "@/lib/catalog";
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, buildPageMetadata } from "@/lib/seo";
+import { telegramBotUrl } from "@/lib/telegram-links";
 import { getFeaturedArticles, getPublishedArticles } from "@/services/blog";
 
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  ...buildPageMetadata({
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    path: "/",
+  }),
+  title: {
+    absolute: DEFAULT_TITLE,
+  },
+};
 
 export default async function HomePage() {
   const [topDeals, latest, categories, featuredPosts, allPosts] =
@@ -121,8 +134,8 @@ export default async function HomePage() {
                 </>
               ) : (
                 <div className="border border-dashed border-stone-300 bg-white/60 px-6 py-10 text-sm text-stone-600">
-                  Todavía no hay artículos publicados. Ejecuta el seed tras
-                  aplicar la migración de articles.
+                  Pronto publicaremos guías y comparativas. Mientras tanto,
+                  echa un vistazo a las ofertas o crea una alerta en Telegram.
                 </div>
               )}
             </div>
@@ -157,7 +170,7 @@ export default async function HomePage() {
               )}
 
               <a
-                href={TELEGRAM_BOT_URL}
+                href={telegramBotUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-8 inline-flex h-11 items-center justify-center border border-ink bg-ink px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
@@ -297,7 +310,7 @@ export default async function HomePage() {
               ruido: solo bajadas que pasan el filtro de score.
             </p>
             <a
-              href={TELEGRAM_BOT_URL}
+              href={telegramBotUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-12 items-center bg-paper px-6 text-xs font-semibold uppercase tracking-[0.16em] text-ink transition hover:bg-amber-200"
@@ -322,11 +335,19 @@ export default async function HomePage() {
 
 function EmptyCatalogHint() {
   return (
-    <div className="border border-dashed border-stone-300 bg-white/60 px-6 py-10 text-sm text-stone-600">
-      Todavía no hay productos en Supabase. Ejecuta{" "}
-      <code className="rounded bg-stone-200 px-1.5 py-0.5">npm run seed</code> o
-      visita{" "}
-      <code className="rounded bg-stone-200 px-1.5 py-0.5">/api/seed</code>.
+    <div className="border border-dashed border-stone-300 bg-white/60 px-6 py-10">
+      <p className="text-sm text-stone-600">
+        Estamos cazando ofertas. Vuelve pronto o activa alertas en Telegram
+        para enterarte al momento.
+      </p>
+      <a
+        href={telegramBotUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 inline-flex h-10 items-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
+      >
+        Abrir Telegram
+      </a>
     </div>
   );
 }

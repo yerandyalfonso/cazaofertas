@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCategories } from "@/lib/catalog";
+import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Categorías",
-  description: "Explora ofertas de Amazon por categoría.",
+  ...buildPageMetadata({
+    title: "Categorías de ofertas Amazon",
+    description:
+      "Explora chollos de Amazon España por categoría: tecnología, hogar, moda y más.",
+    path: "/categorias",
+  }),
 };
 
 export const revalidate = 300;
@@ -44,7 +49,8 @@ export default async function CategoriesPage() {
 
       {categories.length === 0 ? (
         <p className="mt-10 text-sm text-stone-600">
-          No hay categorías todavía. Ejecuta el seed para crearlas.
+          No hay categorías todavía. Vuelve pronto o revisa las ofertas
+          activas.
         </p>
       ) : null}
     </div>

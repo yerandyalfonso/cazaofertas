@@ -214,6 +214,8 @@ function mapArticleRow(row: ArticleQueryRow): BlogPost {
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
     category: row.category,
     readingTime: formatReadingTime(row.reading_time),
     publishedAt: formatDate(row.created_at),
@@ -227,6 +229,7 @@ function mapArticleRow(row: ArticleQueryRow): BlogPost {
     pullQuote: parsed.pullQuote,
     pros: parsed.pros,
     cons: parsed.cons,
+    reviewedAt: formatDate(row.updated_at),
   };
 
   return enrichFromFallback(mapped);

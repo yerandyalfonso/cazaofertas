@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  GripVertical,
   Heading2,
   ImagePlus,
   Loader2,
@@ -54,6 +55,18 @@ export function ArticleBlockEditor({
   products = [],
 }: ArticleBlockEditorProps) {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  function reorderByDrag(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const from = blocks.findIndex((block) => block.id === fromId);
+    const to = blocks.findIndex((block) => block.id === toId);
+    if (from < 0 || to < 0) return;
+    const copy = [...blocks];
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item!);
+    onChange(copy);
+  }
 
   function updateBlock(id: string, patch: Partial<EditorBlock>) {
     onChange(
@@ -102,10 +115,30 @@ export function ArticleBlockEditor({
       {blocks.map((block, index) => (
         <div
           key={block.id}
-          className="border border-stone-300 bg-stone-50/60 p-4"
+          onDragOver={(event) => {
+            event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (dragId) reorderByDrag(dragId, block.id);
+            setDragId(null);
+          }}
+          className={`border border-stone-300 bg-stone-50/60 p-4 ${
+            dragId === block.id ? "opacity-60" : ""
+          }`}
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+              <span
+                draggable
+                onDragStart={() => setDragId(block.id)}
+                onDragEnd={() => setDragId(null)}
+                title="Arrastrar para reordenar"
+                className="inline-flex cursor-grab text-stone-400 active:cursor-grabbing"
+                aria-hidden
+              >
+                <GripVertical className="h-3.5 w-3.5 shrink-0" />
+              </span>
               {block.type === "heading"
                 ? "Título de sección"
                 : block.type === "paragraph"
