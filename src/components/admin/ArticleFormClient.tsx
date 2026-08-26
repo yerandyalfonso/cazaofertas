@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Upload, X } from "lucide-react";
 import { ArticleBlockEditor } from "@/components/admin/ArticleBlockEditor";
+import { ArticleQuickImport } from "@/components/admin/ArticleQuickImport";
 import { ArticleStyleGuide } from "@/components/admin/ArticleStyleGuide";
 import {
   ARTICLE_TEMPLATE_OPTIONS,
@@ -13,6 +14,7 @@ import {
   createBlankEditorBlocks,
   type EditorBlock,
 } from "@/lib/admin-article-editor";
+import type { QuickImportResult } from "@/lib/article-quick-import";
 import type { BlogBlock } from "@/lib/blog";
 import type { BlogTemplate } from "@/lib/blog-templates";
 
@@ -169,6 +171,26 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     }
   }
 
+  function applyQuickImport(result: QuickImportResult) {
+    selectTemplate(result.template);
+    if (result.title) {
+      setTitle(result.title);
+      if (!slugTouched) setSlug(slugify(result.title));
+    }
+    if (result.excerpt) setExcerpt(result.excerpt);
+    if (result.pullQuote) setPullQuote(result.pullQuote);
+    if (result.category) setCategory(result.category);
+    setBlocks(result.blocks);
+    if (result.featuredImage) {
+      setFeaturedImage((current) => current.trim() || result.featuredImage);
+    }
+    if (!seoTitle && result.title) setSeoTitle(result.title);
+    if (!seoDescription && result.excerpt) setSeoDescription(result.excerpt);
+    setWarning(
+      result.warnings.length > 0 ? result.warnings.join(" ") : null,
+    );
+  }
+
   async function uploadImage(file: File): Promise<string> {
     const body = new FormData();
     body.append("file", file);
@@ -308,6 +330,11 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
       ) : null}
 
       <form onSubmit={(event) => void onSave(event)} className="mt-8 space-y-6">
+        <ArticleQuickImport
+          activeBlogTemplate={template}
+          onApply={applyQuickImport}
+        />
+
         <ArticleStyleGuide activeTemplate={template} />
 
         <section className="border border-stone-300 bg-white p-6">
@@ -315,8 +342,8 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             Tipo de artículo
           </p>
           <p className="mt-1 text-sm text-stone-600">
-            Solo clasifica el artículo. La estructura de ejemplo está en la guía
-            de arriba; aquí rellenas los campos a mano.
+            Clasifica la plantilla visual. También se actualiza al usar la
+            importación rápida de arriba.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {ARTICLE_TEMPLATE_OPTIONS.map((option) => {

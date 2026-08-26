@@ -8,6 +8,7 @@ import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
+import { ensureProductFromAmazonUrl } from "@/services/products";
 import { DealLevel } from "@/types";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -654,15 +655,46 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
       return;
     }
 
+    let productId: string | null = null;
+    let productTitle: string | null = null;
+    let initialPrice: number | null = null;
+    let catalogNote = "";
+
+    if (isUrlAlert && asin && url) {
+      try {
+        const product = await ensureProductFromAmazonUrl(client, url);
+        productId = product.id;
+        productTitle = product.title;
+        initialPrice = product.currentPrice;
+        catalogNote = product.created
+          ? "Producto añadido al catálogo."
+          : "Producto ya estaba en el catálogo.";
+      } catch (error) {
+        console.error("[telegram] handleNewAlert: no se pudo crear producto", {
+          asin,
+          url,
+          error: error instanceof Error ? error.message : error,
+        });
+        await sendTelegramMessage({
+          chatId,
+          text: "Pude leer la URL, pero no extraje el producto de Amazon (bloqueo o ficha rara). Inténtalo de nuevo en unos minutos.",
+        });
+        return;
+      }
+    }
+
     const { data: inserted, error: insertError } = await client
       .from("alerts")
       .insert({
         user_id: user.id,
-        keyword,
+        keyword: keyword ?? (productTitle ? productTitle.slice(0, 120) : null),
         url,
+        product_id: productId,
+        last_known_price: initialPrice,
+        last_checked_at: productId ? new Date().toISOString() : null,
         is_active: true,
       })
-      .select("id, keyword, url")
+      .select("id, keyword, url, product_id")
       .single();
 
     if (insertError) {
@@ -671,6 +703,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
         userId: user.id,
         keyword,
         url,
+        productId,
         code: insertError.code,
         message: insertError.message,
         details: insertError.details,
@@ -684,7 +717,17 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
     }
 
     const confirmation = inserted?.url
-      ? `✅ Alerta de URL creada. Te avisaré cuando baje el precio de ese producto.\n<code>${escapeHtml(inserted.url.slice(0, 80))}${inserted.url.length > 80 ? "…" : ""}</code>`
+      ? [
+          "✅ <b>Alerta de URL creada</b>",
+          productTitle ? escapeHtml(productTitle) : "",
+          catalogNote,
+          initialPrice != null
+            ? `Precio actual registrado: <b>${formatEuro(initialPrice)}</b>`
+            : "",
+          "Te avisaré cuando baje el precio.",
+        ]
+          .filter(Boolean)
+          .join("\n")
       : `✅ Alerta creada para: ${escapeHtml(inserted?.keyword ?? keyword ?? "")}`;
 
     await sendTelegramMessage({

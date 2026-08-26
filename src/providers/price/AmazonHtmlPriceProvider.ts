@@ -172,6 +172,8 @@ export function extractPriceFromAmazonHtml(html: string): {
   discountPercentage: number | null;
   isFlashDeal: boolean;
   title?: string;
+  brand?: string;
+  imageUrl?: string;
   availability: ProductAvailability;
 } {
   const $ = cheerio.load(html);
@@ -240,12 +242,53 @@ export function extractPriceFromAmazonHtml(html: string): {
     $("meta[property='og:title']").attr("content")?.trim() ||
     undefined;
 
+  const brandRaw =
+    $("#bylineInfo").text().trim() ||
+    $("#brand").text().trim() ||
+    $("a#brand").text().trim() ||
+    $("tr.po-brand td.a-span9 span").text().trim() ||
+    $("th:contains('Marca')").next("td").text().trim() ||
+    "";
+  const brand =
+    brandRaw
+      .replace(/^visita la tienda de\s+/i, "")
+      .replace(/^marca:\s*/i, "")
+      .replace(/^brand:\s*/i, "")
+      .trim() || undefined;
+
+  let imageUrl: string | undefined =
+    $("#landingImage").attr("data-old-hires") ||
+    $("#imgTagWrapperId img").attr("data-old-hires") ||
+    $("#landingImage").attr("src") ||
+    $("#imgTagWrapperId img").attr("src") ||
+    $("meta[property='og:image']").attr("content")?.trim() ||
+    $("img#main-image").attr("src") ||
+    undefined;
+
+  const dynamicImage = $("#landingImage").attr("data-a-dynamic-image");
+  if ((!imageUrl || imageUrl.startsWith("data:")) && dynamicImage) {
+    try {
+      const map = JSON.parse(dynamicImage) as Record<string, unknown>;
+      const first = Object.keys(map)[0];
+      if (first && /^https?:\/\//i.test(first)) imageUrl = first;
+    } catch {
+      const match = dynamicImage.match(/"(https:[^"]+)"/);
+      if (match?.[1]) imageUrl = match[1];
+    }
+  }
+
+  const cleanImageUrl =
+    imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : undefined;
+  const cleanBrand = brand && brand.length > 1 ? brand.slice(0, 120) : undefined;
+
   return {
     price,
     listPrice,
     discountPercentage,
     isFlashDeal,
     title,
+    brand: cleanBrand,
+    imageUrl: cleanImageUrl,
     availability: availabilityFromHtml($),
   };
 }
@@ -325,6 +368,8 @@ export async function previewAmazonProductPage(
   isFlashDeal: boolean;
   amazonUrl: string;
   availability: ProductAvailability;
+  brand?: string;
+  imageUrl?: string;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -353,6 +398,8 @@ export async function previewAmazonProductPage(
     isFlashDeal: extracted.isFlashDeal,
     amazonUrl,
     availability: extracted.availability,
+    brand: extracted.brand,
+    imageUrl: extracted.imageUrl,
   };
 }
 
@@ -377,6 +424,8 @@ export async function scrapeAmazonProductPage(
     currency: "EUR",
     availability: extracted.availability,
     title: extracted.title,
+    brand: extracted.brand,
+    imageUrl: extracted.imageUrl,
     amazonUrl: url,
     previousPrice: extracted.listPrice ?? undefined,
     discountPercentage: extracted.discountPercentage ?? undefined,

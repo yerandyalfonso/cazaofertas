@@ -4,9 +4,10 @@ import {
   generateAmazonUrl,
   looksLikeAmazonUrl,
 } from "@/lib/affiliate";
-import { formatEuro, roundMoney } from "@/lib/money";
+import { formatEuro, roundMoney, toNumber } from "@/lib/money";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
+import { ensureProductFromAmazonUrl } from "@/services/products";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
@@ -54,7 +55,7 @@ export async function runUserUrlAlerts(options?: {
   const { data: alerts, error } = await client
     .from("alerts")
     .select(
-      "id, user_id, url, keyword, last_known_price, last_checked_at, max_price",
+      "id, user_id, url, keyword, product_id, last_known_price, last_checked_at, max_price",
     )
     .eq("is_active", true)
     .not("url", "is", null)
@@ -97,6 +98,24 @@ export async function runUserUrlAlerts(options?: {
       const pageUrl = /https?:\/\//i.test(url)
         ? url
         : generateAmazonUrl(asin);
+
+      let productId = alert.product_id;
+      if (!productId) {
+        try {
+          const ensured = await ensureProductFromAmazonUrl(client, pageUrl);
+          productId = ensured.id;
+          await client
+            .from("alerts")
+            .update({ product_id: productId })
+            .eq("id", alert.id);
+        } catch (ensureError) {
+          console.warn(
+            `[user-alerts] Alerta ${alert.id}: no se pudo enlazar producto`,
+            ensureError instanceof Error ? ensureError.message : ensureError,
+          );
+        }
+      }
+
       const quote = await scrapeAmazonProductPage(pageUrl, asin, {
         timeoutMs: 12_000,
       });
@@ -112,8 +131,62 @@ export async function runUserUrlAlerts(options?: {
         .update({
           last_checked_at: nowIso,
           last_known_price: currentPrice,
+          ...(productId ? { product_id: productId } : {}),
         })
         .eq("id", alert.id);
+
+      if (productId) {
+        const { data: product } = await client
+          .from("products")
+          .select(
+            "id, current_price, previous_price, lowest_price, highest_price",
+          )
+          .eq("id", productId)
+          .maybeSingle();
+
+        if (product) {
+          const stored = toNumber(product.current_price);
+          const lowest = toNumber(product.lowest_price) ?? currentPrice;
+          const highest = toNumber(product.highest_price) ?? currentPrice;
+          const priceChanged =
+            stored == null || Math.abs(currentPrice - stored) >= 0.01;
+
+          if (priceChanged) {
+            const previous =
+              stored != null
+                ? stored
+                : quote.previousPrice != null
+                  ? roundMoney(quote.previousPrice)
+                  : currentPrice;
+            const discount =
+              previous > currentPrice
+                ? roundMoney(((previous - currentPrice) / previous) * 100)
+                : 0;
+
+            await client
+              .from("products")
+              .update({
+                current_price: currentPrice,
+                previous_price: previous,
+                lowest_price: roundMoney(Math.min(lowest, currentPrice)),
+                highest_price: roundMoney(
+                  Math.max(highest, currentPrice, previous),
+                ),
+                discount_percentage: discount,
+                last_checked_at: nowIso,
+                updated_at: nowIso,
+                is_active: true,
+              })
+              .eq("id", productId);
+
+            await client.from("price_history").insert({
+              product_id: productId,
+              price: currentPrice,
+              source: "amazon",
+            });
+          }
+        }
+      }
 
       result.checked += 1;
 
