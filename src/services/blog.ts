@@ -210,6 +210,7 @@ function mapArticleRow(row: ArticleQueryRow): BlogPost {
   const relatedFromJoin = productsFromArticleJoin(row).map((p) => p.slug);
 
   const mapped: BlogPost = {
+    id: row.id,
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,

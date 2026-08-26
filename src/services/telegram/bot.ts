@@ -1,8 +1,8 @@
 import {
   extractAsin,
-  generateAffiliateUrl,
   looksLikeAmazonUrl,
 } from "@/lib/affiliate";
+import { buildTrackedAffiliateUrl } from "@/lib/affiliate-tracking";
 import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { absoluteUrl } from "@/lib/site";
@@ -10,6 +10,20 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { ensureProductFromAmazonUrl } from "@/services/products";
+import {
+  buildWizardCategoryMarkup,
+  buildWizardConfirmMarkup,
+  buildWizardDiscountMarkup,
+  buildWizardMaxPriceMarkup,
+  buildWizardModeMarkup,
+  clearWizardDraft,
+  formatWizardSummary,
+  getWizardDraft,
+  resolveCategoryId,
+  saveWizardDraft,
+  WIZARD_CATEGORIES,
+  type AlertWizardDraft,
+} from "@/services/telegram/alertWizard";
 import { DealLevel } from "@/types";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -257,8 +271,69 @@ export const START_WELCOME_TEXT = [
 const CATEGORIES_MENU_TEXT = [
   "📂 Categorías",
   "",
-  "Elige una categoría para explorar ofertas:",
+  "Elige una categoría para crear una alerta filtrada:",
 ].join("\n");
+
+const SETTINGS_TEXT = [
+  "⚙️ <b>Ajustes</b>",
+  "",
+  "• Usa /alerts para ver y borrar alertas",
+  "• Usa /addalert para el wizard de creación",
+  "• Las notificaciones llegan por DM cuando hay chollos",
+  "",
+  "Más opciones de preferencias llegarán pronto.",
+].join("\n");
+
+export async function handleTelegramCommand(
+  command: string,
+  options: { chatId: number; telegramId: number },
+): Promise<boolean> {
+  const { chatId, telegramId } = options;
+
+  switch (command) {
+    case "start":
+      await sendStartWelcome(chatId);
+      return true;
+    case "help":
+      await sendTelegramMessage({
+        chatId,
+        text: [
+          "Comandos disponibles:",
+          "/start — menú principal",
+          "/help — esta ayuda",
+          "/alerts — tus alertas",
+          "/addalert — crear alerta (wizard)",
+          "/removealert — eliminar alertas",
+          "/products — mejores ofertas",
+          "/categories — alertas por categoría",
+          "/settings — ajustes",
+        ].join("\n"),
+      });
+      return true;
+    case "addalert":
+      await startAlertWizard(chatId, telegramId);
+      return true;
+    case "alerts":
+    case "removealert":
+      await handleMyAlerts(telegramId, chatId);
+      return true;
+    case "products":
+      await handleBestDeals(chatId);
+      return true;
+    case "categories":
+      await sendTelegramMessage({
+        chatId,
+        text: CATEGORIES_MENU_TEXT,
+        replyMarkup: buildCategoriesMenuMarkup(),
+      });
+      return true;
+    case "settings":
+      await sendTelegramMessage({ chatId, text: SETTINGS_TEXT });
+      return true;
+    default:
+      return false;
+  }
+}
 
 export async function sendStartWelcome(chatId: number): Promise<TelegramMessage> {
   return sendTelegramMessage({
@@ -277,7 +352,10 @@ export async function sendDealAlertMessage(options: {
     text: buildDealAlertText(options.deal),
     disableWebPagePreview: false,
     replyMarkup: buildOfferActionMarkup({
-      affiliateUrl: options.deal.affiliateUrl,
+      affiliateUrl: buildTrackedAffiliateUrl({
+        productId: options.deal.productId,
+        source: "telegram",
+      }),
       productSlug: options.deal.productSlug,
     }),
   });
@@ -296,17 +374,337 @@ export async function sendChannelDealAlert(
   return sendDealAlertMessage({ chatId: channelId, deal });
 }
 
-async function handleCreateAlert(chatId: number): Promise<void> {
+async function handleCreateAlert(chatId: number, telegramId?: number): Promise<void> {
+  if (telegramId !== undefined) {
+    await saveWizardDraft(telegramId, { step: "pick_mode" });
+  }
   await sendTelegramMessage({
     chatId,
     text: [
-      "🔔 <b>Nueva alerta</b>",
+      "🔔 <b>Nueva alerta — paso 1/4</b>",
       "",
-      "Envía:",
-      "• Una <b>palabra clave</b> (ej: airpods, silla gaming)",
-      "• O pega la <b>URL de Amazon</b> del producto que quieres vigilar",
+      "¿Qué quieres vigilar?",
+      "Elige una opción con los botones:",
     ].join("\n"),
+    replyMarkup: buildWizardModeMarkup(),
   });
+}
+
+/** Inicia el wizard (también desde /addalert). */
+export async function startAlertWizard(
+  chatId: number,
+  telegramId: number,
+): Promise<void> {
+  await handleCreateAlert(chatId, telegramId);
+}
+
+async function advanceWizardAfterTarget(
+  chatId: number,
+  telegramId: number,
+  draft: AlertWizardDraft,
+): Promise<void> {
+  await saveWizardDraft(telegramId, { ...draft, step: "pick_discount" });
+  await sendTelegramMessage({
+    chatId,
+    text: [
+      "📉 <b>Paso: descuento mínimo</b>",
+      "",
+      "¿A partir de qué descuento quieres que te avise?",
+    ].join("\n"),
+    replyMarkup: buildWizardDiscountMarkup(),
+  });
+}
+
+async function handleWizardCallback(options: {
+  data: string;
+  chatId: number;
+  telegramId: number;
+  messageId?: number;
+}): Promise<boolean> {
+  const { data, chatId, telegramId } = options;
+  if (!data.startsWith("wiz:")) return false;
+
+  if (data === "wiz:cancel") {
+    await clearWizardDraft(telegramId);
+    await sendTelegramMessage({
+      chatId,
+      text: "Alerta cancelada. Usa /start para volver al menú.",
+      replyMarkup: buildStartMenuMarkup(),
+    });
+    return true;
+  }
+
+  if (data.startsWith("wiz:mode:")) {
+    const mode = data.slice("wiz:mode:".length) as AlertWizardDraft["mode"];
+    if (mode === "category") {
+      await saveWizardDraft(telegramId, {
+        step: "pick_category",
+        mode: "category",
+      });
+      await sendTelegramMessage({
+        chatId,
+        text: [
+          "📂 <b>Paso: categoría</b>",
+          "",
+          "Elige una categoría o «Cualquier categoría»:",
+        ].join("\n"),
+        replyMarkup: buildWizardCategoryMarkup(),
+      });
+      return true;
+    }
+
+    if (mode === "keyword" || mode === "brand" || mode === "url") {
+      await saveWizardDraft(telegramId, {
+        step: "await_text",
+        mode,
+      });
+      const prompt =
+        mode === "keyword"
+          ? "Escribe la <b>palabra clave</b> (ej: airpods, silla gaming):"
+          : mode === "brand"
+            ? "Escribe la <b>marca</b> exacta (ej: Sony, Samsung):"
+            : "Pega la <b>URL de Amazon</b> del producto:";
+      await sendTelegramMessage({
+        chatId,
+        text: ["✏️ <b>Paso: detalle</b>", "", prompt].join("\n"),
+      });
+      return true;
+    }
+  }
+
+  if (data.startsWith("wiz:cat:")) {
+    const slug = data.slice("wiz:cat:".length);
+    const draft = (await getWizardDraft(telegramId)) ?? {
+      step: "pick_category" as const,
+      mode: "category" as const,
+      updatedAt: new Date().toISOString(),
+    };
+    if (slug === "any") {
+      await advanceWizardAfterTarget(chatId, telegramId, {
+        ...draft,
+        mode: "category",
+        categorySlug: null,
+        categoryId: null,
+        categoryLabel: "Cualquiera",
+      });
+      return true;
+    }
+    const cat =
+      WIZARD_CATEGORIES.find((c) => c.slug === slug) ??
+      ({ label: slug, slug } as const);
+    const resolved = await resolveCategoryId(slug);
+    await advanceWizardAfterTarget(chatId, telegramId, {
+      ...draft,
+      mode: "category",
+      categorySlug: slug,
+      categoryId: resolved?.id ?? null,
+      categoryLabel: resolved?.name ?? cat.label,
+    });
+    return true;
+  }
+
+  if (data.startsWith("wiz:disc:")) {
+    const raw = data.slice("wiz:disc:".length);
+    const draft = await getWizardDraft(telegramId);
+    if (!draft) {
+      await sendTelegramMessage({
+        chatId,
+        text: "La sesión del wizard caducó. Pulsa «Crear alerta» de nuevo.",
+      });
+      return true;
+    }
+    const minDiscount = raw === "any" ? null : Number.parseInt(raw, 10);
+    await saveWizardDraft(telegramId, {
+      ...draft,
+      step: "pick_max_price",
+      minDiscount: Number.isFinite(minDiscount) ? minDiscount : null,
+    });
+    await sendTelegramMessage({
+      chatId,
+      text: [
+        "💶 <b>Paso: precio máximo</b>",
+        "",
+        "¿Cuál es el precio máximo que te interesa?",
+      ].join("\n"),
+      replyMarkup: buildWizardMaxPriceMarkup(),
+    });
+    return true;
+  }
+
+  if (data.startsWith("wiz:price:")) {
+    const raw = data.slice("wiz:price:".length);
+    const draft = await getWizardDraft(telegramId);
+    if (!draft) {
+      await sendTelegramMessage({
+        chatId,
+        text: "La sesión del wizard caducó. Pulsa «Crear alerta» de nuevo.",
+      });
+      return true;
+    }
+    const maxPrice = raw === "any" ? null : Number.parseInt(raw, 10);
+    const next = await saveWizardDraft(telegramId, {
+      ...draft,
+      step: "confirm",
+      maxPrice: Number.isFinite(maxPrice) ? maxPrice : null,
+    });
+    await sendTelegramMessage({
+      chatId,
+      text: formatWizardSummary(next),
+      replyMarkup: buildWizardConfirmMarkup(),
+    });
+    return true;
+  }
+
+  if (data === "wiz:confirm") {
+    const draft = await getWizardDraft(telegramId);
+    if (!draft) {
+      await sendTelegramMessage({
+        chatId,
+        text: "La sesión del wizard caducó. Pulsa «Crear alerta» de nuevo.",
+      });
+      return true;
+    }
+    await commitWizardAlert({ telegramId, chatId, draft });
+    return true;
+  }
+
+  return false;
+}
+
+async function commitWizardAlert(options: {
+  telegramId: number;
+  chatId: number;
+  draft: AlertWizardDraft;
+}): Promise<void> {
+  const { telegramId, chatId, draft } = options;
+  const client = createSupabaseServiceClient();
+
+  const { data: user, error: userError } = await client
+    .from("users")
+    .select("id")
+    .eq("telegram_id", telegramId)
+    .maybeSingle();
+
+  if (userError || !user?.id) {
+    await sendTelegramMessage({
+      chatId,
+      text: "Primero usa /start para vincular tu cuenta.",
+    });
+    return;
+  }
+
+  let productId: string | null = null;
+  let productTitle: string | null = null;
+  let initialPrice: number | null = null;
+  let url = draft.url ?? null;
+  let keyword = draft.keyword ?? null;
+  const brand = draft.brand ?? null;
+
+  if (draft.mode === "url" && url) {
+    try {
+      const product = await ensureProductFromAmazonUrl(client, url);
+      productId = product.id;
+      productTitle = product.title;
+      initialPrice = product.currentPrice;
+      if (!keyword) keyword = product.title.slice(0, 120);
+    } catch (error) {
+      console.error("[telegram] wizard URL product", error);
+      await sendTelegramMessage({
+        chatId,
+        text: "No pude leer ese producto de Amazon. Revisa la URL e inténtalo de nuevo.",
+      });
+      return;
+    }
+  }
+
+  const { error: insertError } = await client.from("alerts").insert({
+    user_id: user.id,
+    category_id: draft.categoryId ?? null,
+    keyword,
+    brand,
+    url,
+    product_id: productId,
+    last_known_price: initialPrice,
+    last_checked_at: productId ? new Date().toISOString() : null,
+    min_discount_percentage: draft.minDiscount ?? null,
+    max_price: draft.maxPrice ?? null,
+    is_active: true,
+  });
+
+  if (insertError) {
+    console.error("[telegram] wizard insert", insertError);
+    await sendTelegramMessage({
+      chatId,
+      text: "No pude guardar la alerta. Inténtalo de nuevo en unos segundos.",
+    });
+    return;
+  }
+
+  await clearWizardDraft(telegramId);
+
+  const lines = [
+    "✅ <b>Alerta creada</b>",
+    "",
+    formatWizardSummary({ ...draft, step: "confirm" })
+      .replace("📋 <b>Resumen de la alerta</b>\n\n", "")
+      .replace("\n\n¿Confirmas?", ""),
+  ];
+  if (productTitle) {
+    lines.push("", escapeHtml(productTitle));
+  }
+  if (initialPrice != null) {
+    lines.push(`Precio actual: <b>${formatEuro(initialPrice)}</b>`);
+  }
+
+  await sendTelegramMessage({
+    chatId,
+    text: lines.join("\n"),
+    replyMarkup: buildStartMenuMarkup(),
+  });
+}
+
+async function handleWizardTextInput(
+  message: TelegramMessage,
+  draft: AlertWizardDraft,
+): Promise<boolean> {
+  if (draft.step !== "await_text") return false;
+
+  const chatId = message.chat?.id;
+  const telegramId = message.from?.id;
+  const rawText = message.text?.trim() ?? "";
+  if (chatId === undefined || telegramId === undefined || !rawText) {
+    return true;
+  }
+
+  if (draft.mode === "url") {
+    if (!looksLikeAmazonUrl(rawText) || !extractAsin(rawText)) {
+      await sendTelegramMessage({
+        chatId,
+        text: "Esa no parece una URL de producto Amazon válida (debe incluir /dp/…). Pégala de nuevo o cancela con /start.",
+      });
+      return true;
+    }
+    await advanceWizardAfterTarget(chatId, telegramId, {
+      ...draft,
+      url: rawText.slice(0, 500),
+    });
+    return true;
+  }
+
+  if (draft.mode === "brand") {
+    await advanceWizardAfterTarget(chatId, telegramId, {
+      ...draft,
+      brand: rawText.slice(0, 80),
+    });
+    return true;
+  }
+
+  // keyword
+  await advanceWizardAfterTarget(chatId, telegramId, {
+    ...draft,
+    keyword: rawText.slice(0, 120),
+  });
+  return true;
 }
 
 async function handleCategoriesMenu(
@@ -332,14 +730,22 @@ async function handleHomeMenu(chatId: number, messageId: number): Promise<void> 
 
 async function handleCategoryPick(
   chatId: number,
+  telegramId: number,
   slug: string,
 ): Promise<void> {
   const category =
-    EXAMPLE_CATEGORIES.find((item) => item.slug === slug)?.label ?? slug;
+    EXAMPLE_CATEGORIES.find((item) => item.slug === slug) ??
+    WIZARD_CATEGORIES.find((item) => item.slug === slug);
+  const label = category?.label ?? slug;
+  const resolved = await resolveCategoryId(slug);
 
-  await sendTelegramMessage({
-    chatId,
-    text: `Has elegido <b>${escapeHtml(category)}</b>. Pronto verás ofertas filtradas por esta categoría.`,
+  await advanceWizardAfterTarget(chatId, telegramId, {
+    step: "pick_discount",
+    mode: "category",
+    categorySlug: slug,
+    categoryId: resolved?.id ?? null,
+    categoryLabel: resolved?.name ?? label,
+    updatedAt: new Date().toISOString(),
   });
 }
 
@@ -386,14 +792,15 @@ async function fetchTopDealsText(): Promise<string> {
       });
 
       return {
+        productId: product.id,
         title: product.title,
         currentPrice,
         previousPrice,
         discountPercentage,
         scoring,
-        affiliateUrl: generateAffiliateUrl({
-          affiliate_url: product.affiliate_url ?? undefined,
-          asin: product.asin,
+        affiliateUrl: buildTrackedAffiliateUrl({
+          productId: product.id,
+          source: "telegram",
         }),
       };
     })
@@ -616,10 +1023,16 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
     return;
   }
 
+  const wizard = await getWizardDraft(telegramId);
+  if (wizard?.step === "await_text") {
+    await handleWizardTextInput(message, wizard);
+    return;
+  }
+
   if (!rawText) {
     await sendTelegramMessage({
       chatId,
-      text: "Envía una palabra clave o pega una URL de Amazon para crear la alerta.",
+      text: "Envía una palabra clave o pega una URL de Amazon, o usa «Crear alerta» en el menú.",
     });
     return;
   }
@@ -765,7 +1178,10 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   }
 }
 
-async function handleMyAlerts(telegramId: number, chatId: number): Promise<void> {
+export async function handleMyAlerts(
+  telegramId: number,
+  chatId: number,
+): Promise<void> {
   const { text, replyMarkup } = await fetchUserAlerts(telegramId);
   await sendTelegramMessage({ chatId, text, replyMarkup });
 }
@@ -903,7 +1319,17 @@ export async function handleCallbackQuery(
     }
 
     if (data === "menu:create_alert") {
-      await handleCreateAlert(chatId);
+      await handleCreateAlert(chatId, callbackQuery.from.id);
+      return;
+    }
+
+    if (data.startsWith("wiz:")) {
+      await handleWizardCallback({
+        data,
+        chatId,
+        telegramId: callbackQuery.from.id,
+        messageId,
+      });
       return;
     }
 
@@ -960,7 +1386,7 @@ export async function handleCallbackQuery(
 
     if (data.startsWith("category:")) {
       const slug = data.slice("category:".length);
-      await handleCategoryPick(chatId, slug);
+      await handleCategoryPick(chatId, callbackQuery.from.id, slug);
       return;
     }
 

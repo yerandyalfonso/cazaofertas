@@ -62,6 +62,7 @@ export function BlogArticleView({ post, products }: BlogArticleViewProps) {
           density={
             presentation.layout === "asymmetric" ? "asymmetric" : "classic"
           }
+          articleId={post.id}
         />
 
         {(presentation.pros.length > 0 || presentation.cons.length > 0) &&

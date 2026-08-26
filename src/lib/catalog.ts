@@ -1,8 +1,13 @@
 import { generateAffiliateUrl } from "@/lib/affiliate";
 import { toNumber } from "@/lib/money";
+import {
+  computeMovingAverages,
+  downsamplePoints,
+  type PricePoint,
+} from "@/lib/price-history";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { dealScoringService } from "@/services/deal-scoring";
-import { DealLevel } from "@/types";
+import { DealLevel, ProductAvailability } from "@/types";
 import type { Database } from "@/types/database";
 
 export type ProductRow = Database["public"]["Tables"]["products"]["Row"];
@@ -20,8 +25,11 @@ export interface CatalogProduct {
   previousPrice: number | null;
   lowestPrice: number | null;
   highestPrice: number | null;
+  averagePrice30d: number | null;
+  averagePrice90d: number | null;
   discountPercentage: number;
   currency: string;
+  availability: ProductAvailability;
   isFeatured: boolean;
   lastCheckedAt: string | null;
   affiliateUrl: string;
@@ -33,6 +41,12 @@ export interface CatalogProduct {
   dealLevel: DealLevel;
   dealScore: number;
   dealLabel: string;
+}
+
+export interface PriceHistoryResult {
+  points: PricePoint[];
+  averagePrice30d: number | null;
+  averagePrice90d: number | null;
 }
 
 type ProductWithCategory = ProductRow & {
@@ -74,9 +88,12 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     previousPrice,
     lowestPrice,
     highestPrice: toNumber(product.highest_price),
+    averagePrice30d: toNumber(product.average_price_30d),
+    averagePrice90d: toNumber(product.average_price_90d),
     discountPercentage:
       toNumber(product.discount_percentage) ?? scoring.discountPercentage,
     currency: product.currency,
+    availability: product.availability ?? ProductAvailability.UNKNOWN,
     isFeatured: product.is_featured,
     lastCheckedAt: product.last_checked_at,
     affiliateUrl: generateAffiliateUrl({
@@ -195,29 +212,68 @@ export async function getProductsBySlugs(
     .filter((product): product is CatalogProduct => Boolean(product));
 }
 
+export interface GetPriceHistoryOptions {
+  /** Ventana temporal en días (default 90 para medias 30/90). */
+  days?: number;
+  /** Máximo de puntos crudos a leer de Supabase (default 400). */
+  fetchLimit?: number;
+  /** Máximo de puntos tras downsampling para el gráfico (default 120). */
+  maxPoints?: number;
+}
+
+/**
+ * Histórico reciente (más nuevos primero en query; se devuelve cronológico).
+ * Calcula medias móviles 30d/90d sobre la ventana completa.
+ */
 export async function getPriceHistory(
   productId: string,
-  limit = 30,
-): Promise<Array<{ price: number; timestamp: string }>> {
+  options: GetPriceHistoryOptions | number = {},
+): Promise<PriceHistoryResult> {
+  const opts: GetPriceHistoryOptions =
+    typeof options === "number" ? { fetchLimit: options } : options;
+  const days = opts.days ?? 90;
+  const fetchLimit = Math.min(Math.max(opts.fetchLimit ?? 400, 30), 2_000);
+  const maxPoints = opts.maxPoints ?? 120;
+
+  const empty: PriceHistoryResult = {
+    points: [],
+    averagePrice30d: null,
+    averagePrice90d: null,
+  };
+
   const client = getClient();
-  if (!client) return [];
+  if (!client) return empty;
+
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - days);
 
   const { data, error } = await client
     .from("price_history")
     .select("price, timestamp")
     .eq("product_id", productId)
-    .order("timestamp", { ascending: true })
-    .limit(limit);
+    .gte("timestamp", since.toISOString())
+    .order("timestamp", { ascending: false })
+    .limit(fetchLimit);
 
   if (error || !data) {
     console.error("[catalog] getPriceHistory", error?.message);
-    return [];
+    return empty;
   }
 
-  return data.map((row) => ({
-    price: toNumber(row.price) ?? 0,
-    timestamp: row.timestamp,
-  }));
+  const chronological: PricePoint[] = [...data]
+    .reverse()
+    .map((row) => ({
+      price: toNumber(row.price) ?? 0,
+      timestamp: row.timestamp,
+    }));
+
+  const averages = computeMovingAverages(chronological);
+
+  return {
+    points: downsamplePoints(chronological, maxPoints),
+    averagePrice30d: averages.averagePrice30d,
+    averagePrice90d: averages.averagePrice90d,
+  };
 }
 
 export async function getCategories(): Promise<CategoryRow[]> {

@@ -1,5 +1,6 @@
 import { generateAffiliateUrl } from "@/lib/affiliate";
 import { calculateDiscountPercentage, requireNumber, roundMoney, toNumber } from "@/lib/money";
+import { computeMovingAverages } from "@/lib/price-history";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -26,6 +27,45 @@ import {
 import type { ProductRow } from "@/types/database";
 
 const DEFAULT_BATCH_SIZE = 25;
+
+async function refreshProductAverages(
+  client: TypedSupabaseClient,
+  productId: string,
+): Promise<void> {
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - 90);
+
+  const { data, error } = await client
+    .from("price_history")
+    .select("price, timestamp")
+    .eq("product_id", productId)
+    .gte("timestamp", since.toISOString())
+    .order("timestamp", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.warn("[priceDetection] averages", error.message);
+    return;
+  }
+
+  const points = (data ?? []).map((row) => ({
+    price: toNumber(row.price) ?? 0,
+    timestamp: row.timestamp,
+  }));
+  const { averagePrice30d, averagePrice90d } = computeMovingAverages(points);
+
+  const { error: updateError } = await client
+    .from("products")
+    .update({
+      average_price_30d: averagePrice30d,
+      average_price_90d: averagePrice90d,
+    })
+    .eq("id", productId);
+
+  if (updateError) {
+    console.warn("[priceDetection] average update", updateError.message);
+  }
+}
 
 export interface DetectedDeal {
   productId: string;
@@ -314,6 +354,8 @@ export async function runPriceDetection(
         if (historyError) {
           throw new Error(historyError.message);
         }
+
+        await refreshProductAverages(client, product.id);
 
         stats.updated += 1;
 

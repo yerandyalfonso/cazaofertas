@@ -18,6 +18,8 @@ export type BlogBlock =
     };
 
 export interface BlogPost {
+  /** UUID de Supabase cuando el artículo viene de la BD. */
+  id?: string;
   slug: string;
   title: string;
   excerpt: string;

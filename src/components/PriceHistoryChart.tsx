@@ -11,10 +11,14 @@ interface PriceHistoryPoint {
 interface PriceHistoryChartProps {
   points: PriceHistoryPoint[];
   currentPrice?: number;
+  averagePrice30d?: number | null;
+  averagePrice90d?: number | null;
+  /** Mínimo histórico all-time (products.lowest_price). */
+  allTimeLowest?: number | null;
   className?: string;
 }
 
-type TimeRange = "1w" | "1m";
+type TimeRange = "1w" | "1m" | "3m";
 
 interface DayPoint {
   price: number;
@@ -31,7 +35,14 @@ interface ChartCoord extends DayPoint {
 const RANGE_OPTIONS: Array<{ id: TimeRange; label: string }> = [
   { id: "1w", label: "1 semana" },
   { id: "1m", label: "1 mes" },
+  { id: "3m", label: "3 meses" },
 ];
+
+const RANGE_DAYS: Record<TimeRange, number> = {
+  "1w": 7,
+  "1m": 30,
+  "3m": 90,
+};
 
 const CHART_W = 720;
 const CHART_H = 300;
@@ -96,7 +107,7 @@ function buildDailySeries(
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
-  const dayCount = range === "1w" ? 7 : 30;
+  const dayCount = RANGE_DAYS[range];
   const endDay = toLocalDay(sorted[sorted.length - 1]!.timestamp);
   const startDay = addLocalDays(endDay, -(dayCount - 1));
 
@@ -224,6 +235,9 @@ function buildStepPaths(coords: ChartCoord[]): { line: string; area: string } {
 export function PriceHistoryChart({
   points,
   currentPrice,
+  averagePrice30d = null,
+  averagePrice90d = null,
+  allTimeLowest = null,
   className = "",
 }: PriceHistoryChartProps) {
   const uid = useId().replace(/:/g, "");
@@ -232,6 +246,14 @@ export function PriceHistoryChart({
   const [range, setRange] = useState<TimeRange>("1m");
 
   const days = useMemo(() => buildDailySeries(points, range), [points, range]);
+
+  const windowAverage = useMemo(() => {
+    if (range === "3m") return averagePrice90d;
+    if (range === "1m") return averagePrice30d;
+    if (days.length === 0) return null;
+    const sum = days.reduce((acc, d) => acc + d.price, 0);
+    return Math.round((sum / days.length) * 100) / 100;
+  }, [range, averagePrice30d, averagePrice90d, days]);
 
   const stats = useMemo(() => {
     if (days.length === 0) {
@@ -250,10 +272,18 @@ export function PriceHistoryChart({
       ? Math.round(((stats.max - stats.current) / stats.max) * 100)
       : null;
 
-  const yTicks = useMemo(
-    () => (days.length >= 2 ? niceTicks(stats.min, stats.max, 4) : [stats.min || 0]),
-    [days.length, stats.min, stats.max],
-  );
+  const yTicks = useMemo(() => {
+    if (days.length < 2) return [stats.min || 0];
+    const lo = Math.min(
+      stats.min,
+      windowAverage ?? stats.min,
+    );
+    const hi = Math.max(
+      stats.max,
+      windowAverage ?? stats.max,
+    );
+    return niceTicks(lo, hi, 4);
+  }, [days.length, stats.min, stats.max, windowAverage]);
 
   if (points.length < 2) {
     return (
@@ -262,6 +292,9 @@ export function PriceHistoryChart({
           min={stats.min || null}
           max={stats.max || null}
           current={currentPrice ?? null}
+          average={windowAverage}
+          averageLabel={range === "3m" ? "Media 90d" : "Media 30d"}
+          allTimeLowest={allTimeLowest}
           savings={null}
           empty
         />
@@ -277,8 +310,12 @@ export function PriceHistoryChart({
   const yRange = yMax - yMin || 1;
   const coords = toCoords(days, yMin, yRange);
   const { line: linePath, area: areaPath } = buildStepPaths(coords);
-  const dense = coords.length > 10;
+  const dense = coords.length > 14;
   const active = activeIndex !== null ? coords[activeIndex] : null;
+  const avgY =
+    windowAverage !== null
+      ? PAD.top + (1 - (windowAverage - yMin) / yRange) * PLOT_H
+      : null;
 
   return (
     <div className={className}>
@@ -286,6 +323,11 @@ export function PriceHistoryChart({
         min={stats.min}
         max={stats.max}
         current={stats.current}
+        average={windowAverage}
+        averageLabel={
+          range === "3m" ? "Media 90 días" : range === "1m" ? "Media 30 días" : "Media periodo"
+        }
+        allTimeLowest={allTimeLowest}
         savings={savings}
       />
 
@@ -398,6 +440,17 @@ export function PriceHistoryChart({
               })}
 
               <path d={areaPath} fill={`url(#${gradientId})`} />
+              {avgY !== null ? (
+                <line
+                  x1={PAD.left}
+                  y1={avgY}
+                  x2={CHART_W - PAD.right}
+                  y2={avgY}
+                  stroke="#a8a29e"
+                  strokeWidth="1.5"
+                  strokeDasharray="6 5"
+                />
+              ) : null}
               <path
                 d={linePath}
                 fill="none"
@@ -515,27 +568,47 @@ function MetricBar({
   min,
   max,
   current,
+  average,
+  averageLabel,
+  allTimeLowest,
   savings,
   empty = false,
 }: {
   min: number | null;
   max: number | null;
   current: number | null;
+  average?: number | null;
+  averageLabel?: string;
+  allTimeLowest?: number | null;
   savings: number | null;
   empty?: boolean;
 }) {
   const items = [
     {
-      label: "Mínimo",
+      label: "Mín. periodo",
       value: min,
-      hint: "Mejor precio del periodo",
+      hint: "Mejor precio del rango visible",
       accent: "border-t-teal-700",
       valueClass: "text-teal-900",
     },
     {
+      label: "Mín. histórico",
+      value: allTimeLowest ?? null,
+      hint: "All-time (catálogo)",
+      accent: "border-t-teal-900",
+      valueClass: "text-teal-950",
+    },
+    {
+      label: averageLabel ?? "Media",
+      value: average ?? null,
+      hint: "Media móvil del periodo",
+      accent: "border-t-stone-400",
+      valueClass: "text-stone-700",
+    },
+    {
       label: "Máximo",
       value: max,
-      hint: "Pico registrado",
+      hint: "Pico del periodo",
       accent: "border-t-stone-400",
       valueClass: "text-stone-700",
     },
@@ -552,7 +625,7 @@ function MetricBar({
   ] as const;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {items.map((item) => (
         <div
           key={item.label}

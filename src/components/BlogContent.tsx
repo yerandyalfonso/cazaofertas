@@ -15,6 +15,7 @@ interface BlogContentProps {
   productsBySlug: Map<string, CatalogProduct>;
   /** asymmetric = dos columnas en desktop para lectura + rail de productos */
   density?: "classic" | "asymmetric";
+  articleId?: string | null;
 }
 
 export function BlogContent({
@@ -23,6 +24,7 @@ export function BlogContent({
   relatedProductSlugs = [],
   productsBySlug,
   density = "classic",
+  articleId,
 }: BlogContentProps) {
   const relatedProducts = relatedProductSlugs
     .map((slug) => productsBySlug.get(slug))
@@ -154,7 +156,11 @@ export function BlogContent({
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
                 Oferta recomendada
               </p>
-              <InlineDealCard product={product} />
+              <InlineDealCard
+                product={product}
+                articleId={articleId}
+                clickSource="blog"
+              />
             </aside>
           );
         }
@@ -183,7 +189,12 @@ export function BlogContent({
               </p>
               <div className="flex flex-col gap-3">
                 {products.map((product) => (
-                  <InlineDealCard key={product.id} product={product} />
+                  <InlineDealCard
+                    key={product.id}
+                    product={product}
+                    articleId={articleId}
+                    clickSource="blog"
+                  />
                 ))}
               </div>
             </aside>
@@ -201,7 +212,12 @@ export function BlogContent({
           </p>
           <div className="flex flex-col gap-3">
             {relatedProducts.map((product) => (
-              <InlineDealCard key={product.id} product={product} />
+              <InlineDealCard
+                key={product.id}
+                product={product}
+                articleId={articleId}
+                clickSource="blog"
+              />
             ))}
           </div>
         </aside>
@@ -223,6 +239,8 @@ export function BlogContent({
                 key={product.id}
                 product={product}
                 variant="sidebar"
+                articleId={articleId}
+                clickSource="blog"
               />
             ))}
           </div>

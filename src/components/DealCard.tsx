@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
+import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
 
 interface DealCardProps {
@@ -19,7 +20,7 @@ export function DealCard({
     return (
       <article className="group grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-stone-200 pb-5 last:border-b-0 last:pb-0">
         <Link
-          href={`/ofertas/${product.slug}`}
+          href={`/producto/${product.slug}`}
           className="relative aspect-square overflow-hidden bg-stone-200"
         >
           {product.imageUrl ? (
@@ -36,7 +37,7 @@ export function DealCard({
           <div className="flex flex-wrap gap-1.5">
             <Badge dealLevel={product.dealLevel} />
           </div>
-          <Link href={`/ofertas/${product.slug}`}>
+          <Link href={`/producto/${product.slug}`}>
             <h3 className="line-clamp-2 font-display text-base leading-snug tracking-tight text-ink transition group-hover:text-teal-900">
               {product.title}
             </h3>
@@ -59,7 +60,7 @@ export function DealCard({
       }`}
     >
       <Link
-        href={`/ofertas/${product.slug}`}
+        href={`/producto/${product.slug}`}
         className={`relative block overflow-hidden bg-stone-200 ${
           featured
             ? "aspect-[16/11] md:aspect-auto md:min-h-full"
@@ -90,7 +91,7 @@ export function DealCard({
           ) : null}
         </div>
 
-        <Link href={`/ofertas/${product.slug}`} className="space-y-2">
+        <Link href={`/producto/${product.slug}`} className="space-y-2">
           <h3
             className={`font-display tracking-tight text-ink transition-colors group-hover:text-teal-900 ${
               featured
@@ -120,8 +121,10 @@ export function DealCard({
               Score {Math.round(product.dealScore)}
             </p>
             <a
-              href={product.affiliateUrl}
-              target="_blank"
+              href={buildTrackedAffiliatePath({
+                productId: product.id,
+                source: "deal_card",
+              })}
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 items-center justify-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
             >

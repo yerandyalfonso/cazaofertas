@@ -233,7 +233,9 @@ export type EditorBlockKind =
   | "blockquote"
   | "divider"
   | "image"
-  | "prosCons";
+  | "prosCons"
+  | "product"
+  | "productGrid";
 
 export interface EditorBlockBase {
   id: string;
@@ -255,7 +257,9 @@ export type EditorBlock =
       title?: string;
       pros: string[];
       cons: string[];
-    });
+    })
+  | (EditorBlockBase & { type: "product"; slug: string })
+  | (EditorBlockBase & { type: "productGrid"; slugs: string[] });
 
 let blockSeq = 0;
 export function newBlockId(): string {
@@ -297,12 +301,9 @@ export function blogBlocksToEditor(blocks: BlogBlock[]): EditorBlock[] {
           cons: [...block.cons],
         };
       case "product":
+        return { id, type: "product", slug: block.slug };
       case "productGrid":
-        return {
-          id,
-          type: "paragraph",
-          text: `[Producto vinculado: usa el selector de productos del formulario]`,
-        };
+        return { id, type: "productGrid", slugs: [...block.slugs] };
       default:
         return { id, type: "paragraph", text: "" };
     }
@@ -362,6 +363,18 @@ export function editorBlocksToBlog(blocks: EditorBlock[]): BlogBlock[] {
         }
         break;
       }
+      case "product":
+        if (block.slug.trim()) {
+          result.push({ type: "product", slug: block.slug.trim() });
+        }
+        break;
+      case "productGrid": {
+        const slugs = block.slugs.map((s) => s.trim()).filter(Boolean);
+        if (slugs.length > 0) {
+          result.push({ type: "productGrid", slugs });
+        }
+        break;
+      }
     }
   }
   return result;
@@ -389,6 +402,10 @@ export function emptyEditorBlock(kind: EditorBlockKind): EditorBlock {
       return { id, type: "image", src: "", alt: "" };
     case "prosCons":
       return { id, type: "prosCons", title: "Pros y contras", pros: [""], cons: [""] };
+    case "product":
+      return { id, type: "product", slug: "" };
+    case "productGrid":
+      return { id, type: "productGrid", slugs: [""] };
   }
 }
 

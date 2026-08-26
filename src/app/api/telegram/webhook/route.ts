@@ -3,7 +3,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import {
   handleCallbackQuery,
   handleNewAlert,
-  sendStartWelcome,
+  handleTelegramCommand,
   sendTelegramMessage,
   type TelegramUpdate,
 } from "@/services/telegram/bot";
@@ -113,33 +113,17 @@ export async function POST(request: NextRequest) {
 
     const command = extractCommand(message.text);
 
-    if (command === "start") {
-      await sendStartWelcome(message.chat.id);
-      return NextResponse.json({ ok: true });
-    }
-
-    if (command === "help") {
-      await sendTelegramMessage({
-        chatId: message.chat.id,
-        text: [
-          "Comandos disponibles:",
-          "/start — menú principal",
-          "/help — esta ayuda",
-          "/alerts — tus alertas",
-          "/addalert — crear alerta",
-          "/removealert — eliminar alerta",
-          "/products — ofertas",
-          "/categories — categorías",
-          "/settings — ajustes",
-        ].join("\n"),
-      });
-      return NextResponse.json({ ok: true });
-    }
-
     if (command) {
+      const handled = await handleTelegramCommand(command, {
+        chatId: message.chat.id,
+        telegramId: message.from.id,
+      });
+      if (handled) {
+        return NextResponse.json({ ok: true });
+      }
       await sendTelegramMessage({
         chatId: message.chat.id,
-        text: `El comando /${command} estará disponible pronto. Usa /start para el menú.`,
+        text: `El comando /${command} no está disponible. Usa /help.`,
       });
       return NextResponse.json({ ok: true });
     }

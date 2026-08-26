@@ -18,3 +18,17 @@ export {
   scrapeAmazonProductPage,
   type AmazonHtmlPriceProviderOptions,
 } from "@/providers/price/AmazonHtmlPriceProvider";
+export {
+  KeepaPriceProvider,
+  type KeepaPriceProviderOptions,
+} from "@/providers/price/KeepaPriceProvider";
+export {
+  AmazonCreatorsApiProvider,
+  type AmazonCreatorsApiProviderOptions,
+} from "@/providers/price/AmazonCreatorsApiProvider";
+export {
+  resolvePriceProvider,
+  type PriceProviderId,
+  type ResolvePriceProviderOptions,
+  type ResolvedPriceProvider,
+} from "@/providers/price/createPriceProvider";

@@ -6,12 +6,28 @@ import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
+import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import {
   getActiveProducts,
   getPriceHistory,
   getProductBySlug,
+  TELEGRAM_BOT_URL,
 } from "@/lib/catalog";
 import { formatEuro } from "@/lib/money";
+import { ProductAvailability } from "@/types";
+
+function availabilityLabel(value: ProductAvailability): string {
+  switch (value) {
+    case ProductAvailability.IN_STOCK:
+      return "En stock";
+    case ProductAvailability.OUT_OF_STOCK:
+      return "Agotado";
+    case ProductAvailability.PREORDER:
+      return "Preventa";
+    default:
+      return "Sin dato";
+  }
+}
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -48,9 +64,7 @@ export async function generateMetadata({
       url: `/producto/${slug}`,
       siteName: "CazaOferta",
       locale: "es_ES",
-      images: image
-        ? [{ url: image, alt: title }]
-        : undefined,
+      images: image ? [{ url: image, alt: title }] : undefined,
     },
     twitter: {
       card: image ? "summary_large_image" : "summary",
@@ -66,7 +80,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const history = await getPriceHistory(product.id);
+  const history = await getPriceHistory(product.id, { days: 90, maxPoints: 120 });
+  const averagePrice30d =
+    product.averagePrice30d ?? history.averagePrice30d;
+  const averagePrice90d =
+    product.averagePrice90d ?? history.averagePrice90d;
   const savings =
     product.previousPrice !== null
       ? product.previousPrice - product.currentPrice
@@ -117,12 +135,24 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             {product.title}
           </h1>
 
+          {product.brand ? (
+            <p className="text-sm uppercase tracking-[0.16em] text-stone-500">
+              {product.brand}
+            </p>
+          ) : null}
+
           <Price
             current={product.currentPrice}
             previous={product.previousPrice}
             discountPercentage={product.discountPercentage}
             size="lg"
           />
+
+          <p className="text-sm text-stone-600">
+            Deal score{" "}
+            <strong className="text-ink">{Math.round(product.dealScore)}</strong>
+            {product.dealLabel ? ` · ${product.dealLabel}` : null}
+          </p>
 
           <AffiliateDisclosure />
 
@@ -155,6 +185,32 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
                   : "—"}
               </dd>
             </div>
+            <div>
+              <dt className="text-stone-500">Media 30 días</dt>
+              <dd className="mt-1 font-medium text-ink">
+                {averagePrice30d !== null ? formatEuro(averagePrice30d) : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-stone-500">Media 90 días</dt>
+              <dd className="mt-1 font-medium text-ink">
+                {averagePrice90d !== null ? formatEuro(averagePrice90d) : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-stone-500">Disponibilidad</dt>
+              <dd className="mt-1 font-medium text-ink">
+                {availabilityLabel(product.availability)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-stone-500">Última comprobación</dt>
+              <dd className="mt-1 font-medium text-ink">
+                {product.lastCheckedAt
+                  ? new Date(product.lastCheckedAt).toLocaleString("es-ES")
+                  : "—"}
+              </dd>
+            </div>
           </dl>
 
           {product.description ? (
@@ -163,14 +219,26 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </p>
           ) : null}
 
-          <a
-            href={product.affiliateUrl}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="inline-flex h-12 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.16em] text-paper transition hover:bg-teal-900"
-          >
-            Ir a Amazon
-          </a>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={buildTrackedAffiliatePath({
+                productId: product.id,
+                source: "product_page",
+              })}
+              rel="noopener noreferrer sponsored"
+              className="inline-flex h-12 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.16em] text-paper transition hover:bg-teal-900"
+            >
+              Ir a Amazon
+            </a>
+            <a
+              href={TELEGRAM_BOT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-12 items-center border border-stone-400 px-6 text-xs font-semibold uppercase tracking-[0.16em] text-ink transition hover:border-ink"
+            >
+              Crear alerta en Telegram
+            </a>
+          </div>
         </div>
       </div>
 
@@ -179,12 +247,16 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           Evolución del precio
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Mínimo, máximo y actual, con la curva de chequeos automáticos.
+          Mínimo, media móvil, máximo y actual. La línea discontinua marca la
+          media del periodo seleccionado.
         </p>
         <div className="mt-6">
           <PriceHistoryChart
-            points={history}
+            points={history.points}
             currentPrice={product.currentPrice}
+            averagePrice30d={averagePrice30d}
+            averagePrice90d={averagePrice90d}
+            allTimeLowest={product.lowestPrice}
           />
         </div>
       </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -8,6 +8,7 @@ import {
   ImagePlus,
   Loader2,
   Minus,
+  Package,
   Plus,
   Quote,
   Scale,
@@ -28,20 +29,29 @@ const ADD_OPTIONS: Array<{ kind: EditorBlockKind; label: string; icon: typeof Ty
     { kind: "paragraph", label: "Párrafo", icon: Type },
     { kind: "blockquote", label: "Destacado", icon: Quote },
     { kind: "prosCons", label: "Pros / Contras", icon: Scale },
+    { kind: "product", label: "Producto", icon: Package },
+    { kind: "productGrid", label: "Grid productos", icon: Package },
     { kind: "image", label: "Imagen", icon: ImagePlus },
     { kind: "divider", label: "Separador", icon: Minus },
   ];
+
+export interface ArticleBlockProductOption {
+  slug: string;
+  title: string;
+}
 
 interface ArticleBlockEditorProps {
   blocks: EditorBlock[];
   onChange: (blocks: EditorBlock[]) => void;
   onUploadImage: (file: File) => Promise<string>;
+  products?: ArticleBlockProductOption[];
 }
 
 export function ArticleBlockEditor({
   blocks,
   onChange,
   onUploadImage,
+  products = [],
 }: ArticleBlockEditorProps) {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
@@ -104,9 +114,13 @@ export function ArticleBlockEditor({
                     ? "Destacado"
                     : block.type === "prosCons"
                       ? "Pros / Contras"
-                      : block.type === "image"
-                        ? "Imagen"
-                        : "Separador"}
+                      : block.type === "product"
+                        ? "Producto embebido"
+                        : block.type === "productGrid"
+                          ? "Grid de productos"
+                          : block.type === "image"
+                            ? "Imagen"
+                            : "Separador"}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -308,6 +322,70 @@ export function ArticleBlockEditor({
                   + Añadir contra
                 </button>
               </div>
+            </div>
+          ) : null}
+
+          {block.type === "product" ? (
+            <select
+              value={block.slug}
+              onChange={(event) =>
+                updateBlock(block.id, { slug: event.target.value })
+              }
+              className="h-11 w-full border border-stone-300 bg-white px-3 text-sm outline-none focus:border-ink"
+            >
+              <option value="">Selecciona un producto…</option>
+              {products.map((product) => (
+                <option key={product.slug} value={product.slug}>
+                  {product.title}
+                </option>
+              ))}
+            </select>
+          ) : null}
+
+          {block.type === "productGrid" ? (
+            <div className="space-y-2">
+              {block.slugs.map((slug, idx) => (
+                <div key={`${block.id}-slug-${idx}`} className="flex gap-2">
+                  <select
+                    value={slug}
+                    onChange={(event) => {
+                      const slugs = [...block.slugs];
+                      slugs[idx] = event.target.value;
+                      updateBlock(block.id, { slugs });
+                    }}
+                    className="h-10 min-w-0 flex-1 border border-stone-300 bg-white px-3 text-sm outline-none focus:border-ink"
+                  >
+                    <option value="">Producto…</option>
+                    {products.map((product) => (
+                      <option key={product.slug} value={product.slug}>
+                        {product.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    title="Quitar"
+                    onClick={() => {
+                      const slugs = block.slugs.filter((_, i) => i !== idx);
+                      updateBlock(block.id, {
+                        slugs: slugs.length > 0 ? slugs : [""],
+                      });
+                    }}
+                    className="inline-flex h-10 w-10 items-center justify-center text-stone-500 hover:text-rose-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  updateBlock(block.id, { slugs: [...block.slugs, ""] })
+                }
+                className="text-xs font-semibold text-teal-800 hover:underline"
+              >
+                + Añadir producto al grid
+              </button>
             </div>
           ) : null}
         </div>

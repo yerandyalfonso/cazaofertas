@@ -1,11 +1,11 @@
-import { AmazonHtmlPriceProvider } from "@/providers/price";
+import { resolvePriceProvider } from "@/providers/price";
 import { runPriceDetection, type PriceDetectionStats } from "@/services/priceDetection";
 import { buildAsinUrlMap, productHasMonitorableUrl } from "@/services/products";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 export interface AmazonPriceCheckResult {
   ok: true;
-  provider: "amazon-html";
+  provider: "html" | "keepa" | "creators";
   monitorable: number;
   scoped: number;
   finishedAt: string;
@@ -51,7 +51,7 @@ export async function runAmazonPriceCheck(options?: {
     asins.map((asin) => [asin, urlByAsin.get(asin)!] as const),
   );
 
-  const provider = new AmazonHtmlPriceProvider({
+  const resolved = resolvePriceProvider({
     urlByAsin: scopedUrlMap,
     delayMs: 1_400,
     timeoutMs: 12_000,
@@ -59,17 +59,17 @@ export async function runAmazonPriceCheck(options?: {
 
   const stats = await runPriceDetection({
     client,
-    provider,
-    source: "amazon",
+    provider: resolved.provider,
+    source: resolved.source,
     onlyWithAmazonUrl: true,
     asinAllowList: asins,
-    batchSize: 3,
+    batchSize: resolved.id === "html" ? 3 : 8,
     notify: options?.notify ?? true,
   });
 
   return {
     ok: true,
-    provider: "amazon-html",
+    provider: resolved.id,
     monitorable: monitorable.length,
     scoped: scopedUrlMap.size,
     finishedAt: new Date().toISOString(),

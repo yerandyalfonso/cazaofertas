@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Upload, X } from "lucide-react";
+import { Loader2, ArrowDown, ArrowUp, Plus, Upload, X } from "lucide-react";
 import { ArticleBlockEditor } from "@/components/admin/ArticleBlockEditor";
 import { ArticleQuickImport } from "@/components/admin/ArticleQuickImport";
 import { ArticleStyleGuide } from "@/components/admin/ArticleStyleGuide";
@@ -230,9 +230,21 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     }
   }
 
-  const selectedProducts = products.filter((product) =>
-    productIds.includes(product.id),
-  );
+  const selectedProducts = productIds
+    .map((id) => products.find((product) => product.id === id))
+    .filter((product): product is ProductOption => Boolean(product));
+
+  function moveProduct(id: string, direction: -1 | 1) {
+    setProductIds((prev) => {
+      const index = prev.indexOf(id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= prev.length) return prev;
+      const copy = [...prev];
+      const [item] = copy.splice(index, 1);
+      copy.splice(next, 0, item!);
+      return copy;
+    });
+  }
 
   const filteredProducts = products.filter((product) => {
     if (productIds.includes(product.id)) return false;
@@ -256,6 +268,21 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         pullQuote,
       });
 
+      const embedSlugs = new Set<string>();
+      for (const block of document.blocks) {
+        if (block.type === "product" && block.slug) embedSlugs.add(block.slug);
+        if (block.type === "productGrid") {
+          for (const slug of block.slugs) if (slug) embedSlugs.add(slug);
+        }
+      }
+      const embedIds = products
+        .filter((p) => embedSlugs.has(p.slug))
+        .map((p) => p.id);
+      const mergedProductIds = [
+        ...productIds,
+        ...embedIds.filter((id) => !productIds.includes(id)),
+      ];
+
       const payload = {
         title,
         slug: slug || slugify(title),
@@ -267,7 +294,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         status,
         seoTitle: seoTitle || undefined,
         seoDescription: seoDescription || undefined,
-        productIds,
+        productIds: mergedProductIds,
       };
 
       const response = await fetch(
@@ -536,6 +563,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             blocks={blocks}
             onChange={setBlocks}
             onUploadImage={uploadImage}
+            products={products.map((p) => ({ slug: p.slug, title: p.title }))}
           />
         </section>
 
@@ -568,29 +596,49 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
 
           {selectedProducts.length > 0 ? (
             <ul className="mt-3 space-y-2">
-              {selectedProducts.map((product) => (
+              {selectedProducts.map((product, index) => (
                 <li
                   key={product.id}
                   className="flex items-center justify-between gap-3 border border-stone-200 px-3 py-2 text-sm"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-ink">{product.title}</p>
                     <p className="font-mono text-xs text-stone-500">
                       {product.asin}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    title="Quitar producto"
-                    onClick={() =>
-                      setProductIds((prev) =>
-                        prev.filter((id) => id !== product.id),
-                      )
-                    }
-                    className="text-stone-500 hover:text-rose-700"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      title="Subir"
+                      disabled={index === 0}
+                      onClick={() => moveProduct(product.id, -1)}
+                      className="inline-flex h-7 w-7 items-center justify-center text-stone-500 hover:text-ink disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Bajar"
+                      disabled={index === selectedProducts.length - 1}
+                      onClick={() => moveProduct(product.id, 1)}
+                      className="inline-flex h-7 w-7 items-center justify-center text-stone-500 hover:text-ink disabled:opacity-30"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Quitar producto"
+                      onClick={() =>
+                        setProductIds((prev) =>
+                          prev.filter((id) => id !== product.id),
+                        )
+                      }
+                      className="text-stone-500 hover:text-rose-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

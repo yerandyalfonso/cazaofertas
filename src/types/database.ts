@@ -57,6 +57,8 @@ export type Database = {
           previous_price: number | null;
           lowest_price: number | null;
           highest_price: number | null;
+          average_price_30d: number | null;
+          average_price_90d: number | null;
           discount_percentage: number | null;
           currency: string;
           availability: ProductAvailability;
@@ -84,6 +86,8 @@ export type Database = {
           previous_price?: number | null;
           lowest_price?: number | null;
           highest_price?: number | null;
+          average_price_30d?: number | null;
+          average_price_90d?: number | null;
           discount_percentage?: number | null;
           currency?: string;
           availability?: ProductAvailability;
@@ -111,6 +115,8 @@ export type Database = {
           previous_price?: number | null;
           lowest_price?: number | null;
           highest_price?: number | null;
+          average_price_30d?: number | null;
+          average_price_90d?: number | null;
           discount_percentage?: number | null;
           currency?: string;
           availability?: ProductAvailability;
@@ -171,6 +177,7 @@ export type Database = {
           telegram_id: number | null;
           telegram_username: string | null;
           email: string | null;
+          telegram_wizard: Json | null;
           created_at: string;
           last_active_at: string | null;
         };
@@ -179,6 +186,7 @@ export type Database = {
           telegram_id?: number | null;
           telegram_username?: string | null;
           email?: string | null;
+          telegram_wizard?: Json | null;
           created_at?: string;
           last_active_at?: string | null;
         };
@@ -187,6 +195,7 @@ export type Database = {
           telegram_id?: number | null;
           telegram_username?: string | null;
           email?: string | null;
+          telegram_wizard?: Json | null;
           created_at?: string;
           last_active_at?: string | null;
         };
@@ -359,24 +368,52 @@ export type Database = {
           id: string;
           product_id: string;
           user_id: string | null;
+          article_id: string | null;
           source: string;
+          is_test: boolean;
           created_at: string;
         };
         Insert: {
           id?: string;
           product_id: string;
           user_id?: string | null;
+          article_id?: string | null;
           source: string;
+          is_test?: boolean;
           created_at?: string;
         };
         Update: {
           id?: string;
           product_id?: string;
           user_id?: string | null;
+          article_id?: string | null;
           source?: string;
+          is_test?: boolean;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_clicks_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "affiliate_clicks_article_id_fkey";
+            columns: ["article_id"];
+            isOneToOne: false;
+            referencedRelation: "articles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "affiliate_clicks_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       articles: {
         Row: {

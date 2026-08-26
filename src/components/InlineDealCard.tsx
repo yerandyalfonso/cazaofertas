@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
+import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
 
 interface InlineDealCardProps {
@@ -10,6 +11,8 @@ interface InlineDealCardProps {
   buyLabel?: string;
   /** Vertical stack for article sidebars (narrow columns). */
   variant?: "horizontal" | "sidebar";
+  articleId?: string | null;
+  clickSource?: string;
 }
 
 export function InlineDealCard({
@@ -17,8 +20,15 @@ export function InlineDealCard({
   href,
   buyLabel = "Ver en Amazon",
   variant = "horizontal",
+  articleId,
+  clickSource = "blog_inline",
 }: InlineDealCardProps) {
   const detailHref = href ?? `/producto/${product.slug}`;
+  const buyHref = buildTrackedAffiliatePath({
+    productId: product.id,
+    source: clickSource,
+    articleId,
+  });
 
   if (variant === "sidebar") {
     return (
@@ -73,8 +83,7 @@ export function InlineDealCard({
               size="sm"
             />
             <a
-              href={product.affiliateUrl}
-              target="_blank"
+              href={buyHref}
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 w-full items-center justify-center bg-ink text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900"
             >
@@ -144,8 +153,7 @@ export function InlineDealCard({
               className="min-w-0"
             />
             <a
-              href={product.affiliateUrl}
-              target="_blank"
+              href={buyHref}
               rel="noopener noreferrer sponsored"
               className="inline-flex h-9 shrink-0 items-center self-end bg-ink px-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900 sm:h-10 sm:px-4"
             >

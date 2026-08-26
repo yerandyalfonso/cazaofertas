@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
+import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
 
 interface ProductCardProps {
@@ -12,6 +13,8 @@ interface ProductCardProps {
   /** Affiliate CTA anchored at the bottom of the card (compact only). */
   showBuyButton?: boolean;
   buyLabel?: string;
+  articleId?: string | null;
+  clickSource?: string;
 }
 
 export function ProductCard({
@@ -20,9 +23,16 @@ export function ProductCard({
   variant = "default",
   showBuyButton = false,
   buyLabel = "Comprar",
+  articleId,
+  clickSource = "product_card",
 }: ProductCardProps) {
   const link = href ?? `/producto/${product.slug}`;
   const compact = variant === "compact";
+  const buyHref = buildTrackedAffiliatePath({
+    productId: product.id,
+    source: clickSource,
+    articleId,
+  });
 
   return (
     <article
@@ -100,8 +110,7 @@ export function ProductCard({
       {showBuyButton ? (
         <div className={`mt-auto ${compact ? "px-3 pb-3" : "pt-3"}`}>
           <a
-            href={product.affiliateUrl}
-            target="_blank"
+            href={buyHref}
             rel="noopener noreferrer sponsored"
             className="inline-flex h-10 w-full items-center justify-center bg-ink text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
           >

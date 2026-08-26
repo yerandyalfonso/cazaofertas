@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { extractAsin } from "@/lib/affiliate";
+import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface AdminProduct {
@@ -690,11 +691,13 @@ export default function ProductsAdminClient() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <a
-                        href={product.amazonUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ver en Amazon"
-                        aria-label="Ver en Amazon"
+                        href={buildTrackedAffiliatePath({
+                          productId: product.id,
+                          source: "admin",
+                          test: true,
+                        })}
+                        title="Ver en Amazon (clic de prueba)"
+                        aria-label="Ver en Amazon (clic de prueba)"
                         className={iconBtnClass}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />

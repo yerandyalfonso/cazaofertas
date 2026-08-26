@@ -1,4 +1,5 @@
 import { calculateDiscountPercentage, roundMoney } from "@/lib/money";
+import { evaluateHistoricalLow } from "@/services/historicalLow";
 import {
   DealLevel,
   type DealScoringConfig,
@@ -54,11 +55,7 @@ function historicalDistancePercent(
   currentPrice: number,
   lowestPrice: number | null,
 ): number | null {
-  if (lowestPrice === null || lowestPrice <= 0) {
-    return null;
-  }
-
-  return roundMoney(((currentPrice - lowestPrice) / lowestPrice) * 100);
+  return evaluateHistoricalLow({ currentPrice, lowestPrice }).distancePercent;
 }
 
 function mapScoreToLevel(
@@ -155,22 +152,25 @@ export class DealScoringService {
     }
 
     let historicalPoints = 0;
-    const isHistoricalLow =
-      distanceToHistoricalLowPercent !== null &&
-      distanceToHistoricalLowPercent <= this.config.historicalLowDistancePercent;
+    const historical = evaluateHistoricalLow({
+      currentPrice: input.currentPrice,
+      lowestPrice: input.lowestPrice,
+      nearThresholdPercent: this.config.historicalLowDistancePercent,
+    });
+    const isHistoricalLow = historical.isNearHistoricalLow;
 
-    if (isHistoricalLow) {
+    if (historical.isAtHistoricalLow || isHistoricalLow) {
       historicalPoints = 30;
       reasons.push("Precio en el mínimo histórico o muy cercano.");
     } else if (
-      distanceToHistoricalLowPercent !== null &&
-      distanceToHistoricalLowPercent <= 5
+      historical.distancePercent !== null &&
+      historical.distancePercent <= 5
     ) {
       historicalPoints = 18;
       reasons.push("Precio cercano al mínimo histórico.");
     } else if (
-      distanceToHistoricalLowPercent !== null &&
-      distanceToHistoricalLowPercent <= 10
+      historical.distancePercent !== null &&
+      historical.distancePercent <= 10
     ) {
       historicalPoints = 8;
       reasons.push("Precio relativamente cerca del mínimo histórico.");
