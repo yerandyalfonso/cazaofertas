@@ -11,6 +11,7 @@ import {
   type QuickImportTemplateId,
 } from "@/lib/article-quick-import";
 import type { BlogTemplate } from "@/lib/blog-templates";
+import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface ArticleQuickImportProps {
   activeBlogTemplate: BlogTemplate;
@@ -27,6 +28,8 @@ export function ArticleQuickImport({
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [filling, setFilling] = useState(false);
+  const toast = useAdminToast();
 
   useEffect(() => {
     setImportTemplate(quickImportIdForBlogTemplate(activeBlogTemplate));
@@ -46,33 +49,54 @@ export function ArticleQuickImport({
     try {
       await navigator.clipboard.writeText(preset.sample);
       setCopied(true);
+      toast.success("Ejemplo copiado al portapapeles.");
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
-      setStatus("No se pudo copiar el ejemplo. Selecciónalo a mano.");
+      const message = "No se pudo copiar el ejemplo. Selecciónalo a mano.";
+      setStatus(message);
+      toast.error(message);
     }
   }
 
   function loadSample() {
     setDraft(preset.sample);
     setStatus("Ejemplo cargado abajo. Pulsa «Autorellenar Campos».");
+    toast.info("Ejemplo cargado en el cuadro de texto.");
   }
 
   function autofill() {
     const trimmed = draft.trim();
     if (!trimmed) {
-      setStatus("Pega primero el texto en el cuadro «Insertar texto» o carga el ejemplo.");
+      const message =
+        "Pega primero el texto en el cuadro «Insertar texto» o carga el ejemplo.";
+      setStatus(message);
+      toast.error(message);
       return;
     }
 
-    const result = parseQuickImport(trimmed, importTemplate);
-    onApply(result);
+    setFilling(true);
+    try {
+      const result = parseQuickImport(trimmed, importTemplate);
+      onApply(result);
 
-    if (result.warnings.length > 0) {
-      setStatus(`Campos rellenados con avisos: ${result.warnings.join(" ")}`);
-    } else {
-      setStatus(
-        `Listo: título, extracto y ${result.blocks.length} bloque(s) aplicados (${preset.label}).`,
-      );
+      if (result.warnings.length > 0) {
+        const message = `Campos rellenados con avisos: ${result.warnings.join(" ")}`;
+        setStatus(message);
+        toast.info(message);
+      } else {
+        const message = `Listo: título, extracto y ${result.blocks.length} bloque(s) aplicados (${preset.label}).`;
+        setStatus(message);
+        toast.success(message);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo autorellenar el formulario.";
+      setStatus(message);
+      toast.error(message);
+    } finally {
+      setFilling(false);
     }
   }
 
@@ -194,10 +218,11 @@ export function ArticleQuickImport({
             <button
               type="button"
               onClick={autofill}
-              className="inline-flex h-12 items-center gap-2 bg-teal-800 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-teal-900"
+              disabled={filling}
+              className="inline-flex h-12 items-center gap-2 bg-teal-800 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-teal-900 disabled:opacity-60"
             >
-              <Wand2 className="h-4 w-4" />
-              Autorellenar Campos
+              <Wand2 className={`h-4 w-4 ${filling ? "animate-pulse" : ""}`} />
+              {filling ? "Autorellenando…" : "Autorellenar Campos"}
             </button>
             <button
               type="button"

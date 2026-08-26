@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface LinkedProduct {
   id: string;
@@ -39,6 +40,7 @@ const iconBtnClass =
 
 export function ArticlesAdminClient() {
   const router = useRouter();
+  const toast = useAdminToast();
   const [articles, setArticles] = useState<AdminArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -58,15 +60,17 @@ export function ArticlesAdminClient() {
       };
       if (!response.ok || !data.ok) {
         setError(data.error ?? "No se pudieron cargar artículos.");
+        toast.error(data.error ?? "No se pudieron cargar artículos.");
         return;
       }
       setArticles(data.articles ?? []);
     } catch {
       setError("Error de red al cargar artículos.");
+      toast.error("Error de red al cargar artículos.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -87,13 +91,17 @@ export function ArticlesAdminClient() {
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo eliminar.");
+        const message = data.error ?? "No se pudo eliminar.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setMessage(`Eliminado: ${article.slug}`);
+      toast.success(`Artículo eliminado: ${article.slug}`);
       await load();
     } catch {
       setError("Error de red al eliminar.");
+      toast.error("Error de red al eliminar.");
     } finally {
       setDeletingId(null);
     }

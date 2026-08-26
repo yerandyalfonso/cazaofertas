@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface CronStatus {
   activeProducts: number;
@@ -67,6 +68,7 @@ interface FlashRunResult {
 }
 
 export function CronAdminClient() {
+  const toast = useAdminToast();
   const [status, setStatus] = useState<CronStatus | null>(null);
   const [result, setResult] = useState<CronRunResult | null>(null);
   const [flashResult, setFlashResult] = useState<FlashRunResult | null>(null);
@@ -87,7 +89,9 @@ export function CronAdminClient() {
         error?: string;
       };
       if (!response.ok || data.ok === false) {
-        setError(data.error ?? "No se pudo cargar el estado.");
+        const message = data.error ?? "No se pudo cargar el estado.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setStatus({
@@ -97,10 +101,11 @@ export function CronAdminClient() {
       });
     } catch {
       setError("Error de red al cargar estado.");
+      toast.error("Error de red al cargar estado.");
     } finally {
       setLoadingStatus(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void loadStatus();
@@ -123,11 +128,18 @@ export function CronAdminClient() {
       const data = (await response.json()) as CronRunResult;
       setResult(data);
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "La revisión falló.");
+        const message = data.error ?? "La revisión falló.";
+        setError(message);
+        toast.error(message);
+      } else {
+        toast.success(
+          `Cron precios OK · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados.`,
+        );
       }
       await loadStatus();
     } catch {
       setError("Error de red al ejecutar el cron.");
+      toast.error("Error de red al ejecutar el cron.");
     } finally {
       setRunning(false);
     }
@@ -151,11 +163,18 @@ export function CronAdminClient() {
       const data = (await response.json()) as FlashRunResult;
       setFlashResult(data);
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "El cron de Ofertas Flash falló.");
+        const message = data.error ?? "El cron de Ofertas Flash falló.";
+        setError(message);
+        toast.error(message);
+      } else {
+        toast.success(
+          `Flash OK · +${data.inserted ?? 0} nuevos, ${data.updated ?? 0} actualizados.`,
+        );
       }
       await loadStatus();
     } catch {
       setError("Error de red al ejecutar Ofertas Flash.");
+      toast.error("Error de red al ejecutar Ofertas Flash.");
     } finally {
       setRunningFlash(false);
     }

@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { extractAsin } from "@/lib/affiliate";
+import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface AdminProduct {
   id: string;
@@ -65,6 +66,7 @@ export default function ProductsAdminClient() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [scrapedDiscount, setScrapedDiscount] = useState<number | null>(null);
   const lastScrapedUrl = useRef<string>("");
+  const toast = useAdminToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,17 +80,20 @@ export default function ProductsAdminClient() {
         categories?: CategoryOption[];
       };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudieron cargar productos.");
+        const message = data.error ?? "No se pudieron cargar productos.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setProducts(data.products ?? []);
       setCategories(data.categories ?? []);
     } catch {
       setError("Error de red al cargar productos.");
+      toast.error("Error de red al cargar productos.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -276,12 +281,16 @@ export default function ProductsAdminClient() {
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo guardar.");
+        const message = data.error ?? "No se pudo guardar.";
+        setError(message);
+        toast.error(message);
         return;
       }
-      setMessage(
-        editingAsin ? "Producto actualizado." : "Producto creado / upsert.",
-      );
+      const success = editingAsin
+        ? "Producto actualizado."
+        : "Producto creado / upsert.";
+      setMessage(success);
+      toast.success(success);
       setForm(emptyForm);
       setEditingAsin(null);
       setScrapedDiscount(null);
@@ -289,6 +298,7 @@ export default function ProductsAdminClient() {
       await load();
     } catch {
       setError("Error de red al guardar.");
+      toast.error("Error de red al guardar.");
     } finally {
       setSaving(false);
     }
@@ -311,10 +321,13 @@ export default function ProductsAdminClient() {
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo eliminar.");
+        const message = data.error ?? "No se pudo eliminar.";
+        setError(message);
+        toast.error(message);
         return;
       }
       setMessage(`Eliminado: ${product.asin}`);
+      toast.success(`Producto eliminado: ${product.asin}`);
       if (editingAsin === product.asin) {
         setOpen(false);
         setEditingAsin(null);
@@ -322,6 +335,7 @@ export default function ProductsAdminClient() {
       await load();
     } catch {
       setError("Error de red al eliminar.");
+      toast.error("Error de red al eliminar.");
     } finally {
       setDeletingId(null);
     }
@@ -348,24 +362,29 @@ export default function ProductsAdminClient() {
         };
       };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo actualizar el precio.");
+        const message = data.error ?? "No se pudo actualizar el precio.";
+        setError(message);
+        toast.error(message);
         return;
       }
       const err = data.stats?.errors?.[0];
       if (err) {
-        setError(`${err.asin}: ${err.message}`);
+        const message = `${err.asin}: ${err.message}`;
+        setError(message);
+        toast.error(message);
       } else {
-        setMessage(
-          `Precio ${product.asin}: ${data.stats?.updated ? "actualizado" : "sin cambios"}${
-            data.stats?.dealsDetected
-              ? ` · ${data.stats.dealsDetected} chollo(s)`
-              : ""
-          }`,
-        );
+        const message = `Precio ${product.asin}: ${data.stats?.updated ? "actualizado" : "sin cambios"}${
+          data.stats?.dealsDetected
+            ? ` · ${data.stats.dealsDetected} chollo(s)`
+            : ""
+        }`;
+        setMessage(message);
+        toast.success(message);
       }
       await load();
     } catch {
       setError("Error de red al actualizar precio.");
+      toast.error("Error de red al actualizar precio.");
     } finally {
       setUpdatingAsin(null);
     }

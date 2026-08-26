@@ -7,6 +7,7 @@ import { Loader2, Plus, Upload, X } from "lucide-react";
 import { ArticleBlockEditor } from "@/components/admin/ArticleBlockEditor";
 import { ArticleQuickImport } from "@/components/admin/ArticleQuickImport";
 import { ArticleStyleGuide } from "@/components/admin/ArticleStyleGuide";
+import { useAdminToast } from "@/components/admin/AdminToast";
 import {
   ARTICLE_TEMPLATE_OPTIONS,
   blogBlocksToEditor,
@@ -48,6 +49,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
   const router = useRouter();
   const isEdit = Boolean(articleId);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useAdminToast();
 
   const [template, setTemplate] = useState<BlogTemplate>("flash-deal");
   const [blocks, setBlocks] = useState<EditorBlock[]>(() =>
@@ -217,8 +219,12 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     try {
       const url = await uploadImage(file);
       setFeaturedImage(url);
+      toast.success("Imagen destacada subida.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al subir imagen.");
+      const message =
+        err instanceof Error ? err.message : "Error al subir imagen.";
+      setError(message);
+      toast.error(message);
     } finally {
       setUploadingImage(false);
     }
@@ -274,13 +280,20 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
       );
       const data = (await response.json()) as { ok?: boolean; error?: string };
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo guardar.");
+        const message = data.error ?? "No se pudo guardar.";
+        setError(message);
+        toast.error(message);
         return;
       }
+      toast.success(
+        isEdit ? "Artículo actualizado correctamente." : "Artículo creado.",
+      );
       router.push("/admin/articles");
       router.refresh();
     } catch {
-      setError("Error de red al guardar.");
+      const message = "Error de red al guardar.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

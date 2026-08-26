@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
@@ -122,6 +123,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             discountPercentage={product.discountPercentage}
             size="lg"
           />
+
+          <AffiliateDisclosure />
 
           <dl className="grid grid-cols-2 gap-4 border-y border-stone-300 py-5 text-sm">
             <div>

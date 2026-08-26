@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { DealCard } from "@/components/DealCard";
 import { getActiveProducts, getTopDealProducts } from "@/lib/catalog";
 
@@ -29,6 +30,7 @@ export default async function OffersPage() {
           Ordenados por deal score: descuento, cercanía al mínimo histórico y
           estabilidad de precio.
         </p>
+        <AffiliateDisclosure className="mt-4" />
       </header>
 
       {list.length > 0 ? (

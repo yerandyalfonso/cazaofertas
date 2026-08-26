@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { TELEGRAM_BOT_URL } from "@/lib/catalog";
 
 export function Footer() {
@@ -11,6 +12,7 @@ export function Footer() {
             Revista digital de ofertas de Amazon España. Detectamos bajadas
             reales y te avisamos por Telegram.
           </p>
+          <AffiliateDisclosure className="max-w-sm text-stone-400" />
         </div>
 
         <div className="space-y-3">
@@ -38,16 +40,25 @@ export function Footer() {
 
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-            Alertas
+            Legal y alertas
           </p>
-          <p className="text-sm leading-relaxed text-stone-300">
-            Recibe solo los chollos que te interesan.
-          </p>
+          <ul className="space-y-2 text-sm text-stone-200">
+            <li>
+              <Link href="/aviso-legal" className="hover:text-white">
+                Aviso legal
+              </Link>
+            </li>
+            <li>
+              <Link href="/privacidad" className="hover:text-white">
+                Privacidad
+              </Link>
+            </li>
+          </ul>
           <a
             href={TELEGRAM_BOT_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-10 items-center bg-paper px-4 text-xs font-semibold uppercase tracking-[0.14em] text-ink transition hover:bg-amber-200"
+            className="mt-2 inline-flex h-10 items-center bg-paper px-4 text-xs font-semibold uppercase tracking-[0.14em] text-ink transition hover:bg-amber-200"
           >
             Abrir Telegram
           </a>
@@ -57,10 +68,17 @@ export function Footer() {
       <div className="border-t border-white/10 px-5 py-5 text-xs text-stone-400 md:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} CazaOferta. Como afiliados de Amazon
-            ganamos comisión por compras cualificadas.
+            © {new Date().getFullYear()} CazaOferta. Participamos en el
+            Programa de Afiliados de Amazon EU.
           </p>
-          <p>Precios sujetos a cambio en Amazon.</p>
+          <div className="flex flex-wrap gap-4">
+            <Link href="/aviso-legal" className="hover:text-white">
+              Aviso legal
+            </Link>
+            <Link href="/privacidad" className="hover:text-white">
+              Privacidad
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
