@@ -6,21 +6,17 @@ import {
 
 function resolveAdminChatId(): string | number | null {
   const admin = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim();
-  if (admin) {
-    const asNumber = Number(admin);
-    return Number.isFinite(asNumber) && admin === String(asNumber)
-      ? asNumber
-      : admin;
-  }
+  if (!admin) return null;
 
-  // Fallback: canal principal (mensaje marcado como admin/cron).
-  const channel = process.env.TELEGRAM_CHANNEL_ID?.trim();
-  return channel || null;
+  const asNumber = Number(admin);
+  return Number.isFinite(asNumber) && admin === String(asNumber)
+    ? asNumber
+    : admin;
 }
 
 /**
- * Aviso interno si un cron falla por completo.
- * No lanza: el endpoint debe seguir devolviendo el 500 original.
+ * Aviso interno al chat privado del admin (TELEGRAM_ADMIN_CHAT_ID).
+ * No usa el canal público. No lanza: el endpoint debe seguir devolviendo el 500.
  */
 export async function notifyCronFailure(options: {
   job: string;
@@ -29,7 +25,12 @@ export async function notifyCronFailure(options: {
   if (!isTelegramConfigured()) return;
 
   const chatId = resolveAdminChatId();
-  if (!chatId) return;
+  if (!chatId) {
+    console.warn(
+      "[cron] Falta TELEGRAM_ADMIN_CHAT_ID; no se envió aviso de fallo.",
+    );
+    return;
+  }
 
   const detail = formatEnvError(options.error).slice(0, 500);
 
