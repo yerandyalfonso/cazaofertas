@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-prices",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/flash-deals",
+      "schedule": "0 */4 * * *"
+    }
+  ]
+}

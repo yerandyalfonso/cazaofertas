@@ -1,0 +1,433 @@
+import * as cheerio from "cheerio";
+import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
+import type { PriceProvider, ProductPriceData } from "@/providers/price/types";
+import { ProductAvailability } from "@/types";
+
+export interface AmazonHtmlPriceProviderOptions {
+  /** Mapa ASIN → URL de producto en Amazon. */
+  urlByAsin?: Map<string, string>;
+  /** Pausa entre peticiones para reducir bloqueos (ms). */
+  delayMs?: number;
+  /** Timeout por petición (ms). */
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}
+
+const BROWSER_HEADERS: HeadersInit = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Parsea importes estilo ES (79,99 / 1.234,56) o EN (79.99). */
+export function parseAmazonPriceText(raw: string): number | null {
+  const text = raw
+    .replace(/\u00a0/g, " ")
+    .replace(/[^\d,.\-]/g, "")
+    .trim();
+
+  if (!text) return null;
+
+  let normalized = text;
+  if (/\d{1,3}(\.\d{3})+,\d{1,2}$/.test(text) || /^\d+,\d{1,2}$/.test(text)) {
+    normalized = text.replace(/\./g, "").replace(",", ".");
+  } else if (/\d{1,3}(,\d{3})+\.\d{1,2}$/.test(text)) {
+    normalized = text.replace(/,/g, "");
+  } else if (text.includes(",") && !text.includes(".")) {
+    normalized = text.replace(",", ".");
+  }
+
+  const value = Number.parseFloat(normalized);
+  if (!Number.isFinite(value) || value <= 0 || value > 100_000) {
+    return null;
+  }
+  return Math.round(value * 100) / 100;
+}
+
+function firstPriceFromSelectors(
+  $: cheerio.CheerioAPI,
+  selectors: string[],
+): number | null {
+  for (const selector of selectors) {
+    const nodes = $(selector);
+    for (let i = 0; i < nodes.length; i += 1) {
+      const text = nodes.eq(i).text();
+      const price = parseAmazonPriceText(text);
+      if (price !== null) return price;
+    }
+  }
+  return null;
+}
+
+function priceFromPageScripts(html: string): number | null {
+  const patterns = [
+    /"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
+    /"price"\s*:\s*"([0-9]+(?:[.,][0-9]+)?)"/,
+    /"displayPrice"\s*:\s*"([^"]+)"/,
+    /data-a-color="price"[^>]*>[\s\S]*?([\d.,]+)\s*€/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match?.[1]) continue;
+    const price = parseAmazonPriceText(match[1]);
+    if (price !== null) return price;
+  }
+  return null;
+}
+
+function availabilityFromHtml($: cheerio.CheerioAPI): ProductAvailability {
+  const availability = $("#availability").text().toLowerCase();
+  if (
+    availability.includes("no disponible") ||
+    availability.includes("agotado") ||
+    availability.includes("currently unavailable")
+  ) {
+    return ProductAvailability.OUT_OF_STOCK;
+  }
+  if (availability.includes("preventa") || availability.includes("pre-order")) {
+    return ProductAvailability.PREORDER;
+  }
+  return ProductAvailability.IN_STOCK;
+}
+
+function listPriceFromPageScripts(html: string): number | null {
+  const patterns = [
+    /"basisPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
+    /"listPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
+    /"typicalPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
+    /"wasPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
+    /"landingAsinPrice"[\s\S]{0,200}?"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match?.[1]) continue;
+    const price = parseAmazonPriceText(match[1]);
+    if (price !== null) return price;
+  }
+  return null;
+}
+
+function discountFromSavingsBadge($: cheerio.CheerioAPI): number | null {
+  const selectors = [
+    "#corePriceDisplay_desktop_feature_div span.savingsPercentage",
+    "#corePrice_feature_div span.savingsPercentage",
+    ".savingsPercentage",
+    "#dealprice_savingspercentage",
+  ];
+
+  for (const selector of selectors) {
+    const text = $(selector).first().text();
+    const match = text.match(/(\d{1,3})\s*%/);
+    if (!match) continue;
+    const value = Number.parseInt(match[1], 10);
+    if (Number.isFinite(value) && value > 0 && value < 100) return value;
+  }
+  return null;
+}
+
+function detectFlashDeal($: cheerio.CheerioAPI, html: string): boolean {
+  const badgeText = [
+    $("#dealBadge_feature_div").text(),
+    $("#gatedDealsBadge_feature_div").text(),
+    $("[data-feature-name='dealBadge']").text(),
+    $(".dealBadge").text(),
+    $("#dealBadgeSupportingText").text(),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    /oferta\s*flash|lightning\s*deal|oferta\s*rel[aá]mpago|deal of the day|oferta del d[ií]a|precio\s*rel[aá]mpago/.test(
+      badgeText,
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /isLightningDeal["\s:]*true|dealType["\s:]*["']LIGHTNING|lightningDeal|OFERTA\s*FLASH/i.test(
+      html,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function extractPriceFromAmazonHtml(html: string): {
+  price: number | null;
+  listPrice: number | null;
+  discountPercentage: number | null;
+  isFlashDeal: boolean;
+  title?: string;
+  availability: ProductAvailability;
+} {
+  const $ = cheerio.load(html);
+
+  // Precio de oferta / flash (actual), evitando el tachado a-text-price.
+  const price =
+    firstPriceFromSelectors($, [
+      "#corePrice_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
+      "#corePriceDisplay_desktop_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
+      "#apex_desktop span.a-price:not(.a-text-price) span.a-offscreen",
+      "#priceblock_dealprice",
+      "#priceblock_saleprice",
+      "#priceblock_ourprice",
+      "span.a-price.aok-align-center:not(.a-text-price) .a-offscreen",
+      "#tp_price_block_total_price_ww span.a-offscreen",
+    ]) ?? priceFromPageScripts(html);
+
+  // Precio anterior / lista / tachado (referencia Amazon).
+  let listPrice =
+    firstPriceFromSelectors($, [
+      "#corePrice_feature_div span.a-price.a-text-price span.a-offscreen",
+      "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price span.a-offscreen",
+      "#apex_desktop span.a-price.a-text-price span.a-offscreen",
+      'span.a-price.a-text-price[data-a-strike="true"] span.a-offscreen',
+      ".a-price.a-text-price .a-offscreen",
+      "#listPrice",
+      ".basisPrice .a-offscreen",
+      "#price .a-text-strike",
+      "span[data-a-strike='true'] .a-offscreen",
+    ]) ?? listPriceFromPageScripts(html);
+
+  // Si el badge de ahorro existe y no hay lista, reconstruir referencia.
+  const badgeDiscount = discountFromSavingsBadge($);
+  if (
+    (listPrice === null || (price !== null && listPrice <= price)) &&
+    price !== null &&
+    badgeDiscount !== null
+  ) {
+    const reconstructed =
+      Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
+    if (reconstructed > price) {
+      listPrice = reconstructed;
+    }
+  }
+
+  if (listPrice !== null && price !== null && listPrice <= price) {
+    listPrice = null;
+  }
+
+  let discountPercentage: number | null = null;
+  if (price !== null && listPrice !== null && listPrice > price) {
+    discountPercentage =
+      Math.round(((listPrice - price) / listPrice) * 10000) / 100;
+  } else if (badgeDiscount !== null) {
+    discountPercentage = badgeDiscount;
+  }
+
+  const isFlashDeal =
+    detectFlashDeal($, html) ||
+    (discountPercentage !== null &&
+      discountPercentage >= 20 &&
+      listPrice !== null);
+
+  const title =
+    $("#productTitle").text().trim() ||
+    $("meta[property='og:title']").attr("content")?.trim() ||
+    undefined;
+
+  return {
+    price,
+    listPrice,
+    discountPercentage,
+    isFlashDeal,
+    title,
+    availability: availabilityFromHtml($),
+  };
+}
+
+async function fetchAmazonPageHtml(
+  url: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<string> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? 12_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      headers: BROWSER_HEADERS,
+      signal: controller.signal,
+      redirect: "follow",
+    });
+
+    if (response.status === 503 || response.status === 429) {
+      throw new Error(
+        `Amazon temporalmente no disponible (HTTP ${response.status}).`,
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(`Respuesta HTTP ${response.status} al consultar Amazon.`);
+    }
+
+    const html = await response.text();
+
+    if (
+      html.includes("api-services-support@amazon.com") ||
+      html.includes("Enter the characters you see below") ||
+      html.toLowerCase().includes("robot check")
+    ) {
+      throw new Error("Amazon devolvió un challenge anti-bot (bloqueado).");
+    }
+
+    return html;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** @deprecated Usar fetchAmazonPageHtml */
+async function fetchAmazonProductHtml(
+  url: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<string> {
+  return fetchAmazonPageHtml(url, options);
+}
+
+export { fetchAmazonPageHtml };
+
+/** Prefill admin: título/precio/lista sin exigir precio válido. */
+export async function previewAmazonProductPage(
+  urlOrAsin: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<{
+  asin: string;
+  title?: string;
+  price: number | null;
+  listPrice: number | null;
+  discountPercentage: number | null;
+  isFlashDeal: boolean;
+  amazonUrl: string;
+  availability: ProductAvailability;
+}> {
+  const asin =
+    extractAsin(urlOrAsin)?.toUpperCase() ||
+    (/^[A-Z0-9]{10}$/i.test(urlOrAsin.trim())
+      ? urlOrAsin.trim().toUpperCase()
+      : null);
+
+  if (!asin) {
+    throw new Error("URL o ASIN de Amazon no válidos.");
+  }
+
+  const amazonUrl =
+    extractAsin(urlOrAsin) && urlOrAsin.includes("http")
+      ? urlOrAsin.trim()
+      : generateAmazonUrl(asin);
+
+  const html = await fetchAmazonPageHtml(amazonUrl, options);
+  const extracted = extractPriceFromAmazonHtml(html);
+
+  return {
+    asin,
+    title: extracted.title,
+    price: extracted.price,
+    listPrice: extracted.listPrice,
+    discountPercentage: extracted.discountPercentage,
+    isFlashDeal: extracted.isFlashDeal,
+    amazonUrl,
+    availability: extracted.availability,
+  };
+}
+
+export async function scrapeAmazonProductPage(
+  url: string,
+  asin: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<ProductPriceData> {
+  const html = await fetchAmazonPageHtml(url, options);
+  const extracted = extractPriceFromAmazonHtml(html);
+
+  if (extracted.price === null) {
+    throw new Error("No se pudo extraer el precio del HTML de Amazon.");
+  }
+
+  return {
+    asin,
+    price: extracted.price,
+    currency: "EUR",
+    availability: extracted.availability,
+    title: extracted.title,
+    amazonUrl: url,
+    previousPrice: extracted.listPrice ?? undefined,
+    discountPercentage: extracted.discountPercentage ?? undefined,
+  };
+}
+
+/**
+ * Proveedor de precios vía HTML de la ficha de Amazon.
+ * Frágil frente a cambios de maqueta / bloqueos: preferir PA-API o Keepa a medio plazo.
+ */
+export class AmazonHtmlPriceProvider implements PriceProvider {
+  private readonly urlByAsin: Map<string, string>;
+  private readonly delayMs: number;
+  private readonly timeoutMs: number;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(options: AmazonHtmlPriceProviderOptions = {}) {
+    this.urlByAsin = options.urlByAsin ?? new Map();
+    this.delayMs = options.delayMs ?? 1_250;
+    this.timeoutMs = options.timeoutMs ?? 12_000;
+    this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  async getProduct(asin: string): Promise<ProductPriceData> {
+    const url = this.urlByAsin.get(asin) ?? generateAmazonUrl(asin);
+    return scrapeAmazonProductPage(url, asin, {
+      timeoutMs: this.timeoutMs,
+      fetchImpl: this.fetchImpl,
+    });
+  }
+
+  async getProducts(asins: string[]): Promise<ProductPriceData[]> {
+    const results: ProductPriceData[] = [];
+
+    for (let index = 0; index < asins.length; index += 1) {
+      const asin = asins[index];
+      try {
+        const quote = await this.getProduct(asin);
+        results.push(quote);
+      } catch (error) {
+        console.warn(
+          `[AmazonHtmlPriceProvider] ASIN ${asin}:`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+
+      if (index < asins.length - 1 && this.delayMs > 0) {
+        await sleep(this.delayMs);
+      }
+    }
+
+    return results;
+  }
+}
