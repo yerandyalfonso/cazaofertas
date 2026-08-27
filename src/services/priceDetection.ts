@@ -428,6 +428,11 @@ export async function runPriceDetection(
             score: scoring.score,
             dealLabel: dealScoringService.getLabel(scoring.level),
             productSlug: product.slug,
+            imageUrl: product.image_url ?? quote.imageUrl ?? null,
+            summary:
+              product.description?.trim() ||
+              [product.brand, category?.name].filter(Boolean).join(" · ") ||
+              null,
             affiliateUrl:
               generateAffiliateUrl({
                 amazon_url: product.amazon_url,

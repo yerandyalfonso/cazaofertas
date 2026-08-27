@@ -140,6 +140,22 @@ export async function sendTelegramMessage(options: {
   });
 }
 
+export async function sendTelegramPhoto(options: {
+  chatId: number | string;
+  photoUrl: string;
+  caption: string;
+  parseMode?: "HTML" | "MarkdownV2";
+  replyMarkup?: InlineKeyboardMarkup;
+}): Promise<TelegramMessage> {
+  return callTelegramApi<TelegramMessage>("sendPhoto", {
+    chat_id: options.chatId,
+    photo: options.photoUrl,
+    caption: options.caption,
+    parse_mode: options.parseMode ?? "HTML",
+    reply_markup: options.replyMarkup,
+  });
+}
+
 export async function editTelegramMessage(options: {
   chatId: number;
   messageId: number;
@@ -192,35 +208,57 @@ function dealHeadline(level: DealLevel): string {
   }
 }
 
+function truncatePlain(value: string, maxChars: number): string {
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
+function dealSummaryLine(deal: DealCandidate): string | null {
+  if (deal.summary?.trim()) {
+    return truncatePlain(deal.summary.trim(), 160);
+  }
+  const bits = [deal.brand?.trim(), deal.categoryName?.trim()].filter(Boolean);
+  if (bits.length === 0) return null;
+  return bits.join(" · ");
+}
+
 export function buildDealAlertText(deal: DealCandidate): string {
-  const label =
-    deal.dealLabel ??
-    dealScoringService.getLabel(deal.dealLevel);
-  const scoreLine =
-    deal.score != null
-      ? `⭐ Score ${Math.round(deal.score)} · ${escapeHtml(label)}`
-      : `⭐ ${escapeHtml(label)}`;
+  const score =
+    deal.score != null && Number.isFinite(deal.score)
+      ? Math.round(deal.score)
+      : null;
 
   const lines = [
     dealHeadline(deal.dealLevel),
     "",
-    `<b>${escapeHtml(deal.title)}</b>`,
-    "",
-    `💰 Oferta: <b>${formatEuro(deal.currentPrice)}</b>`,
-    `Antes: <s>${formatEuro(deal.previousPrice)}</s>`,
-    `📉 Descuento: <b>−${Math.round(deal.discountPercentage)}%</b>`,
-    scoreLine,
+    `<b>${escapeHtml(truncatePlain(deal.title, 120))}</b>`,
   ];
 
-  if (deal.nearHistoricalLow) {
-    lines.push("🏷 Cerca del mínimo histórico");
+  const summary = dealSummaryLine(deal);
+  if (summary) {
+    lines.push(escapeHtml(summary));
   }
 
-  if (deal.categoryName) {
-    lines.push(`📁 ${escapeHtml(deal.categoryName)}`);
+  lines.push(
+    "",
+    `💰 Oferta: <b>${formatEuro(deal.currentPrice)}</b>`,
+    `🏷️ Antes: <s>${formatEuro(deal.previousPrice)}</s>`,
+    `📉 Descuento: <b>−${Math.round(deal.discountPercentage)}%</b>`,
+  );
+
+  if (score != null) {
+    lines.push(`⭐ Puntuación <b>${score}/100</b>`);
   }
 
   return lines.join("\n");
+}
+
+/** Caption de foto: Telegram limita a 1024 caracteres. */
+export function buildDealAlertCaption(deal: DealCandidate): string {
+  const text = buildDealAlertText(deal);
+  if (text.length <= 1024) return text;
+  return `${text.slice(0, 1020).trimEnd()}…`;
 }
 
 /** Botones: oferta afiliada + ficha en CazaOferta (si hay slug). */
@@ -357,17 +395,36 @@ export async function sendDealAlertMessage(options: {
   chatId: number | string;
   deal: DealCandidate;
 }): Promise<TelegramMessage> {
+  const replyMarkup = buildOfferActionMarkup({
+    affiliateUrl: buildTrackedAffiliateUrl({
+      productId: options.deal.productId,
+      source: "telegram",
+    }),
+    productSlug: options.deal.productSlug,
+  });
+
+  const photoUrl = options.deal.imageUrl?.trim();
+  if (photoUrl && /^https?:\/\//i.test(photoUrl)) {
+    try {
+      return await sendTelegramPhoto({
+        chatId: options.chatId,
+        photoUrl,
+        caption: buildDealAlertCaption(options.deal),
+        replyMarkup,
+      });
+    } catch (error) {
+      console.warn(
+        "[telegram] sendPhoto falló; se envía solo texto.",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
   return sendTelegramMessage({
     chatId: options.chatId,
     text: buildDealAlertText(options.deal),
-    disableWebPagePreview: false,
-    replyMarkup: buildOfferActionMarkup({
-      affiliateUrl: buildTrackedAffiliateUrl({
-        productId: options.deal.productId,
-        source: "telegram",
-      }),
-      productSlug: options.deal.productSlug,
-    }),
+    disableWebPagePreview: true,
+    replyMarkup,
   });
 }
 

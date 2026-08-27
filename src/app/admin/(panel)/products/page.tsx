@@ -1,13 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronUp,
   ExternalLink,
   Loader2,
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { extractAsin } from "@/lib/affiliate";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
@@ -37,13 +50,25 @@ interface CategoryOption {
   slug: string;
 }
 
+type SortKey =
+  | "title"
+  | "asin"
+  | "currentPrice"
+  | "referencePrice"
+  | "dealScore"
+  | "category"
+  | "lastCheckedAt";
+
+type SortDir = "asc" | "desc";
+type StaleFilter = "all" | "fresh" | "stale" | "never";
 
 function freshnessMeta(lastCheckedAt: string | null): {
   label: string;
   className: string;
+  hours: number | null;
 } {
   if (!lastCheckedAt) {
-    return { label: "Nunca", className: "text-rose-700" };
+    return { label: "Nunca", className: "text-rose-700", hours: null };
   }
   const ageMs = Date.now() - new Date(lastCheckedAt).getTime();
   const hours = ageMs / 3_600_000;
@@ -51,18 +76,42 @@ function freshnessMeta(lastCheckedAt: string | null): {
     return {
       label: new Date(lastCheckedAt).toLocaleString("es-ES"),
       className: "text-teal-800",
+      hours,
     };
   }
   if (hours < 48) {
     return {
       label: new Date(lastCheckedAt).toLocaleString("es-ES"),
       className: "text-amber-800",
+      hours,
     };
   }
   return {
     label: new Date(lastCheckedAt).toLocaleString("es-ES"),
     className: "text-rose-700",
+    hours,
   };
+}
+
+function sortValue(product: AdminProduct, key: SortKey): string | number {
+  switch (key) {
+    case "title":
+      return product.title.toLocaleLowerCase("es");
+    case "asin":
+      return product.asin;
+    case "currentPrice":
+      return product.currentPrice;
+    case "referencePrice":
+      return product.referencePrice;
+    case "dealScore":
+      return product.dealScore;
+    case "category":
+      return (product.category?.name ?? "").toLocaleLowerCase("es");
+    case "lastCheckedAt":
+      return product.lastCheckedAt
+        ? new Date(product.lastCheckedAt).getTime()
+        : 0;
+  }
 }
 
 const emptyForm = {
@@ -76,6 +125,9 @@ const emptyForm = {
 
 const iconBtnClass =
   "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+
+const toolbarFieldClass =
+  "h-10 border border-stone-300 bg-white px-3 text-sm text-ink outline-none focus:border-ink";
 
 export default function ProductsAdminClient() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -94,7 +146,16 @@ export default function ProductsAdminClient() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [scrapedDiscount, setScrapedDiscount] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [staleFilter, setStaleFilter] = useState<StaleFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("lastCheckedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   const lastScrapedUrl = useRef<string>("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const deferredQuery = useDeferredValue(query);
   const toast = useAdminToast();
 
   const load = useCallback(async () => {
@@ -127,6 +188,153 @@ export default function ProductsAdminClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (
+        (event.key === "/" || (event.key === "k" && (event.metaKey || event.ctrlKey))) &&
+        !(event.target instanceof HTMLInputElement) &&
+        !(event.target instanceof HTMLTextAreaElement) &&
+        !(event.target instanceof HTMLSelectElement)
+      ) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const visibleProducts = useMemo(() => {
+    const needle = deferredQuery.trim().toLocaleLowerCase("es");
+    const filtered = products.filter((product) => {
+      if (categoryFilter && product.category?.id !== categoryFilter) {
+        return false;
+      }
+
+      if (staleFilter !== "all") {
+        const hours = freshnessMeta(product.lastCheckedAt).hours;
+        if (staleFilter === "never" && hours !== null) return false;
+        if (staleFilter === "fresh" && (hours === null || hours >= 48)) {
+          return false;
+        }
+        if (staleFilter === "stale" && hours !== null && hours < 48) {
+          return false;
+        }
+      }
+
+      if (!needle) return true;
+      const haystack = [
+        product.title,
+        product.asin,
+        product.brand ?? "",
+        product.category?.name ?? "",
+        product.dealLabel,
+      ]
+        .join(" ")
+        .toLocaleLowerCase("es");
+      return haystack.includes(needle);
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const av = sortValue(a, sortKey);
+      const bv = sortValue(b, sortKey);
+      let cmp = 0;
+      if (typeof av === "number" && typeof bv === "number") {
+        cmp = av - bv;
+      } else {
+        cmp = String(av).localeCompare(String(bv), "es", {
+          numeric: true,
+          sensitivity: "base",
+        });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [
+    products,
+    deferredQuery,
+    categoryFilter,
+    staleFilter,
+    sortKey,
+    sortDir,
+  ]);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    function updateVisibility() {
+      const tableScroll = el?.scrollTop ?? 0;
+      const pageScroll = window.scrollY;
+      setShowScrollTop(tableScroll > 280 || pageScroll > 420);
+    }
+    updateVisibility();
+    el?.addEventListener("scroll", updateVisibility, { passive: true });
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    return () => {
+      el?.removeEventListener("scroll", updateVisibility);
+      window.removeEventListener("scroll", updateVisibility);
+    };
+  }, [loading, visibleProducts.length]);
+
+  const staleCount = useMemo(
+    () =>
+      products.filter((product) => {
+        const hours = freshnessMeta(product.lastCheckedAt).hours;
+        return hours === null || hours >= 48;
+      }).length,
+    [products],
+  );
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "title" || key === "asin" || key === "category" ? "asc" : "desc");
+  }
+
+  function SortButton({
+    column,
+    label,
+  }: {
+    column: SortKey;
+    label: string;
+  }) {
+    const active = sortKey === column;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(column)}
+        className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-ink ${
+          active ? "text-ink" : "text-stone-500"
+        }`}
+      >
+        {label}
+        {active ? (
+          sortDir === "asc" ? (
+            <ArrowUp className="h-3 w-3" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3 w-3" aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden />
+        )}
+      </button>
+    );
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setCategoryFilter("");
+    setStaleFilter("all");
+  }
+
+  const hasActiveFilters =
+    query.trim().length > 0 ||
+    categoryFilter.length > 0 ||
+    staleFilter !== "all";
 
   function openCreate() {
     setEditingAsin(null);
@@ -448,7 +656,7 @@ export default function ProductsAdminClient() {
   })();
 
   return (
-    <div>
+    <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col md:min-h-[calc(100dvh-5rem)]">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
@@ -457,15 +665,41 @@ export default function ProductsAdminClient() {
           <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
             Productos
           </h1>
+          <p className="mt-2 text-sm text-stone-600">
+            {loading
+              ? "Cargando catálogo…"
+              : `${visibleProducts.length} de ${products.length} productos`}
+            {!loading && staleCount > 0 ? (
+              <span className="text-rose-700">
+                {" "}
+                · {staleCount} sin revisar (&gt;48 h)
+              </span>
+            ) : null}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          Nuevo producto
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            title="Recargar listado"
+            className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.14em] text-stone-700 transition hover:border-ink hover:text-ink disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            Recargar
+          </button>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Nuevo producto
+          </button>
+        </div>
       </header>
 
       {message ? (
@@ -478,6 +712,71 @@ export default function ProductsAdminClient() {
           {error}
         </p>
       ) : null}
+
+      <div className="mt-6 flex flex-col gap-3 border border-stone-300 bg-white p-4 md:flex-row md:flex-wrap md:items-center">
+        <label className="relative min-w-[220px] flex-1">
+          <span className="sr-only">Buscar productos</span>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+            aria-hidden
+          />
+          <input
+            ref={searchInputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar título, ASIN, marca… (/)"
+            className={`${toolbarFieldClass} w-full pl-9 pr-9`}
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-stone-400 hover:text-ink"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+
+        <select
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          className={`${toolbarFieldClass} min-w-[160px]`}
+          aria-label="Filtrar por categoría"
+        >
+          <option value="">Todas las categorías</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={staleFilter}
+          onChange={(event) =>
+            setStaleFilter(event.target.value as StaleFilter)
+          }
+          className={`${toolbarFieldClass} min-w-[160px]`}
+          aria-label="Filtrar por frescura del precio"
+        >
+          <option value="all">Cualquier revisión</option>
+          <option value="fresh">Revisados (&lt;48 h)</option>
+          <option value="stale">Desactualizados (≥48 h)</option>
+          <option value="never">Nunca revisados</option>
+        </select>
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="h-10 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 hover:text-ink"
+          >
+            Limpiar filtros
+          </button>
+        ) : null}
+      </div>
 
       {open ? (
         <section className="mt-8 border border-stone-300 bg-white p-6">
@@ -670,17 +969,34 @@ export default function ProductsAdminClient() {
         </section>
       ) : null}
 
-      <div className="mt-8 overflow-x-auto border border-stone-300 bg-white">
+      <div
+        ref={tableScrollRef}
+        className="mt-4 min-h-0 flex-1 overflow-auto border border-stone-300 bg-white"
+      >
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
-              <th className="px-4 py-3 font-semibold">Título</th>
-              <th className="px-4 py-3 font-semibold">ASIN</th>
-              <th className="px-4 py-3 font-semibold">Precio</th>
-              <th className="px-4 py-3 font-semibold">Referencia</th>
-              <th className="px-4 py-3 font-semibold">Score</th>
-              <th className="px-4 py-3 font-semibold">Categoría</th>
-              <th className="px-4 py-3 font-semibold">Última revisión</th>
+              <th className="px-4 py-3">
+                <SortButton column="title" label="Título" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="asin" label="ASIN" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="currentPrice" label="Precio" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="referencePrice" label="Referencia" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="dealScore" label="Score" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="category" label="Categoría" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="lastCheckedAt" label="Última revisión" />
+              </th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
           </thead>
@@ -697,16 +1013,34 @@ export default function ProductsAdminClient() {
                   No hay productos todavía. Añade el primero con «Nuevo producto».
                 </td>
               </tr>
+            ) : visibleProducts.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-stone-500">
+                  Ningún producto coincide con la búsqueda o los filtros.{" "}
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="font-medium text-teal-800 underline"
+                  >
+                    Limpiar filtros
+                  </button>
+                </td>
+              </tr>
             ) : (
-              products.map((product) => (
+              visibleProducts.map((product) => (
                 <tr
                   key={product.id}
-                  className="border-t border-stone-100 align-middle"
+                  className="border-t border-stone-100 align-middle hover:bg-stone-50/80"
                 >
                   <td className="px-4 py-3">
                     <p className="max-w-xs font-medium text-ink">
                       {product.title}
                     </p>
+                    {product.brand ? (
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        {product.brand}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{product.asin}</td>
                   <td className="px-4 py-3">
@@ -735,7 +1069,9 @@ export default function ProductsAdminClient() {
                     {(() => {
                       const fresh = freshnessMeta(product.lastCheckedAt);
                       return (
-                        <span className={`text-xs leading-snug ${fresh.className}`}>
+                        <span
+                          className={`text-xs leading-snug ${fresh.className}`}
+                        >
                           {fresh.label}
                         </span>
                       );
@@ -803,6 +1139,21 @@ export default function ProductsAdminClient() {
           </tbody>
         </table>
       </div>
+
+      {showScrollTop ? (
+        <button
+          type="button"
+          onClick={() => {
+            tableScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center border border-stone-300 bg-ink text-paper shadow-lg transition hover:bg-teal-900 md:bottom-8 md:right-8"
+          title="Volver arriba"
+          aria-label="Volver arriba"
+        >
+          <ChevronUp className="h-5 w-5" aria-hidden />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -24,6 +24,10 @@ export interface DealCandidate {
   /** Score 0–100 del motor de chollos (opcional para canal). */
   score?: number;
   dealLabel?: string;
+  /** Imagen del producto (Telegram sendPhoto). */
+  imageUrl?: string | null;
+  /** Resumen corto bajo el título. */
+  summary?: string | null;
 }
 
 export interface AlertMatch {

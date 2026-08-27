@@ -52,15 +52,19 @@ async function maybeNotifyFlashChannel(
     amazonUrl: string;
     affiliateUrl?: string | null;
     productSlug?: string | null;
+    brand?: string | null;
+    categoryName?: string | null;
+    imageUrl?: string | null;
+    summary?: string | null;
   },
 ): Promise<"sent" | "skipped" | "failed"> {
   const deal: DealCandidate = {
     productId: options.productId,
     asin: options.asin,
     title: options.title,
-    brand: null,
+    brand: options.brand ?? null,
     categoryId: null,
-    categoryName: null,
+    categoryName: options.categoryName ?? null,
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,
@@ -68,6 +72,8 @@ async function maybeNotifyFlashChannel(
     score: options.score,
     dealLabel: options.dealLabel,
     productSlug: options.productSlug ?? null,
+    imageUrl: options.imageUrl ?? null,
+    summary: options.summary ?? null,
     affiliateUrl: generateAffiliateUrl({
       amazon_url: options.amazonUrl,
       affiliate_url: options.affiliateUrl,
@@ -133,6 +139,9 @@ interface CatalogRow {
   previous_price: number | string | null;
   lowest_price: number | string | null;
   highest_price: number | string | null;
+  brand: string | null;
+  image_url: string | null;
+  description: string | null;
 }
 
 /**
@@ -169,7 +178,7 @@ export async function runFlashDealsCheck(options?: {
   const { data: catalogRows, error: catalogError } = await client
     .from("products")
     .select(
-      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
+      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description",
     );
 
   if (catalogError) {
@@ -228,6 +237,8 @@ export async function runFlashDealsCheck(options?: {
         item.origin === "simulated" ? (item.listPriceHint ?? null) : null;
       let amazonUrl = item.amazonUrl || generateAmazonUrl(item.asin);
       let isFlashDeal = item.origin !== "live" || Boolean(listPrice && price);
+      let imageUrl: string | null = existing?.image_url ?? null;
+      let brand: string | null = existing?.brand ?? null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
@@ -241,6 +252,8 @@ export async function runFlashDealsCheck(options?: {
           if (preview.title?.trim()) title = preview.title.trim();
           amazonUrl = preview.amazonUrl || amazonUrl;
           isFlashDeal = preview.isFlashDeal || isFlashDeal;
+          if (preview.imageUrl) imageUrl = preview.imageUrl;
+          if (preview.brand) brand = preview.brand;
         } catch (enrichError) {
           // Live/injected: sin ficha no insertamos. Simulación: hints ok.
           if (item.origin !== "simulated" || price == null) {
@@ -311,6 +324,8 @@ export async function runFlashDealsCheck(options?: {
               amazon_url: amazonUrl,
               asin: item.asin,
             }),
+            brand,
+            image_url: imageUrl,
             current_price: price,
             previous_price: reference,
             lowest_price: price,
@@ -331,7 +346,7 @@ export async function runFlashDealsCheck(options?: {
             const { data: raced } = await client
               .from("products")
               .select(
-                "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price",
+                "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description",
               )
               .eq("asin", item.asin)
               .maybeSingle();
@@ -406,6 +421,9 @@ export async function runFlashDealsCheck(options?: {
           previous_price: reference,
           lowest_price: price,
           highest_price: Math.max(price, reference),
+          brand,
+          image_url: imageUrl,
+          description: null,
         });
 
         inserted += 1;
@@ -424,6 +442,9 @@ export async function runFlashDealsCheck(options?: {
             dealLabel: scoring.label,
             amazonUrl,
             productSlug: slug,
+            brand,
+            imageUrl,
+            summary: brand,
           });
           if (channelStatus === "sent") channelNotificationsSent += 1;
           if (channelStatus === "skipped") channelNotificationsSkipped += 1;
@@ -498,6 +519,8 @@ export async function runFlashDealsCheck(options?: {
               discount_percentage: discount,
               last_checked_at: now,
               updated_at: now,
+              ...(imageUrl ? { image_url: imageUrl } : {}),
+              ...(brand ? { brand } : {}),
             })
             .eq("id", existing!.id);
 
@@ -528,6 +551,13 @@ export async function runFlashDealsCheck(options?: {
               amazonUrl,
               affiliateUrl: existing!.affiliate_url,
               productSlug: existing!.slug,
+              brand: brand ?? existing!.brand,
+              imageUrl: imageUrl ?? existing!.image_url,
+              summary:
+                existing!.description?.trim() ||
+                brand ||
+                existing!.brand ||
+                null,
             });
             if (channelStatus === "sent") channelNotificationsSent += 1;
             if (channelStatus === "skipped") channelNotificationsSkipped += 1;
