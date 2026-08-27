@@ -290,13 +290,13 @@ export function extractPriceFromAmazonHtml(html: string): {
   let listPrice =
     listCandidates.length > 0 ? Math.max(...listCandidates) : null;
 
-  // Si la lista no cuadra con el badge (−21% etc.), preferir la candidata que sí.
+  // Si la lista no cuadra con el badge (−21% etc.), preferir la candidata DOM que sí.
   if (price !== null && badgeDiscount !== null && listCandidates.length > 0) {
     const impliedList =
       Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
-    let best = listPrice;
+    let best: number | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
-    for (const candidate of [...listCandidates, impliedList]) {
+    for (const candidate of listCandidates) {
       if (candidate <= price) continue;
       const pct = ((candidate - price) / candidate) * 100;
       const delta = Math.abs(pct - badgeDiscount);
