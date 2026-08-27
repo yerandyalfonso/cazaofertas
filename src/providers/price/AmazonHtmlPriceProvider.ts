@@ -132,8 +132,19 @@ export function maybeRestoreSpanishVat(value: number): number {
 export function maybeRestoreSpanishVatPair(
   price: number,
   listPrice: number | null,
+  options: { foreignDelivery?: boolean } = {},
 ): { price: number; listPrice: number | null } {
   if (listPrice == null || listPrice <= 0) {
+    if (options.foreignDelivery) {
+      const withVat = Math.round(price * 1.21 * 100) / 100;
+      // Fuera de ES: si ×1,21 parece escaparate y el crudo no es ya .99/.00 fuerte, restaurar.
+      if (
+        looksLikeAmazonShelfPrice(withVat) &&
+        amazonPriceTypicality(price) < 3
+      ) {
+        return { price: withVat, listPrice: null };
+      }
+    }
     return { price: maybeRestoreSpanishVat(price), listPrice: null };
   }
 
@@ -149,12 +160,23 @@ export function maybeRestoreSpanishVatPair(
     amazonPriceTypicality(listPrice) === 0 ||
     !looksLikeAmazonShelfPrice(price);
 
-  if (pairLooksRestored && rawLooksSuspicious) {
+  const rawAlreadyShelf =
+    amazonPriceTypicality(price) >= 3 && amazonPriceTypicality(listPrice) >= 2;
+
+  if (pairLooksRestored && (rawLooksSuspicious || options.foreignDelivery)) {
+    if (options.foreignDelivery && rawAlreadyShelf) {
+      // Ya parecen precios con IVA; no doblar.
+      return { price: Math.round(price * 100) / 100, listPrice };
+    }
     const rawScore =
       amazonPriceTypicality(price) + amazonPriceTypicality(listPrice);
     const vatScore =
       amazonPriceTypicality(withVatPrice) + amazonPriceTypicality(withVatList);
-    if (vatScore > rawScore || rawScore === 0) {
+    if (
+      options.foreignDelivery ||
+      vatScore > rawScore ||
+      rawScore === 0
+    ) {
       return { price: withVatPrice, listPrice: withVatList };
     }
   }
@@ -175,34 +197,108 @@ function glowDeliveryText(html: string): string {
   return `${line1} ${line2}`.replace(/\s+/g, " ").trim();
 }
 
-function assertLikelySpainDelivery(html: string): void {
+function isForeignDeliveryGlow(html: string): boolean {
   const glow = glowDeliveryText(html);
-  if (!glow) return;
-  if (
-    /estados unidos|united states|deutschland|france|italy|united kingdom|japan/i.test(
-      glow,
-    )
-  ) {
-    throw new Error(
-      `Amazon está sirviendo entrega fuera de España («${glow.slice(0, 80)}»). Los precios pueden ir sin IVA.`,
-    );
+  if (!glow) return false;
+  return /estados unidos|united states|deutschland|france|italy|united kingdom|japan/i.test(
+    glow,
+  );
+}
+
+/** Última respuesta HTML venía con entrega fuera de ES (p. ej. Vercel → US). */
+let lastFetchForeignDelivery = false;
+
+function extractGlowCsrfToken(html: string): string | null {
+  return (
+    html.match(/name="anti-csrftoken-a2z"\s+value="([^"]+)"/i)?.[1] ??
+    html.match(/anti-csrftoken-a2z["'\s:=]+["']?([^"'\s]+)/i)?.[1] ??
+    html.match(/glowValidationToken["'\s:=]+["']?([^"'\s]+)/i)?.[1] ??
+    html.match(/CSRF_TOKEN\s*:\s*"([^"]+)"/i)?.[1] ??
+    null
+  );
+}
+
+async function postSpainAddressChange(
+  fetchImpl: typeof fetch,
+  jar: CookieJar,
+  signal: AbortSignal,
+  csrf: string | null,
+): Promise<boolean> {
+  const endpoints = [
+    AMAZON_ES_ADDRESS_CHANGE,
+    "https://www.amazon.es/portal-migration/hz/glow/address-change",
+  ];
+
+  const bodies = [
+    new URLSearchParams({
+      locationType: "LOCATION_INPUT",
+      zipCode: AMAZON_ES_ZIP,
+      storeContext: "generic",
+      deviceType: "web",
+      pageType: "Gateway",
+      actionSource: "glow",
+      almBrandId: "undefined",
+    }),
+    new URLSearchParams({
+      locationType: "LOCATION_INPUT",
+      zipCode: AMAZON_ES_ZIP,
+      countryCode: "ES",
+      storeContext: "generic",
+      deviceType: "web",
+      pageType: "Gateway",
+      actionSource: "glow",
+      almBrandId: "undefined",
+    }),
+  ];
+
+  for (const endpoint of endpoints) {
+    for (const body of bodies) {
+      const change = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: browserHeaders(jar, {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json, text/javascript, */*; q=0.01",
+          ...(csrf ? { "anti-csrftoken-a2z": csrf } : {}),
+          Referer: "https://www.amazon.es/",
+          Origin: "https://www.amazon.es",
+        }),
+        body,
+        signal,
+        redirect: "follow",
+      });
+      absorbSetCookies(jar, change);
+      const payload = (await change.json().catch(() => null)) as {
+        isValidAddress?: number | boolean;
+        successful?: number | boolean;
+        address?: { countryCode?: string; zipCode?: string };
+      } | null;
+
+      if (payload?.isValidAddress || payload?.successful) {
+        return true;
+      }
+    }
   }
+  return false;
 }
 
 async function ensureSpainDeliverySession(
   fetchImpl: typeof fetch,
   timeoutMs: number,
+  options: { force?: boolean } = {},
 ): Promise<CookieJar> {
-  if (spainDeliveryReady && sharedCookieJar) return sharedCookieJar;
+  if (!options.force && spainDeliveryReady && sharedCookieJar) {
+    return sharedCookieJar;
+  }
   if (spainDeliveryPromise) return spainDeliveryPromise;
 
   spainDeliveryPromise = (async () => {
-    const jar = sharedCookieJar ?? defaultCookieJar();
+    const jar = options.force
+      ? defaultCookieJar()
+      : (sharedCookieJar ?? defaultCookieJar());
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      // Sesión mínima antes del cambio de dirección.
       const home = await fetchImpl("https://www.amazon.es/?language=es_ES", {
         method: "GET",
         headers: browserHeaders(jar),
@@ -210,41 +306,42 @@ async function ensureSpainDeliverySession(
         redirect: "follow",
       });
       absorbSetCookies(jar, home);
-      await home.text().catch(() => undefined);
+      const homeHtml = await home.text().catch(() => "");
+      const csrf = extractGlowCsrfToken(homeHtml);
 
-      const body = new URLSearchParams({
-        locationType: "LOCATION_INPUT",
-        zipCode: AMAZON_ES_ZIP,
-        storeContext: "generic",
-        deviceType: "web",
-        pageType: "Gateway",
-        actionSource: "glow",
-        almBrandId: "undefined",
-      });
+      // Token fresco del modal de dirección (mejor en IPs fuera de ES).
+      let glowCsrf = csrf;
+      try {
+        const selections = await fetchImpl(
+          "https://www.amazon.es/gp/glow/get-address-selections.html?deviceType=desktop&pageType=Gateway&storeContext=NoStoreName&actionSource=desktop-modal",
+          {
+            method: "GET",
+            headers: browserHeaders(jar, {
+              ...(csrf ? { "anti-csrftoken-a2z": csrf } : {}),
+              Accept: "text/html,*/*",
+              Referer: "https://www.amazon.es/",
+            }),
+            signal: controller.signal,
+            redirect: "follow",
+          },
+        );
+        absorbSetCookies(jar, selections);
+        const selHtml = await selections.text().catch(() => "");
+        glowCsrf = extractGlowCsrfToken(selHtml) ?? glowCsrf;
+      } catch {
+        // endpoint a veces 404; el POST directo suele bastar
+      }
 
-      const change = await fetchImpl(AMAZON_ES_ADDRESS_CHANGE, {
-        method: "POST",
-        headers: browserHeaders(jar, {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json, text/javascript, */*; q=0.01",
-        }),
-        body,
-        signal: controller.signal,
-        redirect: "follow",
-      });
-      absorbSetCookies(jar, change);
+      const ok = await postSpainAddressChange(
+        fetchImpl,
+        jar,
+        controller.signal,
+        glowCsrf,
+      );
 
-      const payload = (await change.json().catch(() => null)) as {
-        isValidAddress?: number | boolean;
-        successful?: number | boolean;
-      } | null;
-
-      if (
-        !payload ||
-        !(payload.isValidAddress || payload.successful)
-      ) {
+      if (!ok) {
         console.warn(
-          "[AmazonHtml] No se pudo fijar CP España; se continúa con cookies base.",
+          "[AmazonHtml] No se pudo fijar CP España; se continúa (restore IVA si hace falta).",
         );
       }
 
@@ -252,7 +349,6 @@ async function ensureSpainDeliverySession(
       spainDeliveryReady = true;
       return jar;
     } catch (error) {
-      // No tumbar el scrape entero si glow falla: el safety net de IVA actúa después.
       console.warn(
         "[AmazonHtml] Pin de entrega ES falló:",
         error instanceof Error ? error.message : error,
@@ -728,7 +824,9 @@ export function extractPriceFromAmazonHtml(html: string): {
 
   // Vercel (IP US) + entrega fuera de ES → Amazon muestra importes sin IVA (÷1,21).
   if (price !== null) {
-    const restored = maybeRestoreSpanishVatPair(price, listPrice);
+    const restored = maybeRestoreSpanishVatPair(price, listPrice, {
+      foreignDelivery: lastFetchForeignDelivery,
+    });
     price = restored.price;
     listPrice = restored.listPrice;
   }
@@ -765,49 +863,77 @@ async function fetchAmazonPageHtml(
   const timeoutMs = options.timeoutMs ?? 12_000;
   const pinSpainDelivery = options.pinSpainDelivery !== false;
 
-  const jar = pinSpainDelivery
+  let jar = pinSpainDelivery
     ? await ensureSpainDeliverySession(fetchImpl, Math.min(timeoutMs, 12_000))
     : sharedCookieJar ?? defaultCookieJar();
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const doFetch = async (): Promise<string> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, {
+        method: "GET",
+        headers: browserHeaders(jar),
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      absorbSetCookies(jar, response);
+      sharedCookieJar = jar;
 
-  try {
-    const response = await fetchImpl(url, {
-      method: "GET",
-      headers: browserHeaders(jar),
-      signal: controller.signal,
-      redirect: "follow",
-    });
-    absorbSetCookies(jar, response);
-    sharedCookieJar = jar;
+      if (response.status === 503 || response.status === 429) {
+        throw new Error(
+          `Amazon temporalmente no disponible (HTTP ${response.status}).`,
+        );
+      }
 
-    if (response.status === 503 || response.status === 429) {
-      throw new Error(
-        `Amazon temporalmente no disponible (HTTP ${response.status}).`,
-      );
+      if (!response.ok) {
+        throw new Error(`Respuesta HTTP ${response.status} al consultar Amazon.`);
+      }
+
+      const html = await response.text();
+
+      if (
+        html.includes("api-services-support@amazon.com") ||
+        html.includes("Enter the characters you see below") ||
+        html.toLowerCase().includes("robot check")
+      ) {
+        throw new Error("Amazon devolvió un challenge anti-bot (bloqueado).");
+      }
+
+      return html;
+    } finally {
+      clearTimeout(timer);
     }
+  };
 
-    if (!response.ok) {
-      throw new Error(`Respuesta HTTP ${response.status} al consultar Amazon.`);
-    }
+  let html = await doFetch();
 
-    const html = await response.text();
-
-    if (
-      html.includes("api-services-support@amazon.com") ||
-      html.includes("Enter the characters you see below") ||
-      html.toLowerCase().includes("robot check")
-    ) {
-      throw new Error("Amazon devolvió un challenge anti-bot (bloqueado).");
-    }
-
-    assertLikelySpainDelivery(html);
-
-    return html;
-  } finally {
-    clearTimeout(timer);
+  // Si glow sigue en EE. UU., re-pin forzado y un reintento (no tumbar el feed).
+  if (pinSpainDelivery && isForeignDeliveryGlow(html)) {
+    console.warn(
+      "[AmazonHtml] Glow fuera de ES; reintentando pin CP",
+      AMAZON_ES_ZIP,
+      "—",
+      glowDeliveryText(html).slice(0, 60),
+    );
+    spainDeliveryReady = false;
+    jar = await ensureSpainDeliverySession(
+      fetchImpl,
+      Math.min(timeoutMs, 12_000),
+      { force: true },
+    );
+    html = await doFetch();
   }
+
+  lastFetchForeignDelivery = isForeignDeliveryGlow(html);
+  if (lastFetchForeignDelivery) {
+    console.warn(
+      "[AmazonHtml] Entrega aún fuera de ES; se aplicará restore IVA si procede. Glow:",
+      glowDeliveryText(html).slice(0, 80),
+    );
+  }
+
+  return html;
 }
 
 /** @deprecated Usar fetchAmazonPageHtml */
