@@ -505,6 +505,36 @@ export type Database = {
           },
         ];
       };
+      cron_control: {
+        Row: {
+          id: string;
+          paused_until: string | null;
+          pause_reason: string | null;
+          consecutive_denials: number;
+          last_denial_at: string | null;
+          last_success_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          paused_until?: string | null;
+          pause_reason?: string | null;
+          consecutive_denials?: number;
+          last_denial_at?: string | null;
+          last_success_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          paused_until?: string | null;
+          pause_reason?: string | null;
+          consecutive_denials?: number;
+          last_denial_at?: string | null;
+          last_success_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

@@ -7,6 +7,16 @@ interface CronStatus {
   activeProducts: number;
   withAmazonUrl: number;
   lastCheckedAt: string | null;
+  oldestCheckedAt?: string | null;
+  neverChecked?: number;
+  cronControl?: {
+    isPaused: boolean;
+    pausedUntil: string | null;
+    pauseReason: string | null;
+    consecutiveDenials: number;
+    lastDenialAt: string | null;
+    lastSuccessAt: string | null;
+  } | null;
 }
 
 interface CronRunResult {
@@ -15,6 +25,10 @@ interface CronRunResult {
   monitorable?: number;
   scoped?: number;
   finishedAt?: string;
+  pause?: {
+    activated: boolean;
+    denials: number;
+  };
   stats?: {
     processed: number;
     updated: number;
@@ -25,6 +39,8 @@ interface CronRunResult {
     deals: Array<{
       asin: string;
       title: string;
+      amazonUrl?: string;
+      imageUrl?: string | null;
       scoring: { score: number; label: string; level: string };
     }>;
   };
@@ -63,6 +79,7 @@ interface FlashRunResult {
     discountPercentage: number | null;
     dealLabel?: string;
     amazonUrl: string;
+    imageUrl?: string | null;
   }>;
   errors?: Array<{ asin: string; message: string }>;
 }
@@ -75,9 +92,10 @@ export function CronAdminClient() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [running, setRunning] = useState(false);
   const [runningFlash, setRunningFlash] = useState(false);
-  const [limit, setLimit] = useState("5");
-  const [flashLimit, setFlashLimit] = useState("20");
+  const [limit, setLimit] = useState("10");
+  const [flashLimit, setFlashLimit] = useState("12");
   const [error, setError] = useState<string | null>(null);
+  const [pauseBusy, setPauseBusy] = useState(false);
 
   async function readJsonSafe<T>(response: Response): Promise<T | null> {
     const text = await response.text();
@@ -111,6 +129,9 @@ export function CronAdminClient() {
         activeProducts: data.activeProducts,
         withAmazonUrl: data.withAmazonUrl,
         lastCheckedAt: data.lastCheckedAt,
+        oldestCheckedAt: data.oldestCheckedAt,
+        neverChecked: data.neverChecked,
+        cronControl: data.cronControl,
       });
     } catch (err) {
       const message =
@@ -136,9 +157,10 @@ export function CronAdminClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          limit: Number.isFinite(parsedLimit) ? parsedLimit : 5,
+          limit: Number.isFinite(parsedLimit) ? parsedLimit : 10,
           notify: false,
           provider: "html",
+          force: true,
         }),
       });
       const data = await readJsonSafe<CronRunResult>(response);
@@ -153,8 +175,9 @@ export function CronAdminClient() {
       } else {
         const scrapeErrors = data.stats?.errors?.length ?? 0;
         toast.success(
-          `Catálogo revisado · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados` +
-            (scrapeErrors > 0 ? ` · ${scrapeErrors} con error de scrape` : ""),
+          `Lote rotativo · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados` +
+            (scrapeErrors > 0 ? ` · ${scrapeErrors} con error` : "") +
+            (data.pause?.activated ? " · pausa preventiva activada" : ""),
         );
       }
       await loadStatus();
@@ -180,9 +203,10 @@ export function CronAdminClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          limit: Number.isFinite(parsedLimit) ? parsedLimit : 20,
+          limit: Number.isFinite(parsedLimit) ? parsedLimit : 12,
           allowSimulatedFallback: true,
           notify: true,
+          force: true,
         }),
       });
       const data = await readJsonSafe<FlashRunResult>(response);
@@ -212,6 +236,50 @@ export function CronAdminClient() {
     }
   }
 
+  async function setPause(action: "pause" | "resume") {
+    setPauseBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/cron/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          action === "pause"
+            ? {
+                action: "pause",
+                minutes: 90,
+                reason: "Pausa manual desde admin",
+              }
+            : { action: "resume" },
+        ),
+      });
+      const data = await readJsonSafe<{
+        ok?: boolean;
+        error?: string;
+        cronControl?: CronStatus["cronControl"];
+      }>(response);
+      if (!response.ok || !data?.ok) {
+        const message = data?.error ?? "No se pudo actualizar la pausa.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      toast.success(
+        action === "pause"
+          ? "Crons en pausa 90 min"
+          : "Crons reanudados",
+      );
+      await loadStatus();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error al cambiar la pausa.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setPauseBusy(false);
+    }
+  }
+
   return (
     <div>
       <header>
@@ -222,8 +290,9 @@ export function CronAdminClient() {
           Monitorización / Cron
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Dos trabajos distintos: revisar precios del catálogo vigilado, o
-          descubrir Ofertas Flash nuevas para el canal.
+          Rotación por lotes (los más antiguos primero) para cubrir el catálogo
+          al día sin saturar Amazon. Si hay denegaciones, los crons se pausan
+          solos un tiempo prudencial.
         </p>
       </header>
 
@@ -232,6 +301,51 @@ export function CronAdminClient() {
           {error}
         </p>
       ) : null}
+
+      {status?.cronControl?.isPaused ? (
+        <div className="mt-6 border border-amber-300 bg-amber-50 px-4 py-4">
+          <p className="text-sm font-semibold text-amber-950">
+            Crons en pausa preventiva
+          </p>
+          <p className="mt-1 text-sm text-amber-900/90">
+            Hasta{" "}
+            {status.cronControl.pausedUntil
+              ? new Date(status.cronControl.pausedUntil).toLocaleString("es-ES")
+              : "—"}
+            {status.cronControl.pauseReason
+              ? ` · ${status.cronControl.pauseReason}`
+              : ""}
+          </p>
+          <button
+            type="button"
+            disabled={pauseBusy}
+            onClick={() => void setPause("resume")}
+            className="mt-3 inline-flex h-9 items-center border border-amber-800 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-950 disabled:opacity-60"
+          >
+            {pauseBusy ? "…" : "Reanudar ahora"}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-wrap items-center gap-3 border border-stone-300 bg-white px-4 py-3">
+          <p className="text-sm text-stone-600">
+            Estado: <span className="font-medium text-ink">activos</span>
+            {status?.neverChecked != null
+              ? ` · ${status.neverChecked} sin revisar`
+              : ""}
+            {status?.oldestCheckedAt
+              ? ` · más antiguo ${new Date(status.oldestCheckedAt).toLocaleString("es-ES")}`
+              : ""}
+          </p>
+          <button
+            type="button"
+            disabled={pauseBusy || loadingStatus}
+            onClick={() => void setPause("pause")}
+            className="ml-auto inline-flex h-9 items-center border border-stone-300 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink hover:text-ink disabled:opacity-60"
+          >
+            {pauseBusy ? "…" : "Pausar 90 min"}
+          </button>
+        </div>
+      )}
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="border border-stone-300 bg-white p-5">
@@ -272,8 +386,9 @@ export function CronAdminClient() {
           Revisar catálogo vigilado
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
-          Scrapea Amazon HTML de productos ya en el catálogo. Usa un límite bajo
-          (3–5) para evitar timeouts en Vercel.
+          Cada vez revisa un lote (por defecto 10) empezando por los que hace
+          más tiempo que no se comprueban. Varias corridas al día cubren todo el
+          catálogo y alimentan el histórico.
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -376,23 +491,55 @@ export function CronAdminClient() {
               </div>
               <ul className="divide-y divide-stone-100">
                 {flashResult.products.map((product) => (
-                  <li key={`${product.asin}-${product.action}`} className="px-4 py-3 text-sm">
-                    <p className="font-medium text-ink">{product.title}</p>
-                    <p className="mt-1 text-xs text-stone-500">
-                      {product.asin} · {product.action}
-                      {product.wasNewToCatalog ? " · NUEVO" : ""}
-                      {product.isFlashDeal ? " · FLASH" : ""}
-                      {product.isNewLow ? " · nuevo mínimo" : ""}
-                      {product.currentPrice != null
-                        ? ` · ${product.currentPrice.toFixed(2)} €`
-                        : ""}
-                      {product.listPrice != null
-                        ? ` (antes ${product.listPrice.toFixed(2)} €)`
-                        : ""}
-                      {product.discountPercentage
-                        ? ` · −${Math.round(product.discountPercentage)}%`
-                        : ""}
-                    </p>
+                  <li
+                    key={`${product.asin}-${product.action}`}
+                    className="flex items-start gap-3 px-4 py-3 text-sm"
+                  >
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-stone-200">
+                      {product.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={product.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-stone-400">
+                          —
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 font-medium text-ink">
+                        {product.title}
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {product.asin} · {product.action}
+                        {product.wasNewToCatalog ? " · NUEVO" : ""}
+                        {product.isFlashDeal ? " · FLASH" : ""}
+                        {product.isNewLow ? " · nuevo mínimo" : ""}
+                        {product.currentPrice != null
+                          ? ` · ${product.currentPrice.toFixed(2)} €`
+                          : ""}
+                        {product.listPrice != null
+                          ? ` (antes ${product.listPrice.toFixed(2)} €)`
+                          : ""}
+                        {product.discountPercentage
+                          ? ` · −${Math.round(product.discountPercentage)}%`
+                          : ""}
+                      </p>
+                    </div>
+                    <a
+                      href={
+                        product.amazonUrl ||
+                        `https://www.amazon.es/dp/${product.asin}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-9 shrink-0 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper transition hover:bg-teal-900"
+                    >
+                      Ir a Amazon
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -447,12 +594,44 @@ export function CronAdminClient() {
               </div>
               <ul className="divide-y divide-stone-100">
                 {result.stats.deals.map((deal) => (
-                  <li key={deal.asin} className="px-4 py-3 text-sm">
-                    <p className="font-medium text-ink">{deal.title}</p>
-                    <p className="mt-1 text-xs text-stone-500">
-                      {deal.asin} · score {Math.round(deal.scoring.score)} ·{" "}
-                      {deal.scoring.label}
-                    </p>
+                  <li
+                    key={deal.asin}
+                    className="flex items-start gap-3 px-4 py-3 text-sm"
+                  >
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-stone-200">
+                      {deal.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={deal.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-stone-400">
+                          —
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 font-medium text-ink">
+                        {deal.title}
+                      </p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {deal.asin} · score {Math.round(deal.scoring.score)} ·{" "}
+                        {deal.scoring.label}
+                      </p>
+                    </div>
+                    <a
+                      href={
+                        deal.amazonUrl ||
+                        `https://www.amazon.es/dp/${deal.asin}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-9 shrink-0 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper transition hover:bg-teal-900"
+                    >
+                      Ir a Amazon
+                    </a>
                   </li>
                 ))}
               </ul>

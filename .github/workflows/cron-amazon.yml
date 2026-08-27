@@ -1,0 +1,101 @@
+# Crons rotativos vía GitHub Actions (lotes pequeños para no saturar Amazon).
+# Secrets del repo: APP_URL (https://tudominio.com), CRON_SECRET (igual que Vercel).
+name: Cron Amazon
+
+on:
+  schedule:
+    # Precios: cada 2 h (UTC) → ~12 lotes/día × 10 productos
+    - cron: "0 */2 * * *"
+    # Flash: 3 veces al día, desfasado de precios (minuto 30)
+    - cron: "30 7,13,19 * * *"
+    # Alertas usuario: 2 veces al día
+    - cron: "15 6,18 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job a ejecutar"
+        required: true
+        default: "check-prices"
+        type: choice
+        options:
+          - check-prices
+          - flash-deals
+          - user-alerts
+      limit:
+        description: "Límite de productos / candidatos"
+        required: false
+        default: "10"
+      force:
+        description: "Ignorar pausa preventiva (1 = sí)"
+        required: false
+        default: "0"
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolver job y límite
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            JOB="${{ inputs.job }}"
+            LIMIT="${{ inputs.limit }}"
+            FORCE="${{ inputs.force }}"
+          else
+            SCHEDULE="${{ github.event.schedule }}"
+            case "$SCHEDULE" in
+              "30 7,13,19 * * *")
+                JOB="flash-deals"
+                LIMIT="12"
+                ;;
+              "15 6,18 * * *")
+                JOB="user-alerts"
+                LIMIT="15"
+                ;;
+              *)
+                JOB="check-prices"
+                LIMIT="10"
+                ;;
+            esac
+            FORCE="0"
+          fi
+          echo "job=$JOB" >> "$GITHUB_OUTPUT"
+          echo "limit=$LIMIT" >> "$GITHUB_OUTPUT"
+          echo "force=$FORCE" >> "$GITHUB_OUTPUT"
+
+      - name: Llamar endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          JOB: ${{ steps.pick.outputs.job }}
+          LIMIT: ${{ steps.pick.outputs.limit }}
+          FORCE: ${{ steps.pick.outputs.force }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Faltan secrets APP_URL o CRON_SECRET"
+            exit 1
+          fi
+          BASE="${APP_URL%/}"
+          QS="limit=${LIMIT}"
+          if [ "$FORCE" = "1" ]; then
+            QS="${QS}&force=1"
+          fi
+          URL="${BASE}/api/cron/${JOB}?${QS}"
+          echo "GET $URL"
+          # 503 = pausa preventiva: no fallar el workflow
+          HTTP=$(curl -sS -o /tmp/cron-out.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "$URL" || true)
+          echo "HTTP $HTTP"
+          head -c 2000 /tmp/cron-out.json || true
+          echo
+          if [ "$HTTP" = "503" ]; then
+            echo "Cron en pausa preventiva — OK"
+            exit 0
+          fi
+          if [ "$HTTP" != "200" ]; then
+            echo "Fallo HTTP $HTTP"
+            exit 1
+          fi

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
+import {
+  getCronControlState,
+  pauseCronJobs,
+  resumeCronJobs,
+} from "@/services/cronControl";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -13,10 +18,13 @@ export async function GET(request: NextRequest) {
     if (denied) return denied;
     const client = createSupabaseServiceClient();
 
-    const { data, error } = await client
-      .from("products")
-      .select("last_checked_at, is_active, amazon_url")
-      .eq("is_active", true);
+    const [{ data, error }, cronControl] = await Promise.all([
+      client
+        .from("products")
+        .select("last_checked_at, is_active, amazon_url")
+        .eq("is_active", true),
+      getCronControlState().catch(() => null),
+    ]);
 
     if (error) {
       throw new Error(error.message);
@@ -28,12 +36,20 @@ export async function GET(request: NextRequest) {
       .filter((value): value is string => Boolean(value))
       .sort()
       .reverse();
+    const neverChecked = rows.filter((row) => !row.last_checked_at).length;
+    const oldest = rows
+      .map((row) => row.last_checked_at)
+      .filter((value): value is string => Boolean(value))
+      .sort()[0];
 
     return NextResponse.json({
       ok: true,
       activeProducts: rows.length,
       withAmazonUrl: rows.filter((row) => Boolean(row.amazon_url)).length,
       lastCheckedAt: checked[0] ?? null,
+      oldestCheckedAt: oldest ?? null,
+      neverChecked,
+      cronControl,
     });
   } catch (error) {
     const message = formatEnvError(error);
@@ -47,18 +63,36 @@ export async function POST(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
     const body = (await request.json().catch(() => ({}))) as {
+      action?: "run" | "pause" | "resume";
       limit?: number;
       notify?: boolean;
       asins?: string[];
       provider?: "html" | "keepa" | "creators" | "auto";
+      force?: boolean;
+      minutes?: number;
+      reason?: string;
     };
 
+    if (body.action === "pause") {
+      const state = await pauseCronJobs({
+        minutes: body.minutes,
+        reason: body.reason?.trim() || "Pausa manual desde admin",
+      });
+      return NextResponse.json({ ok: true, cronControl: state });
+    }
+
+    if (body.action === "resume") {
+      const state = await resumeCronJobs();
+      return NextResponse.json({ ok: true, cronControl: state });
+    }
+
     const result = await runAmazonPriceCheck({
-      limit: body.limit ?? 5,
+      limit: body.limit ?? 10,
       notify: body.notify ?? false,
       asins: body.asins,
       provider: body.provider ?? "html",
-      delayMs: 700,
+      delayMs: 1_100,
+      force: body.force ?? true,
     });
 
     return NextResponse.json(result);

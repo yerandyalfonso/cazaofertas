@@ -1,35 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatEnvError } from "@/lib/env";
 import { assertInternalAccess } from "@/lib/internal-auth";
-import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
+import {
+  DEFAULT_PRICE_CHECK_BATCH,
+  runAmazonPriceCheck,
+} from "@/services/amazonPriceCheck";
 import { notifyCronFailure } from "@/services/cronNotify";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * Cron de comprobación de precios reales vía HTML de Amazon.
- * Protegido con CRON_SECRET (Authorization: Bearer … o ?secret=).
+ * Cron rotativo de precios: cada ejecución revisa un lote pequeño
+ * (los más antiguos / nunca chequeados) para cubrir el catálogo al día
+ * sin saturar Amazon. Respeta pausa preventiva ante denegaciones.
+ *
+ * Query: ?limit=10&force=1
  */
 export async function GET(request: NextRequest) {
   try {
     assertInternalAccess(request);
 
     const limitParam = request.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const parsed = limitParam ? Number.parseInt(limitParam, 10) : NaN;
+    const limit =
+      Number.isFinite(parsed) && parsed > 0
+        ? parsed
+        : DEFAULT_PRICE_CHECK_BATCH;
+    const force = request.nextUrl.searchParams.get("force") === "1";
 
     const result = await runAmazonPriceCheck({
-      limit: Number.isFinite(limit) && (limit as number) > 0 ? limit : undefined,
+      limit,
       notify: true,
+      force,
+      delayMs: 1_100,
     });
 
     return NextResponse.json(result);
   } catch (error) {
     const message = formatEnvError(error);
-    if (!message.includes("No autorizado")) {
+    const paused = message.includes("Cron en pausa");
+    if (!message.includes("No autorizado") && !paused) {
       await notifyCronFailure({ job: "check-prices", error });
     }
-    const status = message.includes("No autorizado") ? 401 : 500;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    const status = message.includes("No autorizado")
+      ? 401
+      : paused
+        ? 503
+        : 500;
+    return NextResponse.json(
+      { ok: false, skipped: paused, error: message },
+      { status },
+    );
   }
 }
