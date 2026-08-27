@@ -827,6 +827,19 @@ export function extractPriceFromAmazonHtml(html: string): {
   };
 }
 
+function isRetryableAmazonFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /anti-bot|bloqueado|HTTP 503|HTTP 429|temporalmente no disponible|aborted|timeout/i.test(
+    message,
+  );
+}
+
+function resetAmazonHtmlSession(): void {
+  sharedCookieJar = null;
+  spainDeliveryReady = false;
+  spainDeliveryPromise = null;
+}
+
 async function fetchAmazonPageHtml(
   url: string,
   options: {
@@ -839,78 +852,112 @@ async function fetchAmazonPageHtml(
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 12_000;
   const pinSpainDelivery = options.pinSpainDelivery !== false;
+  // En Vercel las IPs de datacenter fallan más: más reintentos y backoff.
+  const maxAttempts = process.env.VERCEL ? 3 : 2;
 
-  let jar = pinSpainDelivery
-    ? await ensureSpainDeliverySession(fetchImpl, Math.min(timeoutMs, 12_000))
-    : sharedCookieJar ?? defaultCookieJar();
+  let lastError: unknown;
 
-  const doFetch = async (): Promise<string> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      const response = await fetchImpl(url, {
-        method: "GET",
-        headers: browserHeaders(jar),
-        signal: controller.signal,
-        redirect: "follow",
-      });
-      absorbSetCookies(jar, response);
-      sharedCookieJar = jar;
+      if (attempt > 0) {
+        resetAmazonHtmlSession();
+        await sleep(1_600 * attempt + Math.round(Math.random() * 900));
+      }
 
-      if (response.status === 503 || response.status === 429) {
-        throw new Error(
-          `Amazon temporalmente no disponible (HTTP ${response.status}).`,
+      let jar = pinSpainDelivery
+        ? await ensureSpainDeliverySession(
+            fetchImpl,
+            Math.min(timeoutMs, 12_000),
+            attempt > 0 ? { force: true } : undefined,
+          )
+        : sharedCookieJar ?? defaultCookieJar();
+
+      const doFetch = async (): Promise<string> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetchImpl(url, {
+            method: "GET",
+            headers: browserHeaders(jar),
+            signal: controller.signal,
+            redirect: "follow",
+          });
+          absorbSetCookies(jar, response);
+          sharedCookieJar = jar;
+
+          if (response.status === 503 || response.status === 429) {
+            throw new Error(
+              `Amazon temporalmente no disponible (HTTP ${response.status}).`,
+            );
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              `Respuesta HTTP ${response.status} al consultar Amazon.`,
+            );
+          }
+
+          const html = await response.text();
+
+          if (
+            html.includes("api-services-support@amazon.com") ||
+            html.includes("Enter the characters you see below") ||
+            html.toLowerCase().includes("robot check")
+          ) {
+            throw new Error(
+              "Amazon devolvió un challenge anti-bot (bloqueado).",
+            );
+          }
+
+          return html;
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      let html = await doFetch();
+
+      // Si glow sigue en EE. UU., re-pin forzado y un reintento (no tumbar el feed).
+      if (pinSpainDelivery && isForeignDeliveryGlow(html)) {
+        console.warn(
+          "[AmazonHtml] Glow fuera de ES; reintentando pin CP",
+          AMAZON_ES_ZIP,
+          "—",
+          glowDeliveryText(html).slice(0, 60),
+        );
+        spainDeliveryReady = false;
+        jar = await ensureSpainDeliverySession(
+          fetchImpl,
+          Math.min(timeoutMs, 12_000),
+          { force: true },
+        );
+        html = await doFetch();
+      }
+
+      lastFetchForeignDelivery = isForeignDeliveryGlow(html);
+      if (lastFetchForeignDelivery) {
+        console.warn(
+          "[AmazonHtml] Entrega aún fuera de ES (se mantiene el precio leído, sin ×IVA). Glow:",
+          glowDeliveryText(html).slice(0, 80),
         );
       }
 
-      if (!response.ok) {
-        throw new Error(`Respuesta HTTP ${response.status} al consultar Amazon.`);
-      }
-
-      const html = await response.text();
-
-      if (
-        html.includes("api-services-support@amazon.com") ||
-        html.includes("Enter the characters you see below") ||
-        html.toLowerCase().includes("robot check")
-      ) {
-        throw new Error("Amazon devolvió un challenge anti-bot (bloqueado).");
-      }
-
       return html;
-    } finally {
-      clearTimeout(timer);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableAmazonFetchError(error) || attempt === maxAttempts - 1) {
+        throw error;
+      }
+      console.warn(
+        `[AmazonHtml] Intento ${attempt + 1}/${maxAttempts} falló, reintento:`,
+        error instanceof Error ? error.message : error,
+      );
     }
-  };
-
-  let html = await doFetch();
-
-  // Si glow sigue en EE. UU., re-pin forzado y un reintento (no tumbar el feed).
-  if (pinSpainDelivery && isForeignDeliveryGlow(html)) {
-    console.warn(
-      "[AmazonHtml] Glow fuera de ES; reintentando pin CP",
-      AMAZON_ES_ZIP,
-      "—",
-      glowDeliveryText(html).slice(0, 60),
-    );
-    spainDeliveryReady = false;
-    jar = await ensureSpainDeliverySession(
-      fetchImpl,
-      Math.min(timeoutMs, 12_000),
-      { force: true },
-    );
-    html = await doFetch();
   }
 
-  lastFetchForeignDelivery = isForeignDeliveryGlow(html);
-  if (lastFetchForeignDelivery) {
-    console.warn(
-      "[AmazonHtml] Entrega aún fuera de ES (se mantiene el precio leído, sin ×IVA). Glow:",
-      glowDeliveryText(html).slice(0, 80),
-    );
-  }
-
-  return html;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("No se pudo leer Amazon.");
 }
 
 /** @deprecated Usar fetchAmazonPageHtml */
@@ -1020,8 +1067,9 @@ export class AmazonHtmlPriceProvider implements PriceProvider {
 
   constructor(options: AmazonHtmlPriceProviderOptions = {}) {
     this.urlByAsin = options.urlByAsin ?? new Map();
-    this.delayMs = options.delayMs ?? 1_250;
-    this.timeoutMs = options.timeoutMs ?? 12_000;
+    const onVercel = Boolean(process.env.VERCEL);
+    this.delayMs = options.delayMs ?? (onVercel ? 2_200 : 1_250);
+    this.timeoutMs = options.timeoutMs ?? (onVercel ? 18_000 : 12_000);
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 

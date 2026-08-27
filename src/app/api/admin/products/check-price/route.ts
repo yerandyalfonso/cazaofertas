@@ -180,8 +180,9 @@ export async function POST(request: NextRequest) {
     const result = await runAmazonPriceCheck({
       asins,
       notify: body.notify ?? false,
-      provider: "html",
-      delayMs: 700,
+      provider: "auto",
+      delayMs: process.env.VERCEL ? 2_200 : 900,
+      force: true,
     });
 
     return NextResponse.json(result);

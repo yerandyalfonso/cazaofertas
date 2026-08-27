@@ -159,7 +159,7 @@ export function CronAdminClient() {
         body: JSON.stringify({
           limit: Number.isFinite(parsedLimit) ? parsedLimit : 10,
           notify: false,
-          provider: "html",
+          provider: "auto",
           force: true,
         }),
       });
@@ -173,12 +173,24 @@ export function CronAdminClient() {
         setError(message);
         toast.error(message);
       } else {
+        const processed = data.stats?.processed ?? 0;
+        const updated = data.stats?.updated ?? 0;
         const scrapeErrors = data.stats?.errors?.length ?? 0;
-        toast.success(
-          `Lote rotativo · ${data.stats?.processed ?? 0} procesados, ${data.stats?.updated ?? 0} actualizados` +
-            (scrapeErrors > 0 ? ` · ${scrapeErrors} con error` : "") +
-            (data.pause?.activated ? " · pausa preventiva activada" : ""),
-        );
+        if (processed > 0 && scrapeErrors >= processed) {
+          const first = data.stats?.errors?.[0]?.message;
+          const message =
+            `Amazon bloqueó el scrape en el servidor (${scrapeErrors}/${processed}).` +
+            (first ? ` ${first}` : "") +
+            " Reintenta en unos minutos o baja el límite.";
+          setError(message);
+          toast.error(message);
+        } else {
+          toast.success(
+            `Lote rotativo · ${processed} procesados, ${updated} actualizados` +
+              (scrapeErrors > 0 ? ` · ${scrapeErrors} con error` : "") +
+              (data.pause?.activated ? " · pausa preventiva activada" : ""),
+          );
+        }
       }
       await loadStatus();
     } catch (err) {
@@ -219,9 +231,22 @@ export function CronAdminClient() {
         setError(message);
         toast.error(message);
       } else {
-        toast.success(
-          `Flash OK · +${data.inserted ?? 0} nuevos, ${data.updated ?? 0} actualizados.`,
-        );
+        const errCount = data.errors?.length ?? 0;
+        const changed = (data.inserted ?? 0) + (data.updated ?? 0);
+        if (changed === 0 && errCount > 0) {
+          const first = data.errors?.[0]?.message;
+          const message =
+            `Flash sin actualizaciones (${errCount} errores de Amazon).` +
+            (first ? ` ${first}` : "") +
+            " En Vercel el HTML suele bloquearse; reintenta más tarde.";
+          setError(message);
+          toast.error(message);
+        } else {
+          toast.success(
+            `Flash OK · +${data.inserted ?? 0} nuevos, ${data.updated ?? 0} actualizados` +
+              (errCount > 0 ? ` · ${errCount} errores` : ""),
+          );
+        }
       }
       await loadStatus();
     } catch (err) {

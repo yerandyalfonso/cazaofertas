@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
       limit: body.limit ?? 10,
       notify: body.notify ?? false,
       asins: body.asins,
-      provider: body.provider ?? "html",
-      delayMs: 1_100,
+      provider: body.provider ?? "auto",
+      delayMs: process.env.VERCEL ? 2_200 : 1_100,
       force: body.force ?? true,
     });
 

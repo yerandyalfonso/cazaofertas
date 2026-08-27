@@ -165,7 +165,8 @@ export async function runFlashDealsCheck(options?: {
 }): Promise<FlashDealsRunResult> {
   const client = createSupabaseServiceClient();
   const limit = options?.limit && options.limit > 0 ? options.limit : 25;
-  const delayMs = options?.delayMs ?? 1_200;
+  const delayMs =
+    options?.delayMs ?? (process.env.VERCEL ? 2_000 : 1_200);
   const shouldNotify = options?.notify ?? true;
 
   const discovery = await discoverFlashDealListings({

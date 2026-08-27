@@ -45,10 +45,11 @@ function hasCreatorsCredentials(): boolean {
 function createHtmlProvider(
   options: ResolvePriceProviderOptions,
 ): AmazonHtmlPriceProvider {
+  const onVercel = Boolean(process.env.VERCEL);
   return new AmazonHtmlPriceProvider({
     urlByAsin: options.urlByAsin,
-    delayMs: options.delayMs ?? 1_400,
-    timeoutMs: options.timeoutMs ?? 12_000,
+    delayMs: options.delayMs ?? (onVercel ? 2_200 : 1_400),
+    timeoutMs: options.timeoutMs ?? (onVercel ? 18_000 : 12_000),
   });
 }
 
