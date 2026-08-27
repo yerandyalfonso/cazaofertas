@@ -4,11 +4,68 @@ import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
+import { splitProductDescription } from "@/lib/product-description";
 
 interface DealCardProps {
   product: CatalogProduct;
   featured?: boolean;
   compact?: boolean;
+}
+
+function ProductThumb({
+  product,
+  featured = false,
+  compact = false,
+  priority = false,
+}: {
+  product: CatalogProduct;
+  featured?: boolean;
+  compact?: boolean;
+  priority?: boolean;
+}) {
+  if (!product.imageUrl) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-transparent text-xs text-stone-400 ${
+          compact ? "aspect-square" : "min-h-40"
+        }`}
+      >
+        Sin imagen
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <Image
+        src={product.imageUrl}
+        alt={product.title}
+        width={176}
+        height={176}
+        sizes="88px"
+        className="h-full w-full bg-transparent object-contain transition-transform duration-500 group-hover:scale-[1.03]"
+      />
+    );
+  }
+
+  return (
+    <Image
+      src={product.imageUrl}
+      alt={product.title}
+      width={900}
+      height={900}
+      priority={priority}
+      sizes={
+        featured
+          ? "(max-width: 768px) 100vw, 50vw"
+          : "(max-width: 768px) 50vw, 33vw"
+      }
+      className={`mx-auto h-auto w-full max-h-56 bg-transparent object-contain transition-transform duration-700 ease-out group-hover:scale-[1.02] ${
+        featured ? "md:max-h-[380px]" : ""
+      }`}
+      style={{ width: "100%", height: "auto" }}
+    />
+  );
 }
 
 export function DealCard({
@@ -21,17 +78,9 @@ export function DealCard({
       <article className="group grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-stone-200 pb-5 last:border-b-0 last:pb-0">
         <Link
           href={`/producto/${product.slug}`}
-          className="relative aspect-square overflow-hidden bg-stone-200"
+          className="relative aspect-square overflow-hidden bg-transparent"
         >
-          {product.imageUrl ? (
-            <Image
-              src={product.imageUrl}
-              alt={product.title}
-              fill
-              sizes="88px"
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            />
-          ) : null}
+          <ProductThumb product={product} compact />
         </Link>
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap gap-1.5">
@@ -54,6 +103,7 @@ export function DealCard({
                 productId: product.id,
                 source: "deal_card_compact",
               })}
+              target="_blank"
               rel="noopener noreferrer sponsored"
               className="text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-900 underline-offset-2 hover:underline"
             >
@@ -80,26 +130,11 @@ export function DealCard({
     >
       <Link
         href={`/producto/${product.slug}`}
-        className={`relative block overflow-hidden bg-stone-200 ${
-          featured
-            ? "aspect-[16/11] md:aspect-auto md:min-h-full"
-            : "aspect-[5/4]"
+        className={`relative flex items-center justify-center bg-transparent px-5 pt-5 ${
+          featured ? "md:h-full md:px-8 md:py-8" : ""
         }`}
       >
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={product.title}
-            fill
-            sizes={
-              featured
-                ? "(max-width: 768px) 100vw, 50vw"
-                : "(max-width: 768px) 50vw, 25vw"
-            }
-            className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-            priority={featured}
-          />
-        ) : null}
+        <ProductThumb product={product} featured={featured} priority={featured} />
       </Link>
 
       <div className="flex flex-1 flex-col gap-4 p-5 md:p-6">
@@ -121,8 +156,9 @@ export function DealCard({
             {product.title}
           </h3>
           {product.description && featured ? (
-            <p className="line-clamp-2 text-sm leading-relaxed text-stone-600">
-              {product.description}
+            <p className="line-clamp-3 text-sm leading-relaxed text-stone-600">
+              {splitProductDescription(product.description).join(" ") ||
+                product.description}
             </p>
           ) : null}
         </Link>
@@ -137,16 +173,14 @@ export function DealCard({
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-              Score {Math.round(product.dealScore)}
-            </p>
-            <p className="sr-only">
-              El score combina descuento, mínimo histórico y estabilidad.
+              {Math.round(product.dealScore)}/100
             </p>
             <a
               href={buildTrackedAffiliatePath({
                 productId: product.id,
                 source: "deal_card",
               })}
+              target="_blank"
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 items-center justify-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
             >

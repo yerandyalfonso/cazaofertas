@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { Badge } from "@/components/Badge";
 import { JsonLd } from "@/components/JsonLd";
 import { Price } from "@/components/Price";
@@ -15,6 +14,7 @@ import {
   getProductBySlug,
 } from "@/lib/catalog";
 import { formatEuro } from "@/lib/money";
+import { splitProductDescription } from "@/lib/product-description";
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
@@ -87,6 +87,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
     product.previousPrice !== null
       ? product.previousPrice - product.currentPrice
       : 0;
+  const descriptionParts = splitProductDescription(product.description);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10 md:px-8 md:py-14">
@@ -132,15 +133,17 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div className="relative aspect-[4/5] overflow-hidden bg-stone-200">
+        <div className="relative w-full bg-transparent">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt={product.title}
-              fill
+              width={1200}
+              height={1200}
               priority
-              className="object-cover"
+              className="h-auto w-full bg-transparent"
               sizes="(max-width: 1024px) 100vw, 50vw"
+              style={{ width: "100%", height: "auto" }}
             />
           ) : null}
         </div>
@@ -176,16 +179,34 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           />
 
           <p className="text-sm text-stone-600">
-            Deal score{" "}
-            <strong className="text-ink">{Math.round(product.dealScore)}</strong>
-            {product.dealLabel ? ` · ${product.dealLabel}` : null}
-          </p>
-          <p className="text-xs leading-relaxed text-stone-500">
-            El score combina descuento, cercanía al mínimo histórico y
-            estabilidad del precio.
+            Puntuación{" "}
+            <strong className="text-ink">{Math.round(product.dealScore)}/100</strong>
           </p>
 
-          <AffiliateDisclosure />
+          {descriptionParts.length > 0 ? (
+            <div className="space-y-3 border-y border-stone-200 py-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
+                Descripción
+              </h2>
+              {descriptionParts.length === 1 ? (
+                <p className="text-base leading-relaxed text-stone-700">
+                  {descriptionParts[0]}
+                </p>
+              ) : (
+                <ul className="space-y-2.5 text-base leading-relaxed text-stone-700">
+                  {descriptionParts.map((part, index) => (
+                    <li key={`${index}-${part.slice(0, 32)}`} className="flex gap-2.5">
+                      <span
+                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-800/70"
+                        aria-hidden
+                      />
+                      <span>{part}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
 
           <dl className="grid grid-cols-2 gap-4 border-y border-stone-300 py-5 text-sm">
             <div>
@@ -244,18 +265,13 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </div>
           </dl>
 
-          {product.description ? (
-            <p className="text-base leading-relaxed text-stone-700">
-              {product.description}
-            </p>
-          ) : null}
-
           <div className="flex flex-wrap gap-3 pb-20 md:pb-0">
             <a
               href={buildTrackedAffiliatePath({
                 productId: product.id,
                 source: "product_page",
               })}
+              target="_blank"
               rel="noopener noreferrer sponsored"
               className="inline-flex h-12 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.16em] text-paper transition hover:bg-teal-900"
             >

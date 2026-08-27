@@ -58,19 +58,35 @@ export async function GET(request: NextRequest) {
         slug: row.slug,
         asin: row.asin,
         brand: row.brand,
+        description: row.description,
         amazonUrl: row.amazon_url,
+        affiliateUrl: row.affiliate_url,
+        imageUrl: row.image_url,
         currentPrice,
         previousPrice,
+        lowestPrice,
+        highestPrice: toNumber(row.highest_price),
+        averagePrice30d: toNumber(row.average_price_30d),
+        averagePrice90d: toNumber(row.average_price_90d),
         referencePrice: previousPrice ?? currentPrice,
         dealScore: scoring.score,
         dealLabel: scoring.label,
+        dealLevel: scoring.level,
         discountPercentage:
           toNumber(row.discount_percentage) ?? scoring.discountPercentage,
+        currency: row.currency,
+        availability: row.availability,
         category: category
           ? { id: category.id, name: category.name, slug: category.slug }
           : null,
         isActive: row.is_active,
+        isFeatured: row.is_featured,
         lastCheckedAt: row.last_checked_at,
+        lastTelegramNotifiedAt: row.last_telegram_notified_at,
+        lastTelegramNotifiedPrice: toNumber(row.last_telegram_notified_price),
+        lastTelegramNotifiedScore: toNumber(row.last_telegram_notified_score),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
       };
     });
 

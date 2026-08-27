@@ -10,6 +10,13 @@ interface OffersCatalogProps {
   categories: Array<{ slug: string; name: string }>;
 }
 
+const DISCOUNT_OPTIONS = [
+  { value: 0, label: "Cualquier %" },
+  { value: 10, label: "≥ 10%" },
+  { value: 20, label: "≥ 20%" },
+  { value: 30, label: "≥ 30%" },
+] as const;
+
 export function OffersCatalog({ products, categories }: OffersCatalogProps) {
   const [category, setCategory] = useState<string>("all");
   const [onlyHistorical, setOnlyHistorical] = useState(false);
@@ -33,52 +40,102 @@ export function OffersCatalog({ products, categories }: OffersCatalogProps) {
     });
   }, [products, category, onlyHistorical, minDiscount]);
 
+  const hasActiveFilters =
+    category !== "all" || onlyHistorical || minDiscount > 0;
+
+  function clearFilters() {
+    setCategory("all");
+    setOnlyHistorical(false);
+    setMinDiscount(0);
+  }
+
   return (
     <div>
-      <div className="mt-8 flex flex-col gap-4 border border-stone-300 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="flex flex-wrap gap-2">
-          <FilterChip
-            active={category === "all"}
-            onClick={() => setCategory("all")}
-            label="Todas"
-          />
-          {categories.map((cat) => (
-            <FilterChip
-              key={cat.slug}
-              active={category === cat.slug}
-              onClick={() => setCategory(cat.slug)}
-              label={cat.name}
-            />
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-          <FilterChip
-            active={onlyHistorical}
-            onClick={() => setOnlyHistorical((v) => !v)}
-            label="Mínimo histórico"
-          />
-          <select
-            value={minDiscount}
-            onChange={(event) =>
-              setMinDiscount(Number.parseInt(event.target.value, 10) || 0)
-            }
-            className="h-9 border border-stone-300 bg-white px-2 text-xs font-semibold uppercase tracking-[0.1em] text-stone-700"
-            aria-label="Descuento mínimo"
+      <div className="mt-10 space-y-5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+            Categoría
+          </p>
+          <div
+            role="tablist"
+            aria-label="Filtrar por categoría"
+            className="-mx-1 mt-2.5 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
           >
-            <option value={0}>Cualquier %</option>
-            <option value={10}>≥ 10%</option>
-            <option value={20}>≥ 20%</option>
-            <option value={30}>≥ 30%</option>
-          </select>
+            <CategoryTab
+              active={category === "all"}
+              onClick={() => setCategory("all")}
+              label="Todas"
+            />
+            {categories.map((cat) => (
+              <CategoryTab
+                key={cat.slug}
+                active={category === cat.slug}
+                onClick={() => setCategory(cat.slug)}
+                label={cat.name}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 border-t border-stone-200/90 pt-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+              Filtros
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterToggle
+                active={onlyHistorical}
+                onClick={() => setOnlyHistorical((v) => !v)}
+                label="Mínimo histórico"
+                ariaPressed={onlyHistorical}
+              />
+              <div
+                role="group"
+                aria-label="Descuento mínimo"
+                className="inline-flex flex-wrap items-stretch border border-stone-300 bg-white"
+              >
+                {DISCOUNT_OPTIONS.map((option, index) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setMinDiscount(option.value)}
+                    aria-pressed={minDiscount === option.value}
+                    className={`h-9 px-3 text-[11px] font-semibold uppercase tracking-[0.1em] transition ${
+                      index > 0 ? "border-l border-stone-300" : ""
+                    } ${
+                      minDiscount === option.value
+                        ? "bg-ink text-paper"
+                        : "bg-white text-stone-600 hover:bg-stone-50 hover:text-ink"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <p className="text-sm text-stone-500">
+              <span className="font-medium text-ink">{filtered.length}</span>{" "}
+              oferta{filtered.length === 1 ? "" : "s"}
+              {hasActiveFilters ? " con filtros" : ""}
+            </p>
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="h-9 border border-stone-300 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-600 transition hover:border-ink hover:text-ink"
+              >
+                Limpiar
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <p className="mt-4 text-sm text-stone-500">
-        {filtered.length} oferta{filtered.length === 1 ? "" : "s"}
-      </p>
-
       {filtered.length > 0 ? (
-        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((product, index) => (
             <DealCard
               key={product.id}
@@ -97,7 +154,7 @@ export function OffersCatalog({ products, categories }: OffersCatalogProps) {
   );
 }
 
-function FilterChip({
+function CategoryTab({
   label,
   active,
   onClick,
@@ -109,13 +166,48 @@ function FilterChip({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      className={`h-9 px-3 text-xs font-semibold uppercase tracking-[0.1em] transition ${
+      className={`h-10 shrink-0 px-4 text-xs font-semibold uppercase tracking-[0.12em] transition ${
         active
-          ? "bg-ink text-paper"
-          : "border border-stone-300 bg-white text-stone-600 hover:border-ink hover:text-ink"
+          ? "bg-ink text-paper shadow-[0_8px_20px_-12px_rgba(18,22,28,0.55)]"
+          : "bg-white text-stone-600 ring-1 ring-inset ring-stone-300 hover:text-ink hover:ring-ink"
       }`}
     >
+      {label}
+    </button>
+  );
+}
+
+function FilterToggle({
+  label,
+  active,
+  onClick,
+  ariaPressed,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  ariaPressed: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={ariaPressed}
+      onClick={onClick}
+      className={`inline-flex h-9 items-center gap-2 border px-3 text-[11px] font-semibold uppercase tracking-[0.1em] transition ${
+        active
+          ? "border-teal-800 bg-teal-900 text-paper"
+          : "border-stone-300 bg-white text-stone-600 hover:border-ink hover:text-ink"
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`inline-block size-1.5 ${
+          active ? "bg-amber-300" : "bg-stone-300"
+        }`}
+      />
       {label}
     </button>
   );

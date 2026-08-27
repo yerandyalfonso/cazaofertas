@@ -24,6 +24,7 @@ import {
   getWizardDraft,
   resolveCategoryId,
   saveWizardDraft,
+  shortProductLabel,
   wizardStepLabel,
   WIZARD_CATEGORIES,
   type AlertWizardDraft,
@@ -195,16 +196,21 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
-function dealHeadline(level: DealLevel): string {
+function dealHeadline(
+  level: DealLevel,
+  options?: { brand?: string | null; store?: string },
+): string {
+  const store = options?.store?.trim() || "Amazon";
+  const by = options?.brand?.trim() || store;
   switch (level) {
     case DealLevel.HISTORICAL_LOW:
-      return "🔥 MÍNIMO HISTÓRICO";
+      return `🔥 Chollazo de ${by}`;
     case DealLevel.GREAT_DEAL:
-      return "🔥 GRAN OFERTA";
+      return `🔥 Gran oferta de ${by}`;
     case DealLevel.GOOD_DEAL:
-      return "🔥 BUENA OFERTA";
+      return `🔥 Buena oferta de ${by}`;
     default:
-      return "🔥 OFERTA";
+      return `🔥 Oferta de ${by}`;
   }
 }
 
@@ -230,7 +236,7 @@ export function buildDealAlertText(deal: DealCandidate): string {
       : null;
 
   const lines = [
-    dealHeadline(deal.dealLevel),
+    dealHeadline(deal.dealLevel, { brand: deal.brand }),
     "",
     `<b>${escapeHtml(truncatePlain(deal.title, 120))}</b>`,
   ];
@@ -250,6 +256,9 @@ export function buildDealAlertText(deal: DealCandidate): string {
   if (score != null) {
     lines.push(`⭐ Puntuación <b>${score}/100</b>`);
   }
+
+  // Dos saltos finales para separar el texto del teclado inline.
+  lines.push("", "");
 
   return lines.join("\n");
 }
@@ -471,17 +480,32 @@ async function startWizardFromDeepLink(
   payload: { type: "asin" | "cat" | "kw"; value: string },
 ): Promise<void> {
   if (payload.type === "asin") {
-    const url = generateAmazonUrl(payload.value);
+    const asin = payload.value;
+    const url = generateAmazonUrl(asin);
+    let title: string | null = null;
+    try {
+      const client = createSupabaseServiceClient();
+      const { data } = await client
+        .from("products")
+        .select("title")
+        .eq("asin", asin)
+        .maybeSingle();
+      title = data?.title ?? null;
+    } catch (error) {
+      console.error("[telegram] deep-link product title", error);
+    }
+    const label = shortProductLabel(title, asin);
     await saveWizardDraft(telegramId, {
       step: "pick_discount",
       mode: "url",
       url,
-      keyword: payload.value,
+      keyword: label,
+      productTitle: label,
     });
     await sendTelegramMessage({
       chatId,
       text: [
-        `🎯 <b>Alerta para ASIN ${payload.value}</b>`,
+        `🎯 <b>Alerta · ${escapeHtml(label)}</b>`,
         "",
         `📉 <b>${wizardStepLabel("pick_discount")}</b>`,
         "",
@@ -542,9 +566,13 @@ async function advanceWizardAfterTarget(
   draft: AlertWizardDraft,
 ): Promise<void> {
   await saveWizardDraft(telegramId, { ...draft, step: "pick_discount" });
+  const productLine = draft.productTitle
+    ? [`🎯 <b>Alerta · ${escapeHtml(draft.productTitle)}</b>`, ""]
+    : [];
   await sendTelegramMessage({
     chatId,
     text: [
+      ...productLine,
       `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
       "",
       "¿A partir de qué descuento quieres que te avise?",
@@ -635,15 +663,21 @@ async function handleWizardBack(
       return;
     case "pick_max_price":
       await saveWizardDraft(telegramId, { ...draft, step: "pick_discount" });
-      await sendTelegramMessage({
-        chatId,
-        text: [
-          `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
-          "",
-          "¿A partir de qué descuento quieres que te avise?",
-        ].join("\n"),
-        replyMarkup: buildWizardDiscountMarkup(),
-      });
+      {
+        const productLine = draft.productTitle
+          ? [`🎯 <b>Alerta · ${escapeHtml(draft.productTitle)}</b>`, ""]
+          : [];
+        await sendTelegramMessage({
+          chatId,
+          text: [
+            ...productLine,
+            `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
+            "",
+            "¿A partir de qué descuento quieres que te avise?",
+          ].join("\n"),
+          replyMarkup: buildWizardDiscountMarkup(),
+        });
+      }
       return;
     case "confirm":
       await saveWizardDraft(telegramId, { ...draft, step: "pick_max_price" });
@@ -920,9 +954,32 @@ async function handleWizardTextInput(
       });
       return true;
     }
+    const url = rawText.slice(0, 500);
+    const asin = extractAsin(rawText);
+    let title: string | null = null;
+    try {
+      const client = createSupabaseServiceClient();
+      if (asin) {
+        const { data } = await client
+          .from("products")
+          .select("title")
+          .eq("asin", asin)
+          .maybeSingle();
+        title = data?.title ?? null;
+      }
+      if (!title) {
+        const product = await ensureProductFromAmazonUrl(client, url);
+        title = product.title;
+      }
+    } catch (error) {
+      console.error("[telegram] wizard url title", error);
+    }
+    const label = shortProductLabel(title, asin);
     await advanceWizardAfterTarget(chatId, telegramId, {
       ...draft,
-      url: rawText.slice(0, 500),
+      url,
+      keyword: label,
+      productTitle: label,
     });
     return true;
   }
@@ -1030,6 +1087,7 @@ async function fetchTopDealsText(): Promise<string> {
       return {
         productId: product.id,
         title: product.title,
+        brand: product.brand as string | null,
         currentPrice,
         previousPrice,
         discountPercentage,
@@ -1058,7 +1116,7 @@ async function fetchTopDealsText(): Promise<string> {
   ranked.forEach((deal, index) => {
     lines.push(
       `<b>${index + 1}. ${escapeHtml(deal.title)}</b>`,
-      `${dealHeadline(deal.scoring.level)}`,
+      `${dealHeadline(deal.scoring.level, { brand: deal.brand ?? null })}`,
       `💰 ${formatEuro(deal.currentPrice)}${
         deal.previousPrice !== null
           ? `  <s>${formatEuro(deal.previousPrice)}</s>`

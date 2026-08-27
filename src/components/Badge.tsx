@@ -2,7 +2,7 @@ import { DealLevel } from "@/types";
 
 const LEVEL_STYLES: Record<DealLevel, { label: string; className: string }> = {
   [DealLevel.NORMAL]: {
-    label: "Normal",
+    label: "Oferta",
     className: "bg-stone-200 text-stone-700",
   },
   [DealLevel.GOOD_DEAL]: {
@@ -14,7 +14,7 @@ const LEVEL_STYLES: Record<DealLevel, { label: string; className: string }> = {
     className: "bg-amber-200 text-amber-950",
   },
   [DealLevel.HISTORICAL_LOW]: {
-    label: "Mínimo histórico",
+    label: "Chollazo",
     className: "bg-rose-200 text-rose-950",
   },
 };

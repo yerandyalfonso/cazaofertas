@@ -11,6 +11,7 @@ const NAV = [
   { href: "/admin/products", label: "Productos" },
   { href: "/admin/articles", label: "Artículos" },
   { href: "/admin/cron", label: "Monitorización / Cron" },
+  { href: "/admin/social", label: "Redes / Tarjetas" },
 ] as const;
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -106,7 +107,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               {footer}
             </div>
           ) : null}
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 md:px-10 md:py-10">
+          <div className="mx-auto w-full max-w-[90rem] px-4 py-6 sm:px-6 md:px-10 md:py-10">
             {children}
           </div>
         </div>

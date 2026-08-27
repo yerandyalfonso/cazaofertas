@@ -32,9 +32,26 @@ export interface AlertWizardDraft {
   keyword?: string | null;
   brand?: string | null;
   url?: string | null;
+  /** Nombre corto del producto (wizard por ASIN/URL). */
+  productTitle?: string | null;
   minDiscount?: number | null;
   maxPrice?: number | null;
   updatedAt: string;
+}
+
+/** Etiqueta legible para Telegram (evita mostrar solo el ASIN). */
+export function shortProductLabel(
+  title: string | null | undefined,
+  fallbackAsin?: string | null,
+  max = 52,
+): string {
+  const clean = title?.replace(/\s+/g, " ").trim();
+  if (clean) {
+    if (clean.length <= max) return clean;
+    return `${clean.slice(0, max - 1).trimEnd()}…`;
+  }
+  if (fallbackAsin) return `Producto ${fallbackAsin}`;
+  return "Producto de Amazon";
 }
 
 const WIZARD_TTL_MS = 30 * 60 * 1000;
@@ -247,7 +264,15 @@ export function formatWizardSummary(draft: AlertWizardDraft): string {
   } else if (draft.mode === "brand") {
     lines.push(`🏷️ Marca: <b>${escapeHtml(draft.brand ?? "—")}</b>`);
   } else if (draft.mode === "url") {
-    lines.push(`🔗 URL: ${escapeHtml((draft.url ?? "").slice(0, 80))}`);
+    const productLabel =
+      draft.productTitle?.trim() ||
+      draft.keyword?.trim() ||
+      null;
+    if (productLabel) {
+      lines.push(`🎯 Producto: <b>${escapeHtml(productLabel)}</b>`);
+    } else if (draft.url) {
+      lines.push(`🔗 URL: ${escapeHtml(draft.url.slice(0, 80))}`);
+    }
   }
 
   lines.push(

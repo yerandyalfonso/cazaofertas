@@ -71,6 +71,8 @@ export interface DetectedDeal {
   productId: string;
   asin: string;
   title: string;
+  amazonUrl?: string;
+  imageUrl?: string | null;
   scoring: DealScoringResult;
   notifications: NotificationDispatchResult;
   channel?: ChannelNotifyResult;
@@ -469,6 +471,8 @@ export async function runPriceDetection(
           productId: product.id,
           asin: product.asin,
           title: product.title,
+          amazonUrl: product.amazon_url,
+          imageUrl: product.image_url,
           scoring,
           notifications,
           channel,

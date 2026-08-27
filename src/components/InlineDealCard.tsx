@@ -4,6 +4,7 @@ import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
+import { splitProductDescription } from "@/lib/product-description";
 
 interface InlineDealCardProps {
   product: CatalogProduct;
@@ -43,7 +44,7 @@ export function InlineDealCard({
               alt={product.title}
               fill
               sizes="(max-width: 1024px) 100vw, 320px"
-              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+              className="object-contain transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-stone-400">
@@ -84,6 +85,7 @@ export function InlineDealCard({
             />
             <a
               href={buyHref}
+              target="_blank"
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 w-full items-center justify-center bg-ink text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900"
             >
@@ -98,14 +100,14 @@ export function InlineDealCard({
   return (
     <article className="group overflow-hidden border border-stone-300 bg-white">
       <div className="grid min-h-[148px] grid-cols-[112px_minmax(0,1fr)] sm:grid-cols-[148px_minmax(0,1fr)]">
-        <Link href={detailHref} className="relative min-h-full bg-stone-100">
+        <Link href={detailHref} className="relative min-h-full bg-transparent">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt={product.title}
               fill
               sizes="(max-width: 640px) 112px, 148px"
-              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+              className="object-contain transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full min-h-[148px] items-center justify-center text-xs text-stone-400">
@@ -135,7 +137,8 @@ export function InlineDealCard({
               </Link>
               {product.description ? (
                 <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-stone-500">
-                  {product.description}
+                  {splitProductDescription(product.description).join(" ") ||
+                    product.description}
                 </p>
               ) : product.brand ? (
                 <p className="mt-1.5 text-sm text-stone-500">{product.brand}</p>
@@ -154,6 +157,7 @@ export function InlineDealCard({
             />
             <a
               href={buyHref}
+              target="_blank"
               rel="noopener noreferrer sponsored"
               className="inline-flex h-9 shrink-0 items-center self-end bg-ink px-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900 sm:h-10 sm:px-4"
             >

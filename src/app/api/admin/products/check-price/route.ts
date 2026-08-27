@@ -69,20 +69,6 @@ async function syncAsinsFromHtml(asins: string[]) {
             ? roundMoney(((listPrice - nextPrice) / listPrice) * 100)
             : null;
 
-      // Guardrail: rechaza basura típica de carrusel/AOD (p.ej. 83€ vs 249€ = −66%).
-      if (
-        listPrice != null &&
-        discount != null &&
-        discount >= 55 &&
-        listPrice / nextPrice >= 2.2
-      ) {
-        errors.push({
-          asin,
-          message: `Precio sospechoso descartado (${nextPrice} € vs ref. ${listPrice} €, −${Math.round(discount)}%). No parece el buy box.`,
-        });
-        continue;
-      }
-
       const storedCurrent = toNumber(product.current_price);
       const storedPrevious = toNumber(product.previous_price);
       const previousLowest = toNumber(product.lowest_price);
@@ -116,6 +102,7 @@ async function syncAsinsFromHtml(asins: string[]) {
           ...(preview.title ? { title: preview.title } : {}),
           ...(preview.imageUrl ? { image_url: preview.imageUrl } : {}),
           ...(preview.brand ? { brand: preview.brand } : {}),
+          ...(preview.description ? { description: preview.description } : {}),
         })
         .eq("id", product.id);
 

@@ -35,7 +35,7 @@ export const DEAL_LEVEL_LABELS: Record<DealLevel, string> = {
   [DealLevel.NORMAL]: "Precio normal",
   [DealLevel.GOOD_DEAL]: "Buena oferta",
   [DealLevel.GREAT_DEAL]: "Gran oferta",
-  [DealLevel.HISTORICAL_LOW]: "Mínimo histórico",
+  [DealLevel.HISTORICAL_LOW]: "Chollazo",
 };
 
 export interface ProductDealInput {

@@ -47,7 +47,7 @@ export function ProductCard({
         className={`flex min-h-0 flex-1 flex-col ${compact ? "gap-3 p-3" : "gap-4"}`}
       >
         <div
-          className={`relative overflow-hidden bg-stone-200 ${
+          className={`relative overflow-hidden bg-stone-100 ${
             compact ? "aspect-[4/5] w-full" : "aspect-[4/5]"
           }`}
         >
@@ -61,7 +61,7 @@ export function ProductCard({
                   ? "(max-width: 640px) 45vw, 180px"
                   : "(max-width: 768px) 50vw, 25vw"
               }
-              className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+              className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.04]"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-stone-500">
@@ -111,6 +111,7 @@ export function ProductCard({
         <div className={`mt-auto ${compact ? "px-3 pb-3" : "pt-3"}`}>
           <a
             href={buyHref}
+            target="_blank"
             rel="noopener noreferrer sponsored"
             className="inline-flex h-10 w-full items-center justify-center bg-ink text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
           >

@@ -100,6 +100,7 @@ export interface FlashDealProductReport {
   dealLabel?: string;
   dealLevel?: string;
   amazonUrl: string;
+  imageUrl?: string | null;
   wasNewToCatalog: boolean;
 }
 
@@ -239,6 +240,7 @@ export async function runFlashDealsCheck(options?: {
       let isFlashDeal = item.origin !== "live" || Boolean(listPrice && price);
       let imageUrl: string | null = existing?.image_url ?? null;
       let brand: string | null = existing?.brand ?? null;
+      let description: string | null = existing?.description ?? null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
@@ -254,6 +256,7 @@ export async function runFlashDealsCheck(options?: {
           isFlashDeal = preview.isFlashDeal || isFlashDeal;
           if (preview.imageUrl) imageUrl = preview.imageUrl;
           if (preview.brand) brand = preview.brand;
+          if (preview.description) description = preview.description;
         } catch (enrichError) {
           // Live/injected: sin ficha no insertamos. Simulación: hints ok.
           if (item.origin !== "simulated" || price == null) {
@@ -326,6 +329,7 @@ export async function runFlashDealsCheck(options?: {
             }),
             brand,
             image_url: imageUrl,
+            description,
             current_price: price,
             previous_price: reference,
             lowest_price: price,
@@ -423,7 +427,7 @@ export async function runFlashDealsCheck(options?: {
           highest_price: Math.max(price, reference),
           brand,
           image_url: imageUrl,
-          description: null,
+          description,
         });
 
         inserted += 1;
@@ -444,7 +448,7 @@ export async function runFlashDealsCheck(options?: {
             productSlug: slug,
             brand,
             imageUrl,
-            summary: brand,
+            summary: description || brand,
           });
           if (channelStatus === "sent") channelNotificationsSent += 1;
           if (channelStatus === "skipped") channelNotificationsSkipped += 1;
@@ -462,6 +466,7 @@ export async function runFlashDealsCheck(options?: {
           dealLabel: scoring.label,
           dealLevel: scoring.level,
           amazonUrl,
+          imageUrl,
           wasNewToCatalog: true,
         });
       } else {
@@ -488,6 +493,7 @@ export async function runFlashDealsCheck(options?: {
             listPrice: reference > price ? reference : null,
             discountPercentage: discount,
             amazonUrl,
+            imageUrl: imageUrl ?? existing!.image_url,
             wasNewToCatalog: false,
           });
         } else {
@@ -521,6 +527,7 @@ export async function runFlashDealsCheck(options?: {
               updated_at: now,
               ...(imageUrl ? { image_url: imageUrl } : {}),
               ...(brand ? { brand } : {}),
+              ...(description ? { description } : {}),
             })
             .eq("id", existing!.id);
 
@@ -554,6 +561,7 @@ export async function runFlashDealsCheck(options?: {
               brand: brand ?? existing!.brand,
               imageUrl: imageUrl ?? existing!.image_url,
               summary:
+                description ||
                 existing!.description?.trim() ||
                 brand ||
                 existing!.brand ||
@@ -575,6 +583,7 @@ export async function runFlashDealsCheck(options?: {
             dealLabel: scoring.label,
             dealLevel: scoring.level,
             amazonUrl,
+            imageUrl: imageUrl ?? existing!.image_url,
             wasNewToCatalog: false,
           });
         }

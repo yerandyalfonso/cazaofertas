@@ -13,6 +13,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   ChevronUp,
+  Eye,
   ExternalLink,
   Loader2,
   Pencil,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { extractAsin } from "@/lib/affiliate";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
+import { splitProductDescription } from "@/lib/product-description";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface AdminProduct {
@@ -32,16 +34,32 @@ interface AdminProduct {
   slug: string;
   asin: string;
   brand: string | null;
+  description?: string | null;
   amazonUrl: string;
+  affiliateUrl?: string | null;
+  imageUrl?: string | null;
   currentPrice: number;
   previousPrice: number | null;
+  lowestPrice?: number | null;
+  highestPrice?: number | null;
+  averagePrice30d?: number | null;
+  averagePrice90d?: number | null;
   referencePrice: number;
   dealScore: number;
   dealLabel: string;
+  dealLevel?: string;
   discountPercentage: number;
+  currency?: string;
+  availability?: string;
   category: { id: string; name: string; slug: string } | null;
   isActive: boolean;
+  isFeatured?: boolean;
   lastCheckedAt: string | null;
+  lastTelegramNotifiedAt?: string | null;
+  lastTelegramNotifiedPrice?: number | null;
+  lastTelegramNotifiedScore?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 interface CategoryOption {
@@ -141,6 +159,9 @@ export default function ProductsAdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<AdminProduct | null>(
+    null,
+  );
   const [editingAsin, setEditingAsin] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -337,6 +358,7 @@ export default function ProductsAdminClient() {
     staleFilter !== "all";
 
   function openCreate() {
+    setViewingProduct(null);
     setEditingAsin(null);
     setForm(emptyForm);
     setShowNewCategory(false);
@@ -349,6 +371,7 @@ export default function ProductsAdminClient() {
   }
 
   function openEdit(product: AdminProduct) {
+    setViewingProduct(null);
     setEditingAsin(product.asin);
     setForm({
       amazonUrl: product.amazonUrl,
@@ -778,6 +801,239 @@ export default function ProductsAdminClient() {
         ) : null}
       </div>
 
+      {viewingProduct ? (
+        <section className="mt-8 border border-stone-300 bg-white p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                Consulta BD
+              </p>
+              <h2 className="mt-1 font-display text-2xl leading-tight text-ink">
+                {viewingProduct.title}
+              </h2>
+              <p className="mt-1 font-mono text-xs text-stone-500">
+                {viewingProduct.id}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={`/producto/${viewingProduct.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center border border-stone-300 px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-700 hover:border-ink hover:text-ink"
+              >
+                Ver en web
+              </a>
+              <a
+                href={
+                  viewingProduct.amazonUrl ||
+                  `https://www.amazon.es/dp/${viewingProduct.asin}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper hover:bg-teal-900"
+              >
+                Ir a Amazon
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  openEdit(viewingProduct);
+                }}
+                className="inline-flex h-9 items-center border border-stone-300 px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-700 hover:border-ink"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingProduct(null)}
+                className="inline-flex h-9 w-9 items-center justify-center border border-stone-300 text-stone-500 hover:text-ink"
+                aria-label="Cerrar detalle"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+            <div className="relative h-40 w-40 shrink-0 overflow-hidden bg-stone-200 sm:h-48 sm:w-48">
+              {viewingProduct.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={viewingProduct.imageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs text-stone-400">
+                  Sin imagen
+                </div>
+              )}
+            </div>
+
+            <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+              {(
+                [
+                  ["ASIN", viewingProduct.asin],
+                  ["Slug", viewingProduct.slug],
+                  ["Marca", viewingProduct.brand ?? "—"],
+                  ["Categoría", viewingProduct.category?.name ?? "—"],
+                  [
+                    "Precio actual",
+                    `${viewingProduct.currentPrice.toFixed(2)} €`,
+                  ],
+                  [
+                    "Precio anterior",
+                    viewingProduct.previousPrice != null
+                      ? `${viewingProduct.previousPrice.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Mínimo",
+                    viewingProduct.lowestPrice != null
+                      ? `${viewingProduct.lowestPrice.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Máximo",
+                    viewingProduct.highestPrice != null
+                      ? `${viewingProduct.highestPrice.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Media 30d",
+                    viewingProduct.averagePrice30d != null
+                      ? `${viewingProduct.averagePrice30d.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Media 90d",
+                    viewingProduct.averagePrice90d != null
+                      ? `${viewingProduct.averagePrice90d.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Descuento",
+                    viewingProduct.discountPercentage > 0
+                      ? `−${Math.round(viewingProduct.discountPercentage)}%`
+                      : "—",
+                  ],
+                  [
+                    "Score",
+                    `${Math.round(viewingProduct.dealScore)} · ${viewingProduct.dealLabel}`,
+                  ],
+                  ["Nivel", viewingProduct.dealLevel ?? "—"],
+                  ["Disponibilidad", viewingProduct.availability ?? "—"],
+                  ["Moneda", viewingProduct.currency ?? "EUR"],
+                  ["Activo", viewingProduct.isActive ? "Sí" : "No"],
+                  ["Destacado", viewingProduct.isFeatured ? "Sí" : "No"],
+                  [
+                    "Última revisión",
+                    viewingProduct.lastCheckedAt
+                      ? new Date(viewingProduct.lastCheckedAt).toLocaleString(
+                          "es-ES",
+                        )
+                      : "—",
+                  ],
+                  [
+                    "Último Telegram",
+                    viewingProduct.lastTelegramNotifiedAt
+                      ? new Date(
+                          viewingProduct.lastTelegramNotifiedAt,
+                        ).toLocaleString("es-ES")
+                      : "—",
+                  ],
+                  [
+                    "Precio notificado",
+                    viewingProduct.lastTelegramNotifiedPrice != null
+                      ? `${viewingProduct.lastTelegramNotifiedPrice.toFixed(2)} €`
+                      : "—",
+                  ],
+                  [
+                    "Score notificado",
+                    viewingProduct.lastTelegramNotifiedScore != null
+                      ? String(Math.round(viewingProduct.lastTelegramNotifiedScore))
+                      : "—",
+                  ],
+                  [
+                    "Creado",
+                    viewingProduct.createdAt
+                      ? new Date(viewingProduct.createdAt).toLocaleString("es-ES")
+                      : "—",
+                  ],
+                  [
+                    "Actualizado",
+                    viewingProduct.updatedAt
+                      ? new Date(viewingProduct.updatedAt).toLocaleString("es-ES")
+                      : "—",
+                  ],
+                ] as Array<[string, string]>
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                    {label}
+                  </dt>
+                  <dd className="mt-0.5 break-all font-medium text-ink">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="mt-6 grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Amazon URL
+              </p>
+              <p className="mt-1 break-all text-sm text-ink">
+                {viewingProduct.amazonUrl || "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Affiliate URL
+              </p>
+              <p className="mt-1 break-all text-sm text-ink">
+                {viewingProduct.affiliateUrl || "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Image URL
+              </p>
+              <p className="mt-1 break-all text-sm text-ink">
+                {viewingProduct.imageUrl || "—"}
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Descripción
+              </p>
+              {(() => {
+                const parts = splitProductDescription(
+                  viewingProduct.description,
+                );
+                if (parts.length === 0) {
+                  return (
+                    <p className="mt-1 text-sm text-stone-400">
+                      Sin descripción
+                    </p>
+                  );
+                }
+                return (
+                  <ul className="mt-2 space-y-2 text-sm leading-relaxed text-stone-700">
+                    {parts.map((part, index) => (
+                      <li key={`${index}-${part.slice(0, 24)}`}>• {part}</li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {open ? (
         <section className="mt-8 border border-stone-300 bg-white p-6">
           <div className="flex items-center justify-between gap-4">
@@ -973,7 +1229,7 @@ export default function ProductsAdminClient() {
         ref={tableScrollRef}
         className="mt-4 min-h-0 flex-1 overflow-auto border border-stone-300 bg-white"
       >
-        <table className="min-w-full text-left text-sm">
+        <table className="w-full min-w-[72rem] text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
               <th className="px-4 py-3">
@@ -997,7 +1253,9 @@ export default function ProductsAdminClient() {
               <th className="px-4 py-3">
                 <SortButton column="lastCheckedAt" label="Última revisión" />
               </th>
-              <th className="px-4 py-3 font-semibold">Acciones</th>
+              <th className="sticky right-0 z-20 bg-stone-50 px-4 py-3 font-semibold shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1033,17 +1291,40 @@ export default function ProductsAdminClient() {
                   className="border-t border-stone-100 align-middle hover:bg-stone-50/80"
                 >
                   <td className="px-4 py-3">
-                    <p className="max-w-xs font-medium text-ink">
-                      {product.title}
-                    </p>
-                    {product.brand ? (
-                      <p className="mt-0.5 text-xs text-stone-500">
-                        {product.brand}
-                      </p>
-                    ) : null}
+                    <div className="flex min-w-[280px] max-w-xl items-start gap-3">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden bg-stone-200">
+                        {product.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={product.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className="line-clamp-2 cursor-pointer font-medium leading-snug text-ink hover:text-teal-900"
+                          onClick={() => {
+                            setOpen(false);
+                            setViewingProduct(product);
+                          }}
+                          title="Ver datos en BD"
+                        >
+                          {product.title}
+                        </p>
+                        {product.brand ? (
+                          <p className="mt-0.5 text-xs text-stone-500">
+                            {product.brand}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">{product.asin}</td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                    {product.asin}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
                     {product.currentPrice.toFixed(2)} €
                     {product.discountPercentage > 0 ? (
                       <span className="mt-1 block text-xs text-amber-800">
@@ -1051,10 +1332,10 @@ export default function ProductsAdminClient() {
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-stone-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-stone-600">
                     {product.referencePrice.toFixed(2)} €
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     <span className="font-medium">
                       {Math.round(product.dealScore)}
                     </span>
@@ -1062,10 +1343,10 @@ export default function ProductsAdminClient() {
                       {product.dealLabel}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-stone-600">
+                  <td className="whitespace-nowrap px-4 py-3 text-stone-600">
                     {product.category?.name ?? "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     {(() => {
                       const fresh = freshnessMeta(product.lastCheckedAt);
                       return (
@@ -1077,8 +1358,20 @@ export default function ProductsAdminClient() {
                       );
                     })()}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
+                  <td className="sticky right-0 z-10 bg-white px-4 py-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.1)]">
+                    <div className="flex flex-nowrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        title="Ver datos en BD"
+                        aria-label="Ver datos en BD"
+                        onClick={() => {
+                          setOpen(false);
+                          setViewingProduct(product);
+                        }}
+                        className={iconBtnClass}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
                       <a
                         href={buildTrackedAffiliatePath({
                           productId: product.id,

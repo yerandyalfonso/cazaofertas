@@ -43,6 +43,7 @@ export function ProductStickyBuyBar({
             productId,
             source: "product_page_sticky",
           })}
+          target="_blank"
           rel="noopener noreferrer sponsored"
           className="inline-flex h-11 shrink-0 items-center bg-ink px-4 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper"
         >

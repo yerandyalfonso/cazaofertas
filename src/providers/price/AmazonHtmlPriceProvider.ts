@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
+import { formatDescriptionForStorage } from "@/lib/product-description";
 import type { PriceProvider, ProductPriceData } from "@/providers/price/types";
 import { ProductAvailability } from "@/types";
 
@@ -102,90 +103,32 @@ export function looksLikeAmazonShelfPrice(value: number): boolean {
   return AMAZON_SHELF_CENTS.has(cents);
 }
 
-function amazonPriceTypicality(value: number): number {
-  const cents = Math.round(value * 100) % 100;
-  if (cents === 99 || cents === 95 || cents === 90 || cents === 49) return 4;
-  if (cents === 0) return 3;
-  if (cents === 50 || cents === 80 || cents === 70 || cents === 45) return 2;
-  if (AMAZON_SHELF_CENTS.has(cents)) return 1;
-  return 0;
-}
-
 /**
- * Si Amazon sirvió el precio sin IVA (típico con entrega fuera de ES desde IP US),
- * recompone el escaparate ×1,21 cuando el resultado «parece» precio de etiqueta.
+ * Legacy no-op: solo operamos amazon.es con IVA ya incluido.
+ * Se mantiene exportado por compatibilidad; no multiplica ×1,21.
  */
-export function maybeRestoreSpanishVat(value: number): number {
-  const rounded = Math.round(value * 100) / 100;
-  // Ya parece escaparate (.99, entero, .90…) → no tocar (evita 995 → 1203,95).
-  if (amazonPriceTypicality(rounded) >= 2) return rounded;
-
-  const withVat = Math.round(value * 1.21 * 100) / 100;
-  if (!looksLikeAmazonShelfPrice(withVat)) return rounded;
-  if (!looksLikeAmazonShelfPrice(rounded)) return withVat;
-  return amazonPriceTypicality(withVat) > amazonPriceTypicality(rounded)
-    ? withVat
-    : rounded;
+export function maybeRestoreSpanishVat(
+  value: number,
+  _options: { foreignDelivery?: boolean } = {},
+): number {
+  return Math.round(value * 100) / 100;
 }
 
-/** Corrige par oferta/lista cuando ambos salieron sin IVA (mismo ratio 1,21). */
+/** Legacy no-op: devolvemos el par tal cual viene de Amazon ES. */
 export function maybeRestoreSpanishVatPair(
   price: number,
   listPrice: number | null,
-  options: { foreignDelivery?: boolean } = {},
+  _options: { foreignDelivery?: boolean } = {},
 ): { price: number; listPrice: number | null } {
-  if (listPrice == null || listPrice <= 0) {
-    if (options.foreignDelivery) {
-      const withVat = Math.round(price * 1.21 * 100) / 100;
-      // Fuera de ES: si ×1,21 parece escaparate y el crudo no es ya .99/.00 fuerte, restaurar.
-      if (
-        looksLikeAmazonShelfPrice(withVat) &&
-        amazonPriceTypicality(price) < 3
-      ) {
-        return { price: withVat, listPrice: null };
-      }
-    }
-    return { price: maybeRestoreSpanishVat(price), listPrice: null };
-  }
-
-  const withVatPrice = Math.round(price * 1.21 * 100) / 100;
-  const withVatList = Math.round(listPrice * 1.21 * 100) / 100;
-  const pairLooksRestored =
-    looksLikeAmazonShelfPrice(withVatPrice) &&
-    looksLikeAmazonShelfPrice(withVatList) &&
-    withVatList > withVatPrice;
-
-  const rawLooksSuspicious =
-    amazonPriceTypicality(price) === 0 ||
-    amazonPriceTypicality(listPrice) === 0 ||
-    !looksLikeAmazonShelfPrice(price);
-
-  const rawAlreadyShelf =
-    amazonPriceTypicality(price) >= 3 && amazonPriceTypicality(listPrice) >= 2;
-
-  if (pairLooksRestored && (rawLooksSuspicious || options.foreignDelivery)) {
-    if (options.foreignDelivery && rawAlreadyShelf) {
-      // Ya parecen precios con IVA; no doblar.
-      return { price: Math.round(price * 100) / 100, listPrice };
-    }
-    const rawScore =
-      amazonPriceTypicality(price) + amazonPriceTypicality(listPrice);
-    const vatScore =
-      amazonPriceTypicality(withVatPrice) + amazonPriceTypicality(withVatList);
-    if (
-      options.foreignDelivery ||
-      vatScore > rawScore ||
-      rawScore === 0
-    ) {
-      return { price: withVatPrice, listPrice: withVatList };
-    }
-  }
-
-  const nextPrice = maybeRestoreSpanishVat(price);
-  const nextList = maybeRestoreSpanishVat(listPrice);
+  const roundedPrice = Math.round(price * 100) / 100;
+  const roundedList =
+    listPrice != null && listPrice > 0
+      ? Math.round(listPrice * 100) / 100
+      : null;
   return {
-    price: nextPrice,
-    listPrice: nextList > nextPrice ? nextList : null,
+    price: roundedPrice,
+    listPrice:
+      roundedList != null && roundedList > roundedPrice ? roundedList : null,
   };
 }
 
@@ -200,6 +143,7 @@ function glowDeliveryText(html: string): string {
 function isForeignDeliveryGlow(html: string): boolean {
   const glow = glowDeliveryText(html);
   if (!glow) return false;
+  if (/españa|spain|\bES\b|madrid|barcelona|28001/i.test(glow)) return false;
   return /estados unidos|united states|deutschland|france|italy|united kingdom|japan/i.test(
     glow,
   );
@@ -674,6 +618,7 @@ export function extractPriceFromAmazonHtml(html: string): {
   title?: string;
   brand?: string;
   imageUrl?: string;
+  description?: string;
   availability: ProductAvailability;
 } {
   const $ = cheerio.load(html);
@@ -822,14 +767,45 @@ export function extractPriceFromAmazonHtml(html: string): {
     imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : undefined;
   const cleanBrand = brand && brand.length > 1 ? brand.slice(0, 120) : undefined;
 
-  // Vercel (IP US) + entrega fuera de ES → Amazon muestra importes sin IVA (÷1,21).
-  if (price !== null) {
-    const restored = maybeRestoreSpanishVatPair(price, listPrice, {
-      foreignDelivery: lastFetchForeignDelivery,
-    });
-    price = restored.price;
-    listPrice = restored.listPrice;
-  }
+  const bulletPoints: string[] = [];
+  $("#feature-bullets ul li span.a-list-item, #feature-bullets li span").each(
+    (_, el) => {
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      if (
+        text.length > 12 &&
+        !/^\s*ver más\s*$/i.test(text) &&
+        !bulletPoints.includes(text)
+      ) {
+        bulletPoints.push(text);
+      }
+    },
+  );
+  const productDescription =
+    $("#productDescription p")
+      .map((_, el) => $(el).text().replace(/\s+/g, " ").trim())
+      .get()
+      .filter(Boolean)
+      .join("\n\n") ||
+    $("#productDescription").text().replace(/\s+/g, " ").trim() ||
+    "";
+
+  // También A+ / expander si existen (texto plano).
+  const aplusBits: string[] = [];
+  $(
+    "#aplus_feature_div .a-spacing-base, #aplusStandalone_feature_div p, #productFactsDesktop_feature_div .a-spacing-small span",
+  ).each((_, el) => {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    if (text.length > 40 && text.length < 500 && !aplusBits.includes(text)) {
+      aplusBits.push(text);
+    }
+  });
+
+  const description = formatDescriptionForStorage(
+    [...bulletPoints.slice(0, 12), ...aplusBits.slice(0, 6)],
+    productDescription,
+  );
+
+  // amazon.es ya incluye IVA: usar el precio del buy box tal cual (sin ×1,21).
   if (listPrice !== null && price !== null && listPrice <= price) {
     listPrice = null;
   }
@@ -846,6 +822,7 @@ export function extractPriceFromAmazonHtml(html: string): {
     title,
     brand: cleanBrand,
     imageUrl: cleanImageUrl,
+    description,
     availability: availabilityFromHtml($),
   };
 }
@@ -928,7 +905,7 @@ async function fetchAmazonPageHtml(
   lastFetchForeignDelivery = isForeignDeliveryGlow(html);
   if (lastFetchForeignDelivery) {
     console.warn(
-      "[AmazonHtml] Entrega aún fuera de ES; se aplicará restore IVA si procede. Glow:",
+      "[AmazonHtml] Entrega aún fuera de ES (se mantiene el precio leído, sin ×IVA). Glow:",
       glowDeliveryText(html).slice(0, 80),
     );
   }
@@ -967,6 +944,7 @@ export async function previewAmazonProductPage(
   availability: ProductAvailability;
   brand?: string;
   imageUrl?: string;
+  description?: string;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -996,6 +974,7 @@ export async function previewAmazonProductPage(
     availability: extracted.availability,
     brand: extracted.brand,
     imageUrl: extracted.imageUrl,
+    description: extracted.description,
   };
 }
 
