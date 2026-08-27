@@ -221,21 +221,20 @@ export async function runFlashDealsCheck(options?: {
     try {
       let title =
         item.titleHint?.trim() || `Producto Amazon ${item.asin}`;
-      let price = item.priceHint ?? null;
-      let listPrice = item.listPriceHint ?? null;
+      // Hints del listado Gold Box NO son fuente de verdad (pueden ir sin IVA
+      // o ser de otra oferta). Solo simulación puede insertar con hints.
+      let price = item.origin === "simulated" ? (item.priceHint ?? null) : null;
+      let listPrice =
+        item.origin === "simulated" ? (item.listPriceHint ?? null) : null;
       let amazonUrl = item.amazonUrl || generateAmazonUrl(item.asin);
       let isFlashDeal = item.origin !== "live" || Boolean(listPrice && price);
 
-      // Simulación / hints suficientes: no hace falta scrape de ficha.
-      const needsLiveEnrichment =
-        item.origin === "live" ||
-        item.origin === "injected" ||
-        price == null;
+      const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
       if (needsLiveEnrichment) {
         try {
           const preview = await previewAmazonProductPage(amazonUrl, {
-            timeoutMs: 14_000,
+            timeoutMs: 18_000,
           });
           if (preview.price != null) price = preview.price;
           if (preview.listPrice != null) listPrice = preview.listPrice;
@@ -243,8 +242,8 @@ export async function runFlashDealsCheck(options?: {
           amazonUrl = preview.amazonUrl || amazonUrl;
           isFlashDeal = preview.isFlashDeal || isFlashDeal;
         } catch (enrichError) {
-          // Si hay hints de listado/simulación, seguimos; si no, error.
-          if (price == null) {
+          // Live/injected: sin ficha no insertamos. Simulación: hints ok.
+          if (item.origin !== "simulated" || price == null) {
             throw enrichError;
           }
         }
@@ -253,7 +252,8 @@ export async function runFlashDealsCheck(options?: {
       if (price == null) {
         errors.push({
           asin: item.asin,
-          message: "Sin precio de oferta para insertar/actualizar.",
+          message:
+            "Sin precio del buy box Amazon ES (no se usan hints del listado).",
         });
         continue;
       }

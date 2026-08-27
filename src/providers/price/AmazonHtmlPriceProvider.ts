@@ -13,7 +13,7 @@ export interface AmazonHtmlPriceProviderOptions {
   fetchImpl?: typeof fetch;
 }
 
-const BROWSER_HEADERS: HeadersInit = {
+const BROWSER_HEADERS_BASE: HeadersInit = {
   "User-Agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   Accept:
@@ -22,9 +22,255 @@ const BROWSER_HEADERS: HeadersInit = {
   "Cache-Control": "no-cache",
   Pragma: "no-cache",
   "Upgrade-Insecure-Requests": "1",
-  // Forzar ficha ES/EUR aunque el fetch salga desde IP de Vercel (US).
-  Cookie: "lc-acbes=es_ES; i18n-prefs=EUR; skin=noskin",
 };
+
+/** CP Madrid: fuerza catálogo ES con IVA aunque el fetch salga desde Vercel (IP US). */
+const AMAZON_ES_ZIP = (process.env.AMAZON_ES_ZIP ?? "28001").trim() || "28001";
+const AMAZON_ES_ADDRESS_CHANGE =
+  "https://www.amazon.es/gp/delivery/ajax/address-change.html";
+
+/** Céntimos habituales en precios de escaparate Amazon ES. */
+const AMAZON_SHELF_CENTS = new Set([
+  0, 5, 9, 10, 20, 25, 30, 40, 45, 49, 50, 60, 70, 75, 80, 90, 95, 99,
+]);
+
+type CookieJar = Map<string, string>;
+
+let sharedCookieJar: CookieJar | null = null;
+let spainDeliveryReady = false;
+let spainDeliveryPromise: Promise<CookieJar> | null = null;
+
+function defaultCookieJar(): CookieJar {
+  return new Map([
+    ["lc-acbes", "es_ES"],
+    ["i18n-prefs", "EUR"],
+    ["skin", "noskin"],
+    ["sp-cdn", '"L5Z9:ES"'],
+  ]);
+}
+
+function cookieHeader(jar: CookieJar): string {
+  return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+}
+
+function absorbSetCookies(jar: CookieJar, response: Response): void {
+  const list =
+    typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : [];
+  for (const raw of list) {
+    const segments = raw.split(";");
+    const first = segments[0];
+    if (!first) continue;
+    const eq = first.indexOf("=");
+    if (eq <= 0) continue;
+    const name = first.slice(0, eq).trim();
+    const value = first.slice(eq + 1).trim();
+    let expiresAt: number | null = null;
+    for (const segment of segments.slice(1)) {
+      const [rawKey, ...rest] = segment.split("=");
+      const key = rawKey?.trim().toLowerCase();
+      if (key === "expires" && rest.length > 0) {
+        const parsed = Date.parse(rest.join("=").trim());
+        if (Number.isFinite(parsed)) expiresAt = parsed;
+      }
+    }
+    // Marcadores de borrado (value "-" + Expires pasado) no deben pisar la sesión.
+    if (expiresAt !== null && expiresAt < Date.now()) {
+      continue;
+    }
+    if (value === "-") continue;
+    jar.set(name, value);
+  }
+}
+
+function browserHeaders(jar: CookieJar, extra?: HeadersInit): HeadersInit {
+  return {
+    ...BROWSER_HEADERS_BASE,
+    Cookie: cookieHeader(jar),
+    ...(extra ?? {}),
+  };
+}
+
+/**
+ * ¿Parece un precio de etiqueta Amazon ES (99 céntimos, .90, entero…)?
+ * Los importes «sin IVA» (p.ej. 793,38 = 959,99/1,21) suelen fallar este test.
+ */
+export function looksLikeAmazonShelfPrice(value: number): boolean {
+  if (!Number.isFinite(value) || value <= 0) return false;
+  const cents = Math.round(value * 100) % 100;
+  return AMAZON_SHELF_CENTS.has(cents);
+}
+
+function amazonPriceTypicality(value: number): number {
+  const cents = Math.round(value * 100) % 100;
+  if (cents === 99 || cents === 95 || cents === 90 || cents === 49) return 4;
+  if (cents === 0) return 3;
+  if (cents === 50 || cents === 80 || cents === 70 || cents === 45) return 2;
+  if (AMAZON_SHELF_CENTS.has(cents)) return 1;
+  return 0;
+}
+
+/**
+ * Si Amazon sirvió el precio sin IVA (típico con entrega fuera de ES desde IP US),
+ * recompone el escaparate ×1,21 cuando el resultado «parece» precio de etiqueta.
+ */
+export function maybeRestoreSpanishVat(value: number): number {
+  const rounded = Math.round(value * 100) / 100;
+  // Ya parece escaparate (.99, entero, .90…) → no tocar (evita 995 → 1203,95).
+  if (amazonPriceTypicality(rounded) >= 2) return rounded;
+
+  const withVat = Math.round(value * 1.21 * 100) / 100;
+  if (!looksLikeAmazonShelfPrice(withVat)) return rounded;
+  if (!looksLikeAmazonShelfPrice(rounded)) return withVat;
+  return amazonPriceTypicality(withVat) > amazonPriceTypicality(rounded)
+    ? withVat
+    : rounded;
+}
+
+/** Corrige par oferta/lista cuando ambos salieron sin IVA (mismo ratio 1,21). */
+export function maybeRestoreSpanishVatPair(
+  price: number,
+  listPrice: number | null,
+): { price: number; listPrice: number | null } {
+  if (listPrice == null || listPrice <= 0) {
+    return { price: maybeRestoreSpanishVat(price), listPrice: null };
+  }
+
+  const withVatPrice = Math.round(price * 1.21 * 100) / 100;
+  const withVatList = Math.round(listPrice * 1.21 * 100) / 100;
+  const pairLooksRestored =
+    looksLikeAmazonShelfPrice(withVatPrice) &&
+    looksLikeAmazonShelfPrice(withVatList) &&
+    withVatList > withVatPrice;
+
+  const rawLooksSuspicious =
+    amazonPriceTypicality(price) === 0 ||
+    amazonPriceTypicality(listPrice) === 0 ||
+    !looksLikeAmazonShelfPrice(price);
+
+  if (pairLooksRestored && rawLooksSuspicious) {
+    const rawScore =
+      amazonPriceTypicality(price) + amazonPriceTypicality(listPrice);
+    const vatScore =
+      amazonPriceTypicality(withVatPrice) + amazonPriceTypicality(withVatList);
+    if (vatScore > rawScore || rawScore === 0) {
+      return { price: withVatPrice, listPrice: withVatList };
+    }
+  }
+
+  const nextPrice = maybeRestoreSpanishVat(price);
+  const nextList = maybeRestoreSpanishVat(listPrice);
+  return {
+    price: nextPrice,
+    listPrice: nextList > nextPrice ? nextList : null,
+  };
+}
+
+function glowDeliveryText(html: string): string {
+  const line1 =
+    html.match(/id="glow-ingress-line1"[^>]*>([\s\S]*?)<\//i)?.[1] ?? "";
+  const line2 =
+    html.match(/id="glow-ingress-line2"[^>]*>([\s\S]*?)<\//i)?.[1] ?? "";
+  return `${line1} ${line2}`.replace(/\s+/g, " ").trim();
+}
+
+function assertLikelySpainDelivery(html: string): void {
+  const glow = glowDeliveryText(html);
+  if (!glow) return;
+  if (
+    /estados unidos|united states|deutschland|france|italy|united kingdom|japan/i.test(
+      glow,
+    )
+  ) {
+    throw new Error(
+      `Amazon está sirviendo entrega fuera de España («${glow.slice(0, 80)}»). Los precios pueden ir sin IVA.`,
+    );
+  }
+}
+
+async function ensureSpainDeliverySession(
+  fetchImpl: typeof fetch,
+  timeoutMs: number,
+): Promise<CookieJar> {
+  if (spainDeliveryReady && sharedCookieJar) return sharedCookieJar;
+  if (spainDeliveryPromise) return spainDeliveryPromise;
+
+  spainDeliveryPromise = (async () => {
+    const jar = sharedCookieJar ?? defaultCookieJar();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      // Sesión mínima antes del cambio de dirección.
+      const home = await fetchImpl("https://www.amazon.es/?language=es_ES", {
+        method: "GET",
+        headers: browserHeaders(jar),
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      absorbSetCookies(jar, home);
+      await home.text().catch(() => undefined);
+
+      const body = new URLSearchParams({
+        locationType: "LOCATION_INPUT",
+        zipCode: AMAZON_ES_ZIP,
+        storeContext: "generic",
+        deviceType: "web",
+        pageType: "Gateway",
+        actionSource: "glow",
+        almBrandId: "undefined",
+      });
+
+      const change = await fetchImpl(AMAZON_ES_ADDRESS_CHANGE, {
+        method: "POST",
+        headers: browserHeaders(jar, {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json, text/javascript, */*; q=0.01",
+        }),
+        body,
+        signal: controller.signal,
+        redirect: "follow",
+      });
+      absorbSetCookies(jar, change);
+
+      const payload = (await change.json().catch(() => null)) as {
+        isValidAddress?: number | boolean;
+        successful?: number | boolean;
+      } | null;
+
+      if (
+        !payload ||
+        !(payload.isValidAddress || payload.successful)
+      ) {
+        console.warn(
+          "[AmazonHtml] No se pudo fijar CP España; se continúa con cookies base.",
+        );
+      }
+
+      sharedCookieJar = jar;
+      spainDeliveryReady = true;
+      return jar;
+    } catch (error) {
+      // No tumbar el scrape entero si glow falla: el safety net de IVA actúa después.
+      console.warn(
+        "[AmazonHtml] Pin de entrega ES falló:",
+        error instanceof Error ? error.message : error,
+      );
+      sharedCookieJar = jar;
+      spainDeliveryReady = true;
+      return jar;
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+
+  try {
+    return await spainDeliveryPromise;
+  } finally {
+    spainDeliveryPromise = null;
+  }
+}
 
 function amazonEsProductUrl(asin: string, preferredUrl?: string): string {
   if (preferredUrl && /amazon\.es\//i.test(preferredUrl) && preferredUrl.includes(asin)) {
@@ -66,12 +312,18 @@ function sleep(ms: number): Promise<void> {
 
 /** Parsea importes estilo ES (79,99 / 1.234,56) o EN (79.99). */
 export function parseAmazonPriceText(raw: string): number | null {
-  const text = raw
+  let text = raw
     .replace(/\u00a0/g, " ")
     .replace(/[^\d,.\-]/g, "")
     .trim();
 
   if (!text) return null;
+
+  // Entero de .a-price-whole suele venir como "9," (coma sobrante).
+  if (/^\d+[.,]$/.test(text)) return null;
+
+  // whole+fraction mal unidos → "9,,79"
+  text = text.replace(/,{2,}/g, ",").replace(/\.{2,}/g, ".");
 
   let normalized = text;
   if (/\d{1,3}(\.\d{3})+,\d{1,2}$/.test(text) || /^\d+,\d{1,2}$/.test(text)) {
@@ -113,16 +365,97 @@ function priceFromWholeFraction(
   for (let i = 0; i < roots.length; i += 1) {
     const root = roots.eq(i);
     if (root.hasClass("a-text-price")) continue;
-    const whole = root.find(".a-price-whole").first().text();
-    const fraction = root.find(".a-price-fraction").first().text();
+    const el = roots.get(i);
+    if (el && isSecondaryOfferPriceNode($, el)) continue;
+    // Solo dígitos: Amazon deja "9," en .a-price-whole.
+    const whole = root.find(".a-price-whole").first().text().replace(/[^\d]/g, "");
+    const fraction = root
+      .find(".a-price-fraction")
+      .first()
+      .text()
+      .replace(/[^\d]/g, "");
     if (!whole) continue;
-    const combined = `${whole.replace(/[^\d.,]/g, "")}${
-      fraction ? `,${fraction.replace(/[^\d]/g, "")}` : ""
-    }`;
+    const combined = fraction ? `${whole},${fraction}` : whole;
     const price = parseAmazonPriceText(combined);
-    if (price !== null) return price;
+    if (price !== null && price >= 1) return price;
   }
   return null;
+}
+
+/**
+ * Precio de «Comprar nuevo» (one-time). Ignora Suscríbete y ahorra / 2ª mano.
+ * En fichas con acordeón, esos bloques también usan .priceToPay y el whole
+ * "8," se parseaba antes como 8,00 €.
+ */
+function priceFromOneTimeBuyBox($: cheerio.CheerioAPI): number | null {
+  const preferredRoots = [
+    "#apex_desktop_newAccordionRow",
+    "#ppd_newAccordionRow",
+    "#newAccordionRow",
+    "#newAccordionRow_0",
+    "#buyBoxAccordion .a-accordion-active",
+  ];
+
+  for (const root of preferredRoots) {
+    if ($(root).length === 0) continue;
+    const fromOffscreen = firstPriceFromSelectors($, [
+      `${root} .reinventPricePriceToPayMargin.priceToPay span.a-offscreen`,
+      `${root} .apex-pricetopay-value span.a-offscreen`,
+      `${root} span.a-price.priceToPay:not(.a-text-price) span.a-offscreen`,
+      `${root} span.a-price[data-a-size='l'] span.a-offscreen`,
+      `${root} span.a-price:not(.a-text-price) span.a-offscreen`,
+    ]);
+    if (fromOffscreen !== null && fromOffscreen >= 1) return fromOffscreen;
+
+    const fromParts = priceFromWholeFraction(
+      $,
+      [
+        `${root} .reinventPricePriceToPayMargin.priceToPay`,
+        `${root} .apex-pricetopay-value`,
+        `${root} span.a-price.priceToPay`,
+        `${root} span.a-price[data-a-size='l']`,
+      ].join(", "),
+    );
+    if (fromParts !== null && fromParts >= 1) return fromParts;
+  }
+
+  return null;
+}
+
+function isSecondaryOfferPriceNode(
+  $: cheerio.CheerioAPI,
+  el: Parameters<cheerio.CheerioAPI>[0],
+): boolean {
+  const $el = $(el);
+  const chain = [$el, ...$el.parents().toArray().map((p) => $(p))]
+    .map((node) => `${node.attr("id") ?? ""} ${node.attr("class") ?? ""}`)
+    .join(" ")
+    .toLowerCase();
+  return /sns|subscribe|subscription|usedaccordion|apex_desktop_used|apex_desktop_sns|tiered-price/.test(
+    chain,
+  );
+}
+
+/** Recoge precios de selectores ignorando SNS / 2ª mano / precio unitario. */
+function collectBuyBoxPayPrices(
+  $: cheerio.CheerioAPI,
+  selectors: string[],
+): number[] {
+  const values: number[] = [];
+  const seen = new Set<number>();
+  for (const selector of selectors) {
+    const nodes = $(selector);
+    for (let i = 0; i < nodes.length; i += 1) {
+      const el = nodes.get(i);
+      if (!el || isSecondaryOfferPriceNode($, el)) continue;
+      const price = parseAmazonPriceText(nodes.eq(i).text());
+      // Descarta €/unidad (0,27€) y basura.
+      if (price === null || price < 1 || seen.has(price)) continue;
+      seen.add(price);
+      values.push(price);
+    }
+  }
+  return values;
 }
 
 function priceFromPageScripts(html: string): number | null {
@@ -249,8 +582,10 @@ export function extractPriceFromAmazonHtml(html: string): {
 } {
   const $ = cheerio.load(html);
 
-  // SOLO bloque de compra. Nunca carruseles, AOD u ofertas de terceros.
-  const payCandidates = collectPricesFromSelectors(
+  // 1) «Comprar nuevo» del acordeón (evita SNS 8,81 / usado / whole "8," → 8,00).
+  // 2) Buy box genérico excluyendo bloques secundarios.
+  // 3) whole+fraction y scripts.
+  const payCandidates = collectBuyBoxPayPrices(
     $,
     buyboxSelectors(
       ".reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
@@ -264,12 +599,17 @@ export function extractPriceFromAmazonHtml(html: string): {
     ),
   );
   let price =
+    priceFromOneTimeBuyBox($) ??
     payCandidates[0] ??
     priceFromWholeFraction(
       $,
-      buyboxSelectors(
-        ".reinventPricePriceToPayMargin.priceToPay, .apex-pricetopay-value, .priceToPay",
-      ).join(", "),
+      [
+        "#apex_desktop_newAccordionRow .reinventPricePriceToPayMargin.priceToPay",
+        "#apex_desktop_newAccordionRow .apex-pricetopay-value",
+        ...buyboxSelectors(
+          ".reinventPricePriceToPayMargin.priceToPay, .apex-pricetopay-value, .priceToPay",
+        ),
+      ].join(", "),
     ) ??
     // Último recurso: solo patrones priceToPay en JSON (no priceAmount suelto).
     priceFromPageScripts(html);
@@ -386,6 +726,20 @@ export function extractPriceFromAmazonHtml(html: string): {
     imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : undefined;
   const cleanBrand = brand && brand.length > 1 ? brand.slice(0, 120) : undefined;
 
+  // Vercel (IP US) + entrega fuera de ES → Amazon muestra importes sin IVA (÷1,21).
+  if (price !== null) {
+    const restored = maybeRestoreSpanishVatPair(price, listPrice);
+    price = restored.price;
+    listPrice = restored.listPrice;
+  }
+  if (listPrice !== null && price !== null && listPrice <= price) {
+    listPrice = null;
+  }
+  if (price !== null && listPrice !== null && listPrice > price) {
+    discountPercentage =
+      Math.round(((listPrice - price) / listPrice) * 10000) / 100;
+  }
+
   return {
     price,
     listPrice,
@@ -403,20 +757,30 @@ async function fetchAmazonPageHtml(
   options: {
     timeoutMs?: number;
     fetchImpl?: typeof fetch;
+    /** Si false, no intenta fijar CP España (tests). Default true. */
+    pinSpainDelivery?: boolean;
   } = {},
 ): Promise<string> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 12_000;
+  const pinSpainDelivery = options.pinSpainDelivery !== false;
+
+  const jar = pinSpainDelivery
+    ? await ensureSpainDeliverySession(fetchImpl, Math.min(timeoutMs, 12_000))
+    : sharedCookieJar ?? defaultCookieJar();
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetchImpl(url, {
       method: "GET",
-      headers: BROWSER_HEADERS,
+      headers: browserHeaders(jar),
       signal: controller.signal,
       redirect: "follow",
     });
+    absorbSetCookies(jar, response);
+    sharedCookieJar = jar;
 
     if (response.status === 503 || response.status === 429) {
       throw new Error(
@@ -437,6 +801,8 @@ async function fetchAmazonPageHtml(
     ) {
       throw new Error("Amazon devolvió un challenge anti-bot (bloqueado).");
     }
+
+    assertLikelySpainDelivery(html);
 
     return html;
   } finally {
