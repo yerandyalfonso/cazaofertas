@@ -51,7 +51,8 @@ async function syncAsinsFromHtml(asins: string[]) {
       if (preview.price === null) {
         errors.push({
           asin,
-          message: "No se pudo leer el precio en la ficha Amazon.",
+          message:
+            "No se pudo leer el precio del buy box de Amazon (posible bloqueo anti-bot). Reintenta en unos segundos.",
         });
         continue;
       }
@@ -67,6 +68,20 @@ async function syncAsinsFromHtml(asins: string[]) {
           : listPrice != null
             ? roundMoney(((listPrice - nextPrice) / listPrice) * 100)
             : null;
+
+      // Guardrail: rechaza basura típica de carrusel/AOD (p.ej. 83€ vs 249€ = −66%).
+      if (
+        listPrice != null &&
+        discount != null &&
+        discount >= 55 &&
+        listPrice / nextPrice >= 2.2
+      ) {
+        errors.push({
+          asin,
+          message: `Precio sospechoso descartado (${nextPrice} € vs ref. ${listPrice} €, −${Math.round(discount)}%). No parece el buy box.`,
+        });
+        continue;
+      }
 
       const storedCurrent = toNumber(product.current_price);
       const storedPrevious = toNumber(product.previous_price);

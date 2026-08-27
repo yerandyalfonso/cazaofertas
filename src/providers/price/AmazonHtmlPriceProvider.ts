@@ -271,6 +271,7 @@ export function extractPriceFromAmazonHtml(html: string): {
         ".reinventPricePriceToPayMargin.priceToPay, .apex-pricetopay-value, .priceToPay",
       ).join(", "),
     ) ??
+    // Último recurso: solo patrones priceToPay en JSON (no priceAmount suelto).
     priceFromPageScripts(html);
 
   // Precio recomendado / lista: solo basis del buy box (nunca mini de relacionados).
