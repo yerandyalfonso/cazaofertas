@@ -126,15 +126,12 @@ function priceFromWholeFraction(
 }
 
 function priceFromPageScripts(html: string): number | null {
+  // Solo señales del precio a pagar. Nunca el primer priceAmount suelto (puede ser un relacionado).
   const patterns = [
-    // Preferir precio a pagar (flash / apex), no el primer priceAmount suelto.
     /"priceToPay"\s*:\s*\{[^}]{0,120}?"amount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
     /"priceToPay"[\s\S]{0,160}?"value"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
     /"buyingPrice"\s*:\s*\{[^}]{0,80}?"amount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
-    /apex-pricetopay-value[\s\S]{0,200}?([\d.,]+)\s*€/i,
-    /"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
-    /"displayPrice"\s*:\s*"([^"]+)"/,
-    /data-a-color="price"[^>]*>[\s\S]*?([\d.,]+)\s*€/,
+    /"desktop_buybox"[\s\S]{0,400}?"displayPrice"\s*:\s*"([^"]+)"/i,
   ];
 
   for (const pattern of patterns) {
@@ -165,9 +162,6 @@ function listPriceFromPageScripts(html: string): number | null {
   const patterns = [
     /"basisPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
     /"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
-    /"listPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
-    /"typicalPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
-    /"wasPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
     /"landingAsinPrice"[\s\S]{0,200}?"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
   ];
 
@@ -180,13 +174,23 @@ function listPriceFromPageScripts(html: string): number | null {
   return null;
 }
 
+const BUYBOX_ROOTS = [
+  "#corePrice_feature_div",
+  "#corePriceDisplay_desktop_feature_div",
+  "#apex_desktop",
+  "#desktop_buybox",
+  "#buybox",
+] as const;
+
+function buyboxSelectors(suffix: string): string[] {
+  return BUYBOX_ROOTS.map((root) => `${root} ${suffix}`);
+}
+
+/** Solo badges del bloque de precio principal (nunca carruseles / relacionados). */
 function discountFromSavingsBadge($: cheerio.CheerioAPI): number | null {
-  const selectors = [
-    "#corePriceDisplay_desktop_feature_div span.savingsPercentage",
-    "#corePrice_feature_div span.savingsPercentage",
-    ".savingsPercentage",
+  const selectors = buyboxSelectors("span.savingsPercentage").concat([
     "#dealprice_savingspercentage",
-  ];
+  ]);
 
   for (const selector of selectors) {
     const text = $(selector).first().text();
@@ -245,42 +249,41 @@ export function extractPriceFromAmazonHtml(html: string): {
 } {
   const $ = cheerio.load(html);
 
-  // Precio a pagar: priorizar buy box (.priceToPay), no acordeones secundarios.
-  const payCandidates = collectPricesFromSelectors($, [
-    "#corePrice_feature_div .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
-    "#corePriceDisplay_desktop_feature_div .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
-    "#apex_desktop .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
-    "#corePrice_feature_div .apex-pricetopay-value span.a-offscreen",
-    "#corePriceDisplay_desktop_feature_div .apex-pricetopay-value span.a-offscreen",
-    "#apex_desktop .apex-pricetopay-value span.a-offscreen",
-    ".priceToPay span.a-offscreen",
-    "#corePrice_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
-    "#corePriceDisplay_desktop_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
-    "#priceblock_dealprice",
-    "#priceblock_saleprice",
-    "#priceblock_ourprice",
-  ]);
+  // SOLO bloque de compra. Nunca carruseles, AOD u ofertas de terceros.
+  const payCandidates = collectPricesFromSelectors(
+    $,
+    buyboxSelectors(
+      ".reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
+    ).concat(
+      buyboxSelectors(".apex-pricetopay-value span.a-offscreen"),
+      buyboxSelectors(
+        "span.a-price.priceToPay:not(.a-text-price) span.a-offscreen",
+      ),
+      buyboxSelectors("span.a-price:not(.a-text-price) span.a-offscreen"),
+      ["#priceblock_dealprice", "#priceblock_saleprice", "#priceblock_ourprice"],
+    ),
+  );
   let price =
     payCandidates[0] ??
     priceFromWholeFraction(
       $,
-      "#corePrice_feature_div .reinventPricePriceToPayMargin.priceToPay, #corePriceDisplay_desktop_feature_div .priceToPay, #apex_desktop .apex-pricetopay-value, .priceToPay",
+      buyboxSelectors(
+        ".reinventPricePriceToPayMargin.priceToPay, .apex-pricetopay-value, .priceToPay",
+      ).join(", "),
     ) ??
     priceFromPageScripts(html);
 
-  // Lista / precio recomendado: el MÁS ALTO entre tachados del bloque core,
-  // excluyendo el mínimo 30 días (.srpPriceBlockAUI).
-  const listCandidates = collectPricesFromSelectors($, [
-    "#corePrice_feature_div .apex-basisprice-value span.a-offscreen",
-    "#corePriceDisplay_desktop_feature_div .apex-basisprice-value span.a-offscreen",
-    "#apex_desktop .apex-basisprice-value span.a-offscreen",
-    ".basisPrice .a-offscreen",
-    "#corePrice_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-    "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-    "#apex_desktop span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-    'span.a-price.a-text-price[data-a-strike="true"]:not(.srpPriceBlockAUI) span.a-offscreen',
-    "#listPrice",
-  ]);
+  // Precio recomendado / lista: solo basis del buy box (nunca mini de relacionados).
+  const listCandidates = collectPricesFromSelectors(
+    $,
+    buyboxSelectors(".apex-basisprice-value span.a-offscreen").concat(
+      buyboxSelectors(".basisPrice .a-offscreen"),
+      buyboxSelectors(
+        "span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+      ),
+      ["#listPrice"],
+    ),
+  );
   const scriptList = listPriceFromPageScripts(html);
   if (scriptList !== null && !listCandidates.includes(scriptList)) {
     listCandidates.push(scriptList);
@@ -290,7 +293,7 @@ export function extractPriceFromAmazonHtml(html: string): {
   let listPrice =
     listCandidates.length > 0 ? Math.max(...listCandidates) : null;
 
-  // Si la lista no cuadra con el badge (−21% etc.), preferir la candidata DOM que sí.
+  // Alinear lista con el badge del buy box (−33%, etc.).
   if (price !== null && badgeDiscount !== null && listCandidates.length > 0) {
     const impliedList =
       Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
