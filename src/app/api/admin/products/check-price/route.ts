@@ -1,10 +1,149 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
+import { roundMoney, toNumber } from "@/lib/money";
+import { createSupabaseServiceClient } from "@/lib/supabase";
+import { previewAmazonProductPage } from "@/providers/price";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+/**
+ * Admin «Revisar»: scrape HTML directo de la ficha Amazon ES y escribe precio/lista.
+ * Así el toast muestra exactamente lo leído (y no un proveedor desfasado).
+ */
+async function syncAsinsFromHtml(asins: string[]) {
+  const client = createSupabaseServiceClient();
+  const quotes: Array<{
+    asin: string;
+    price: number;
+    listPrice: number | null;
+    discountPercentage: number | null;
+    isFlashDeal: boolean;
+    title?: string;
+    updated: boolean;
+  }> = [];
+  const errors: Array<{ asin: string; message: string }> = [];
+
+  for (const asin of asins) {
+    try {
+      const { data: product, error: lookupError } = await client
+        .from("products")
+        .select(
+          "id, asin, current_price, previous_price, lowest_price, highest_price, amazon_url",
+        )
+        .eq("asin", asin)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (lookupError) throw new Error(lookupError.message);
+      if (!product) {
+        errors.push({ asin, message: "Producto no encontrado en el catálogo." });
+        continue;
+      }
+
+      const preview = await previewAmazonProductPage(
+        product.amazon_url || asin,
+        { timeoutMs: 18_000 },
+      );
+
+      if (preview.price === null) {
+        errors.push({
+          asin,
+          message: "No se pudo leer el precio en la ficha Amazon.",
+        });
+        continue;
+      }
+
+      const nextPrice = roundMoney(preview.price);
+      const listPrice =
+        preview.listPrice != null && preview.listPrice > nextPrice
+          ? roundMoney(preview.listPrice)
+          : null;
+      const discount =
+        preview.discountPercentage != null && preview.discountPercentage > 0
+          ? roundMoney(preview.discountPercentage)
+          : listPrice != null
+            ? roundMoney(((listPrice - nextPrice) / listPrice) * 100)
+            : null;
+
+      const storedCurrent = toNumber(product.current_price);
+      const storedPrevious = toNumber(product.previous_price);
+      const previousLowest = toNumber(product.lowest_price);
+      const previousHighest = toNumber(product.highest_price);
+      const reference = listPrice ?? (storedPrevious != null && storedPrevious > nextPrice
+        ? storedPrevious
+        : null);
+      const changed = storedCurrent === null || storedCurrent !== nextPrice;
+      const now = new Date().toISOString();
+
+      const { error: updateError } = await client
+        .from("products")
+        .update({
+          current_price: nextPrice,
+          previous_price: reference ?? storedPrevious ?? nextPrice,
+          discount_percentage: discount,
+          lowest_price:
+            previousLowest === null
+              ? nextPrice
+              : roundMoney(Math.min(previousLowest, nextPrice)),
+          highest_price: roundMoney(
+            Math.max(
+              previousHighest ?? nextPrice,
+              nextPrice,
+              reference ?? nextPrice,
+            ),
+          ),
+          availability: preview.availability,
+          last_checked_at: now,
+          updated_at: now,
+          ...(preview.title ? { title: preview.title } : {}),
+          ...(preview.imageUrl ? { image_url: preview.imageUrl } : {}),
+          ...(preview.brand ? { brand: preview.brand } : {}),
+        })
+        .eq("id", product.id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      if (changed) {
+        await client.from("price_history").insert({
+          product_id: product.id,
+          price: nextPrice,
+          source: "amazon",
+        });
+      }
+
+      quotes.push({
+        asin,
+        price: nextPrice,
+        listPrice: reference,
+        discountPercentage: discount,
+        isFlashDeal: preview.isFlashDeal,
+        title: preview.title,
+        updated: changed,
+      });
+    } catch (error) {
+      errors.push({
+        asin,
+        message: error instanceof Error ? error.message : "Error desconocido",
+      });
+    }
+  }
+
+  return {
+    ok: true as const,
+    provider: "html" as const,
+    quotes,
+    stats: {
+      processed: asins.length,
+      updated: quotes.filter((q) => q.updated).length,
+      unchanged: quotes.filter((q) => !q.updated).length,
+      dealsDetected: quotes.filter((q) => q.isFlashDeal).length,
+      errors,
+    },
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +169,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 1–3 ASINs: sync HTML directo (más fiable para flash / admin Revisar).
+    if (asins.length <= 3) {
+      const result = await syncAsinsFromHtml(asins);
+      return NextResponse.json(result);
+    }
+
     const result = await runAmazonPriceCheck({
       asins,
       notify: body.notify ?? false,
-      // HTML = precio visible en Amazon (Keepa/Creators suelen ir retrasados en flash).
       provider: "html",
       delayMs: 700,
     });

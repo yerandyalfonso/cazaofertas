@@ -18,11 +18,47 @@ const BROWSER_HEADERS: HeadersInit = {
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   Accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Accept-Language": "es-ES,es;q=0.9",
   "Cache-Control": "no-cache",
   Pragma: "no-cache",
   "Upgrade-Insecure-Requests": "1",
+  // Forzar ficha ES/EUR aunque el fetch salga desde IP de Vercel (US).
+  Cookie: "lc-acbes=es_ES; i18n-prefs=EUR; skin=noskin",
 };
+
+function amazonEsProductUrl(asin: string, preferredUrl?: string): string {
+  if (preferredUrl && /amazon\.es\//i.test(preferredUrl) && preferredUrl.includes(asin)) {
+    try {
+      const url = new URL(preferredUrl);
+      url.searchParams.set("language", "es_ES");
+      url.searchParams.set("currency", "EUR");
+      url.searchParams.set("th", "1");
+      url.searchParams.set("psc", "1");
+      return url.toString();
+    } catch {
+      // fall through
+    }
+  }
+  return `https://www.amazon.es/dp/${asin}?language=es_ES&currency=EUR&th=1&psc=1`;
+}
+
+function collectPricesFromSelectors(
+  $: cheerio.CheerioAPI,
+  selectors: string[],
+): number[] {
+  const values: number[] = [];
+  const seen = new Set<number>();
+  for (const selector of selectors) {
+    const nodes = $(selector);
+    for (let i = 0; i < nodes.length; i += 1) {
+      const price = parseAmazonPriceText(nodes.eq(i).text());
+      if (price === null || seen.has(price)) continue;
+      seen.add(price);
+      values.push(price);
+    }
+  }
+  return values;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -209,74 +245,79 @@ export function extractPriceFromAmazonHtml(html: string): {
 } {
   const $ = cheerio.load(html);
 
-  const price =
-    firstPriceFromSelectors($, [
-      // Apex / «precio a pagar» (ofertas flash / ventas rápidas)
-      "#corePrice_feature_div .apex-pricetopay-value span.a-offscreen",
-      "#corePriceDisplay_desktop_feature_div .apex-pricetopay-value span.a-offscreen",
-      "#apex_desktop .apex-pricetopay-value span.a-offscreen",
-      ".priceToPay span.a-offscreen",
-      "span.a-price.priceToPay:not(.a-text-price) span.a-offscreen",
-      "#corePrice_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
-      "#corePriceDisplay_desktop_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
-      "#apex_desktop span.a-price:not(.a-text-price) span.a-offscreen",
-      "#priceblock_dealprice",
-      "#priceblock_saleprice",
-      "#priceblock_ourprice",
-      "span.a-price.aok-align-center:not(.a-text-price) .a-offscreen",
-      "#tp_price_block_total_price_ww span.a-offscreen",
-    ]) ??
+  // Precio a pagar: priorizar buy box (.priceToPay), no acordeones secundarios.
+  const payCandidates = collectPricesFromSelectors($, [
+    "#corePrice_feature_div .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
+    "#corePriceDisplay_desktop_feature_div .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
+    "#apex_desktop .reinventPricePriceToPayMargin.priceToPay span.a-offscreen",
+    "#corePrice_feature_div .apex-pricetopay-value span.a-offscreen",
+    "#corePriceDisplay_desktop_feature_div .apex-pricetopay-value span.a-offscreen",
+    "#apex_desktop .apex-pricetopay-value span.a-offscreen",
+    ".priceToPay span.a-offscreen",
+    "#corePrice_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
+    "#corePriceDisplay_desktop_feature_div span.a-price:not(.a-text-price) span.a-offscreen",
+    "#priceblock_dealprice",
+    "#priceblock_saleprice",
+    "#priceblock_ourprice",
+  ]);
+  let price =
+    payCandidates[0] ??
     priceFromWholeFraction(
       $,
-      "#corePrice_feature_div .apex-pricetopay-value, #corePriceDisplay_desktop_feature_div .priceToPay, #apex_desktop .apex-pricetopay-value, .priceToPay",
+      "#corePrice_feature_div .reinventPricePriceToPayMargin.priceToPay, #corePriceDisplay_desktop_feature_div .priceToPay, #apex_desktop .apex-pricetopay-value, .priceToPay",
     ) ??
     priceFromPageScripts(html);
 
-  // Lista / «precio recomendado». Excluir srpPriceBlockAUI (mínimo 30 días).
-  let listPrice =
-    firstPriceFromSelectors($, [
-      "#corePrice_feature_div .apex-basisprice-value span.a-offscreen",
-      "#corePriceDisplay_desktop_feature_div .apex-basisprice-value span.a-offscreen",
-      "#apex_desktop .apex-basisprice-value span.a-offscreen",
-      ".basisPrice .a-offscreen",
-      "#corePrice_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-      "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-      "#apex_desktop span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-      'span.a-price.a-text-price[data-a-strike="true"]:not(.srpPriceBlockAUI) span.a-offscreen',
-      "#listPrice",
-      "#price .a-text-strike",
-    ]) ?? listPriceFromPageScripts(html);
+  // Lista / precio recomendado: el MÁS ALTO entre tachados del bloque core,
+  // excluyendo el mínimo 30 días (.srpPriceBlockAUI).
+  const listCandidates = collectPricesFromSelectors($, [
+    "#corePrice_feature_div .apex-basisprice-value span.a-offscreen",
+    "#corePriceDisplay_desktop_feature_div .apex-basisprice-value span.a-offscreen",
+    "#apex_desktop .apex-basisprice-value span.a-offscreen",
+    ".basisPrice .a-offscreen",
+    "#corePrice_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+    "#corePriceDisplay_desktop_feature_div span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+    "#apex_desktop span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
+    'span.a-price.a-text-price[data-a-strike="true"]:not(.srpPriceBlockAUI) span.a-offscreen',
+    "#listPrice",
+  ]);
+  const scriptList = listPriceFromPageScripts(html);
+  if (scriptList !== null && !listCandidates.includes(scriptList)) {
+    listCandidates.push(scriptList);
+  }
 
   const badgeDiscount = discountFromSavingsBadge($);
-  if (
+  let listPrice =
+    listCandidates.length > 0 ? Math.max(...listCandidates) : null;
+
+  // Si la lista no cuadra con el badge (−21% etc.), preferir la candidata que sí.
+  if (price !== null && badgeDiscount !== null && listCandidates.length > 0) {
+    const impliedList =
+      Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
+    let best = listPrice;
+    let bestDelta = Number.POSITIVE_INFINITY;
+    for (const candidate of [...listCandidates, impliedList]) {
+      if (candidate <= price) continue;
+      const pct = ((candidate - price) / candidate) * 100;
+      const delta = Math.abs(pct - badgeDiscount);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        best = candidate;
+      }
+    }
+    if (best !== null && bestDelta <= 6) {
+      listPrice = Math.round(best * 100) / 100;
+    } else if (impliedList > price) {
+      listPrice = impliedList;
+    }
+  } else if (
     (listPrice === null || (price !== null && listPrice <= price)) &&
     price !== null &&
     badgeDiscount !== null
   ) {
     const reconstructed =
       Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
-    if (reconstructed > price) {
-      listPrice = reconstructed;
-    }
-  }
-
-  // Si la «lista» parece el mínimo 30d (muy cerca del precio), preferir badge.
-  if (
-    price !== null &&
-    listPrice !== null &&
-    badgeDiscount !== null &&
-    listPrice > price
-  ) {
-    const impliedList =
-      Math.round((price / (1 - badgeDiscount / 100)) * 100) / 100;
-    const fromListPct = ((listPrice - price) / listPrice) * 100;
-    // Badge −32% pero lista implica ~5% → lista era el mínimo 30 días.
-    if (
-      Math.abs(fromListPct - badgeDiscount) > 8 &&
-      Math.abs(impliedList - listPrice) / impliedList > 0.08
-    ) {
-      listPrice = impliedList;
-    }
+    if (reconstructed > price) listPrice = reconstructed;
   }
 
   if (listPrice !== null && price !== null && listPrice <= price) {
@@ -441,10 +482,9 @@ export async function previewAmazonProductPage(
     throw new Error("URL o ASIN de Amazon no válidos.");
   }
 
-  const amazonUrl =
-    extractAsin(urlOrAsin) && urlOrAsin.includes("http")
-      ? urlOrAsin.trim()
-      : generateAmazonUrl(asin);
+  const preferred =
+    urlOrAsin.includes("http") && extractAsin(urlOrAsin) ? urlOrAsin.trim() : undefined;
+  const amazonUrl = amazonEsProductUrl(asin, preferred);
 
   const html = await fetchAmazonPageHtml(amazonUrl, options);
   const extracted = extractPriceFromAmazonHtml(html);
@@ -471,7 +511,8 @@ export async function scrapeAmazonProductPage(
     fetchImpl?: typeof fetch;
   } = {},
 ): Promise<ProductPriceData> {
-  const html = await fetchAmazonPageHtml(url, options);
+  const amazonUrl = amazonEsProductUrl(asin, url);
+  const html = await fetchAmazonPageHtml(amazonUrl, options);
   const extracted = extractPriceFromAmazonHtml(html);
 
   if (extracted.price === null) {
@@ -486,7 +527,7 @@ export async function scrapeAmazonProductPage(
     title: extracted.title,
     brand: extracted.brand,
     imageUrl: extracted.imageUrl,
-    amazonUrl: url,
+    amazonUrl,
     previousPrice: extracted.listPrice ?? undefined,
     discountPercentage: extracted.discountPercentage ?? undefined,
   };

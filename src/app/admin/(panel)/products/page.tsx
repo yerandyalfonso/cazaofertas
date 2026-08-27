@@ -383,6 +383,14 @@ export default function ProductsAdminClient() {
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
+        provider?: string;
+        quotes?: Array<{
+          asin: string;
+          price: number;
+          listPrice: number | null;
+          discountPercentage: number | null;
+          updated: boolean;
+        }>;
         stats?: {
           updated: number;
           unchanged: number;
@@ -402,11 +410,17 @@ export default function ProductsAdminClient() {
         setError(message);
         toast.error(message);
       } else {
-        const message = `Precio ${product.asin}: ${data.stats?.updated ? "actualizado" : "sin cambios"}${
-          data.stats?.dealsDetected
-            ? ` · ${data.stats.dealsDetected} chollo(s)`
-            : ""
-        }`;
+        const quote = data.quotes?.find((item) => item.asin === product.asin);
+        const message = quote
+          ? `${product.asin}: ${quote.price.toFixed(2)} €` +
+            (quote.listPrice != null
+              ? ` (ref. ${quote.listPrice.toFixed(2)} €)`
+              : "") +
+            (quote.discountPercentage != null
+              ? ` · −${Math.round(quote.discountPercentage)}%`
+              : "") +
+            (quote.updated ? " · actualizado" : " · sin cambio de precio")
+          : `Precio ${product.asin}: ${data.stats?.updated ? "actualizado" : "sin cambios"}`;
         setMessage(message);
         toast.success(message);
       }
@@ -735,6 +749,8 @@ export default function ProductsAdminClient() {
                           source: "admin",
                           test: true,
                         })}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         title="Ver en Amazon (clic de prueba)"
                         aria-label="Ver en Amazon (clic de prueba)"
                         className={iconBtnClass}
