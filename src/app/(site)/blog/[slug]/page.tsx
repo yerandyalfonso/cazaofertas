@@ -7,21 +7,14 @@ import {
   breadcrumbJsonLd,
   buildPageMetadata,
 } from "@/lib/seo";
-import {
-  getArticleBySlug,
-  getArticleSlugs,
-} from "@/services/blog";
+import { getArticleBySlug } from "@/services/blog";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const slugs = await getArticleSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+/** CMS + Supabase: no prerender en build (evita timeouts de 60s en Vercel). */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

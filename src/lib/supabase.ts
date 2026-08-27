@@ -4,6 +4,28 @@ import type { Database } from "@/types/database";
 
 export type TypedSupabaseClient = SupabaseClient<Database>;
 
+/** Evita que el build de Vercel se quede colgado >60s en páginas estáticas. */
+function fetchWithTimeout(timeoutMs: number): typeof fetch {
+  return async (input, init) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const parent = init?.signal;
+    if (parent) {
+      if (parent.aborted) controller.abort();
+      else {
+        parent.addEventListener("abort", () => controller.abort(), {
+          once: true,
+        });
+      }
+    }
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 export function createSupabaseBrowserClient(): TypedSupabaseClient {
   const env = getPublicEnv();
 
@@ -23,6 +45,9 @@ export function createSupabaseServiceClient(): TypedSupabaseClient {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
+      },
+      global: {
+        fetch: fetchWithTimeout(12_000),
       },
     },
   );

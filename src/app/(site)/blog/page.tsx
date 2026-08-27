@@ -18,6 +18,9 @@ export const metadata: Metadata = {
 
 export const revalidate = 300;
 
+/** Índice del blog también depende de Supabase; no bloquear el build. */
+export const dynamic = "force-dynamic";
+
 export default async function BlogPage() {
   const [posts, featured] = await Promise.all([
     getPublishedArticles(),

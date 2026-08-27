@@ -43,7 +43,8 @@ interface ProductPageProps {
 export const revalidate = 300;
 
 export async function generateStaticParams() {
-  const products = await getActiveProducts(40);
+  // Pocas rutas en build; el resto se genera on-demand (ISR).
+  const products = await getActiveProducts(12);
   return products.map((product) => ({ slug: product.slug }));
 }
 

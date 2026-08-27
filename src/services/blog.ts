@@ -312,36 +312,47 @@ export async function getArticleBySlug(
   const client = getClient();
 
   if (client) {
-    const { data, error } = await client
-      .from("articles")
-      .select(
-        `
+    try {
+      const { data, error } = await client
+        .from("articles")
+        .select(
+          `
         *,
         article_products (
           position,
           products (*, categories(id, name, slug))
         )
       `,
-      )
-      .eq("slug", slug)
-      .eq("status", "published")
-      .maybeSingle();
+        )
+        .eq("slug", slug)
+        .eq("status", "published")
+        .maybeSingle();
 
-    if (error) {
-      console.error("[blog] getArticleBySlug", error.message);
-    } else if (data) {
-      const row = data as ArticleQueryRow;
-      const post = mapArticleRow(row);
-      const products = await mergeProducts(post, productsFromArticleJoin(row));
-      return { post, products, source: "supabase" };
+      if (error) {
+        console.error("[blog] getArticleBySlug", error.message);
+      } else if (data) {
+        const row = data as ArticleQueryRow;
+        const post = mapArticleRow(row);
+        const products = await mergeProducts(post, productsFromArticleJoin(row));
+        return { post, products, source: "supabase" };
+      }
+    } catch (error) {
+      console.error(
+        "[blog] getArticleBySlug aborted/failed",
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 
   const fallback = BLOG_POSTS.find((post) => post.slug === slug);
   if (!fallback) return null;
 
-  const products = await getProductsBySlugs(collectProductSlugs(fallback));
-  return { post: fallback, products, source: "fallback" };
+  try {
+    const products = await getProductsBySlugs(collectProductSlugs(fallback));
+    return { post: fallback, products, source: "fallback" };
+  } catch {
+    return { post: fallback, products: [], source: "fallback" };
+  }
 }
 
 export async function getArticleSlugs(): Promise<string[]> {
