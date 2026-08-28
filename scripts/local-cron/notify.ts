@@ -4,9 +4,14 @@ import {
   notifyCronFailure,
 } from "@/services/cronNotify";
 import type { FlashDealsRunResult } from "@/services/flashDeals";
+import type { KiabiDealsRunResult } from "@/services/kiabiDeals";
 import type { UserUrlAlertsResult } from "@/services/userUrlAlerts";
 
 const JOB_PREFIX = "local";
+
+function isKiabiDataDomeError(message: string): boolean {
+  return /403|datadome|anti-bot|bloqueó/i.test(message);
+}
 
 function jobId(name: string): string {
   return `${JOB_PREFIX}/${name}`;
@@ -104,6 +109,88 @@ export async function reviewFlashDealsResult(
       ...errorLines,
       feedErrors.length > 0 ? `Feeds fallidos: ${feedErrors.length}` : "",
       ...feedLines,
+    ],
+  });
+}
+
+export async function reviewKiabiDealsResult(
+  result: KiabiDealsRunResult,
+): Promise<void> {
+  const job = jobId("kiabi-deals");
+
+  if (!result.enabled) {
+    await notifyCronAlert({
+      job,
+      headline: "Kiabi desactivado",
+      lines: [
+        "KIABI_DEALS_ENABLED no está en 1/true/on.",
+        "Añádelo a .env.local y reinicia el cron.",
+      ],
+    });
+    return;
+  }
+
+  const errors = result.errors ?? [];
+  const feedErrors = result.discovery?.feedErrors ?? [];
+  const dataDomeOnly =
+    feedErrors.length > 0 &&
+    feedErrors.every((e) => isKiabiDataDomeError(e.message)) &&
+    errors.length === 0;
+  const hasWork =
+    result.inserted > 0 ||
+    result.updated > 0 ||
+    result.channelNotificationsSent > 0;
+
+  if (hasWork || errors.length > 0 || feedErrors.length > 0) {
+    const headline = hasWork
+      ? result.discovery.usedFallback
+        ? "Kiabi: OK (lista de respaldo)"
+        : "Kiabi: sincronización OK"
+      : dataDomeOnly
+        ? "Kiabi: DataDome bloqueó el scrape"
+        : "Kiabi: revisión con incidencias";
+
+    await notifyCronAlert({
+      job,
+      headline,
+      lines: [
+        `Candidatos: ${result.discovery.candidates}`,
+        result.discovery.usedFallback
+          ? "Usó JSON de respaldo (promociones no accesibles desde Node)."
+          : "",
+        `Procesados: ${result.processed}`,
+        `Nuevos: ${result.inserted} · Actualizados: ${result.updated}`,
+        `Sin rebaja: ${result.skippedNoDiscount}`,
+        result.skippedExisting > 0
+          ? `Ya en catálogo (omitidos): ${result.skippedExisting}`
+          : "",
+        `Canal Telegram: ${result.channelNotificationsSent} enviados`,
+        errors.length > 0 ? `Errores ficha: ${errors.length}` : "",
+        errors
+          .slice(0, 2)
+          .map((e) => `• ${e.externalId}: ${e.message}`)
+          .join("\n"),
+        feedErrors.length > 0
+          ? feedErrors
+              .slice(0, 1)
+              .map((e) => `Feed: ${e.message}`)
+              .join("\n")
+          : "",
+        dataDomeOnly && !hasWork
+          ? "El cron disparó bien; Kiabi exige navegador. Opcional: KIABI_COOKIES_FILE en .env.local"
+          : "",
+      ],
+    });
+    return;
+  }
+
+  await notifyCronAlert({
+    job,
+    headline: "Kiabi: prueba OK (sin novedades)",
+    lines: [
+      `Candidatos en rebajas: ${result.discovery.candidates}`,
+      "No hubo chollos nuevos que superen el umbral de descuento.",
+      "El cron está operativo; se reintentará en el próximo horario.",
     ],
   });
 }

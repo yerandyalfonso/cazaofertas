@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { RemoteImage } from "@/components/RemoteImage";
 import { InlineDealCard } from "@/components/InlineDealCard";
 import {
   BlogPullQuote,
@@ -99,7 +99,7 @@ export function BlogContent({
           return (
             <figure key={key} className="space-y-3">
               <div className="relative aspect-[16/10] overflow-hidden bg-stone-200">
-                <Image
+                <RemoteImage
                   src={block.src}
                   alt={block.alt}
                   fill

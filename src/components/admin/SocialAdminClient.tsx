@@ -1,10 +1,18 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Save } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatEuro } from "@/lib/money";
+import {
+  formatSocialProjectDate,
+  getSocialCardProject,
+  projectFromSnapshot,
+  upsertSocialCardProject,
+} from "@/lib/social-card-projects";
 
 interface SocialProduct {
   id: string;
@@ -637,9 +645,22 @@ function ProductImage({
   );
 }
 
-export function SocialAdminClient() {
+export function SocialAdminClient({
+  projectId,
+}: {
+  projectId: string | null;
+}) {
+  const router = useRouter();
   const toast = useAdminToast();
   const cardRef = useRef<HTMLDivElement>(null);
+  const hydratingRef = useRef(false);
+
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(
+    projectId,
+  );
+  const [projectName, setProjectName] = useState("Nueva tarjeta");
+  const [editorReady, setEditorReady] = useState(false);
+
   const [products, setProducts] = useState<SocialProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
@@ -655,6 +676,146 @@ export function SocialAdminClient() {
   const [exporting, setExporting] = useState(false);
   const [imageReady, setImageReady] = useState(false);
   const [imageBgColor, setImageBgColor] = useState<string | null>(null);
+
+  const selected = useMemo(
+    () => products.find((p) => p.id === selectedId) ?? null,
+    [products, selectedId],
+  );
+
+  const buildSnapshot = useCallback(
+    () => ({
+      name: projectName.trim() || "Tarjeta sin título",
+      productId: selectedId || null,
+      productTitle: selected?.title ?? null,
+      formatId,
+      layoutId,
+      styleId,
+      colorTone,
+      imageFit,
+      imagePadX,
+      imagePadY,
+      cardRadius,
+    }),
+    [
+      projectName,
+      selectedId,
+      selected?.title,
+      formatId,
+      layoutId,
+      styleId,
+      colorTone,
+      imageFit,
+      imagePadX,
+      imagePadY,
+      cardRadius,
+    ],
+  );
+
+  const applyProject = useCallback(
+    (project: NonNullable<ReturnType<typeof getSocialCardProject>>) => {
+      hydratingRef.current = true;
+      setCurrentProjectId(project.id);
+      setProjectName(project.name);
+      setSelectedId(project.productId ?? "");
+      setFormatId(project.formatId);
+      setLayoutId(project.layoutId);
+      setStyleId(project.styleId);
+      setColorTone(project.colorTone);
+      setImageFit(project.imageFit);
+      setImagePadX(project.imagePadX);
+      setImagePadY(project.imagePadY);
+      setCardRadius(project.cardRadius);
+      window.setTimeout(() => {
+        hydratingRef.current = false;
+      }, 0);
+    },
+    [],
+  );
+
+  const persistCurrentProject = useCallback(
+    (options?: { silent?: boolean }) => {
+      const id = currentProjectId ?? projectId;
+      if (!id) return;
+
+      const existing = getSocialCardProject(id);
+      if (!existing) return;
+
+      upsertSocialCardProject(
+        projectFromSnapshot(buildSnapshot(), existing),
+      );
+
+      if (!options?.silent) {
+        toast.success("Tarjeta guardada.");
+      }
+    },
+    [buildSnapshot, currentProjectId, projectId, toast],
+  );
+
+  function saveCurrentProject() {
+    const existingId = projectId ?? currentProjectId;
+    const existing = existingId ? getSocialCardProject(existingId) : undefined;
+    const saved = projectFromSnapshot(buildSnapshot(), existing ?? undefined);
+
+    upsertSocialCardProject(saved);
+    setCurrentProjectId(saved.id);
+
+    if (!projectId) {
+      router.replace(`/admin/social/${saved.id}`);
+    }
+
+    toast.success("Tarjeta guardada.");
+  }
+
+  useEffect(() => {
+    if (projectId) {
+      const project = getSocialCardProject(projectId);
+      if (!project) {
+        toast.error("Tarjeta no encontrada.");
+        router.replace("/admin/social");
+        return;
+      }
+      applyProject(project);
+      setEditorReady(true);
+      return;
+    }
+
+    setCurrentProjectId(null);
+    setProjectName("Nueva tarjeta");
+    setSelectedId("");
+    setFormatId("square");
+    setLayoutId("minimal");
+    setStyleId("pastel");
+    setColorTone(PRESET_TONE.pastel);
+    setImageFit("blur");
+    setImagePadX(0);
+    setImagePadY(0);
+    setCardRadius(40);
+    setEditorReady(true);
+  }, [applyProject, projectId, router, toast]);
+
+  useEffect(() => {
+    const id = currentProjectId ?? projectId;
+    if (!id || !editorReady || hydratingRef.current) return;
+    const timer = window.setTimeout(() => {
+      persistCurrentProject({ silent: true });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    cardRadius,
+    colorTone,
+    currentProjectId,
+    editorReady,
+    formatId,
+    imageFit,
+    imagePadX,
+    imagePadY,
+    layoutId,
+    persistCurrentProject,
+    projectId,
+    projectName,
+    selectedId,
+    styleId,
+  ]);
 
   const format = FORMATS.find((item) => item.id === formatId) ?? FORMATS[0];
   const layout = LAYOUTS.find((item) => item.id === layoutId) ?? LAYOUTS[0];
@@ -691,8 +852,9 @@ export function SocialAdminClient() {
   }, [toast]);
 
   useEffect(() => {
+    if (!editorReady) return;
     void load();
-  }, [load]);
+  }, [editorReady, load]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -704,11 +866,6 @@ export function SocialAdminClient() {
         (p.brand?.toLowerCase().includes(q) ?? false),
     );
   }, [products, query]);
-
-  const selected = useMemo(
-    () => products.find((p) => p.id === selectedId) ?? null,
-    [products, selectedId],
-  );
 
   const discount = useMemo(() => {
     if (!selected) return 0;
@@ -1223,15 +1380,75 @@ export function SocialAdminClient() {
     }
   }
 
+  if (!editorReady) {
+    return (
+      <div className="flex h-80 items-center justify-center border border-dashed border-stone-300 bg-white text-stone-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Cargando editor…
+      </div>
+    );
+  }
+
   return (
     <div>
-      <header className="max-w-3xl">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+      <header className="border-b border-stone-200 pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <Link
+              href="/admin/social"
+              className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 hover:underline"
+            >
+              ← Volver a tarjetas
+            </Link>
+            <h1 className="mt-3 font-display text-3xl tracking-tight text-ink md:text-4xl">
+              {projectId ? "Editar tarjeta" : "Nueva tarjeta"}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-stone-600">
+              {projectId && currentProjectId
+                ? `Última actualización: ${formatSocialProjectDate(
+                    getSocialCardProject(currentProjectId)?.updatedAt ??
+                      new Date().toISOString(),
+                  )}`
+                : "Configura la tarjeta y guárdala para añadirla a tu lista."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={saveCurrentProject}
+              disabled={!selected}
+              className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-ink hover:bg-stone-50 disabled:opacity-40"
+            >
+              <Save className="h-4 w-4" />
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => void downloadPng()}
+              disabled={exporting || !selected}
+              className="inline-flex h-11 items-center gap-2 bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Descargar PNG
+            </button>
+          </div>
+        </div>
+        <label className="mt-4 block max-w-md text-sm font-medium text-ink">
+          Nombre del proyecto
+          <input
+            value={projectName}
+            onChange={(event) => setProjectName(event.target.value)}
+            className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal text-ink outline-none focus:border-ink"
+            placeholder="Ej. Oferta aspiradora Black Friday"
+          />
+        </label>
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
           Redes
         </p>
-        <h1 className="mt-2 font-display text-3xl tracking-tight text-ink md:text-4xl">
-          Generador de imágenes
-        </h1>
         <p className="mt-2 text-sm leading-relaxed text-stone-600">
           Layout Minimalista por defecto (sin cambios). Añade Split, Banner o
           Sello; elige paleta light y exporta PNG a resolución nativa.

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveAmazonProductCategoryId } from "@/lib/categories";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { roundMoney, toNumber } from "@/lib/money";
+import { buildOutOfStockUpdate, inStockAvailabilityPatch } from "@/lib/out-of-stock-policy";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { previewAmazonProductPage } from "@/providers/price";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
+import { ProductAvailability } from "@/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -17,12 +20,13 @@ async function syncAsinsFromHtml(asins: string[]) {
   const client = createSupabaseServiceClient();
   const quotes: Array<{
     asin: string;
-    price: number;
+    price: number | null;
     listPrice: number | null;
     discountPercentage: number | null;
     isFlashDeal: boolean;
     title?: string;
     updated: boolean;
+    unavailable?: boolean;
   }> = [];
   const errors: Array<{ asin: string; message: string }> = [];
 
@@ -31,7 +35,7 @@ async function syncAsinsFromHtml(asins: string[]) {
       const { data: product, error: lookupError } = await client
         .from("products")
         .select(
-          "id, asin, current_price, previous_price, lowest_price, highest_price, amazon_url",
+          "id, asin, title, brand, category_id, current_price, previous_price, lowest_price, highest_price, amazon_url, availability, out_of_stock_at, is_active",
         )
         .eq("asin", asin)
         .eq("is_active", true)
@@ -49,6 +53,34 @@ async function syncAsinsFromHtml(asins: string[]) {
       );
 
       if (preview.price === null) {
+        if (preview.availability === ProductAvailability.OUT_OF_STOCK) {
+          const now = new Date().toISOString();
+          const oosPatch = buildOutOfStockUpdate(product, now, {
+            ...(preview.title ? { title: preview.title } : {}),
+            ...(preview.imageUrl ? { image_url: preview.imageUrl } : {}),
+            ...(preview.brand ? { brand: preview.brand } : {}),
+            ...(preview.description ? { description: preview.description } : {}),
+          });
+          const { error: updateError } = await client
+            .from("products")
+            .update(oosPatch)
+            .eq("id", product.id);
+
+          if (updateError) throw new Error(updateError.message);
+
+          quotes.push({
+            asin,
+            price: null,
+            listPrice: null,
+            discountPercentage: null,
+            isFlashDeal: false,
+            title: preview.title,
+            updated: false,
+            unavailable: true,
+          });
+          continue;
+        }
+
         errors.push({
           asin,
           message:
@@ -78,6 +110,14 @@ async function syncAsinsFromHtml(asins: string[]) {
         : null);
       const changed = storedCurrent === null || storedCurrent !== nextPrice;
       const now = new Date().toISOString();
+      const categoryId =
+        product.category_id ??
+        (await resolveAmazonProductCategoryId(client, {
+          categorySlug: preview.categorySlug,
+          breadcrumbs: preview.breadcrumbs,
+          title: preview.title ?? product.title,
+          brand: preview.brand ?? product.brand,
+        }));
 
       const { error: updateError } = await client
         .from("products")
@@ -99,10 +139,12 @@ async function syncAsinsFromHtml(asins: string[]) {
           availability: preview.availability,
           last_checked_at: now,
           updated_at: now,
+          ...inStockAvailabilityPatch(preview.availability),
           ...(preview.title ? { title: preview.title } : {}),
           ...(preview.imageUrl ? { image_url: preview.imageUrl } : {}),
           ...(preview.brand ? { brand: preview.brand } : {}),
           ...(preview.description ? { description: preview.description } : {}),
+          ...(!product.category_id && categoryId ? { category_id: categoryId } : {}),
         })
         .eq("id", product.id);
 

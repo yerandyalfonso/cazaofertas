@@ -7,6 +7,7 @@ import { buildTrackedAffiliateUrl } from "@/lib/affiliate-tracking";
 import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { absoluteUrl } from "@/lib/site";
+import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -81,15 +82,7 @@ interface TelegramApiResponse<T> {
   result?: T;
 }
 
-const EXAMPLE_CATEGORIES = [
-  { label: "Electrónica", slug: "tecnologia" },
-  { label: "Hogar", slug: "hogar" },
-  { label: "Moda", slug: "moda" },
-  { label: "Belleza", slug: "belleza" },
-  { label: "Deportes", slug: "deportes" },
-  { label: "Juguetes", slug: "juguetes" },
-  { label: "Informática", slug: "informatica" },
-] as const;
+const EXAMPLE_CATEGORIES = WIZARD_CATEGORY_OPTIONS;
 
 export function isTelegramConfigured(): boolean {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN);

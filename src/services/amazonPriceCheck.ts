@@ -6,6 +6,7 @@ import {
 } from "@/services/cronControl";
 import { runPriceDetection, type PriceDetectionStats } from "@/services/priceDetection";
 import { buildAsinUrlMap, productHasMonitorableUrl } from "@/services/products";
+import { ProductAvailability } from "@/types";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 /** Lote por defecto: cubre el día con varias corridas sin saturar Amazon. */
@@ -59,16 +60,32 @@ export async function runAmazonPriceCheck(options?: {
   const { data: products, error } = await client
     .from("products")
     .select(
-      "id, asin, amazon_url, affiliate_url, current_price, previous_price, title, is_active, last_checked_at",
+      "id, asin, amazon_url, affiliate_url, current_price, previous_price, title, is_active, last_checked_at, availability",
     )
-    .eq("is_active", true)
-    .order("last_checked_at", { ascending: true, nullsFirst: true });
+    .eq("is_active", true);
 
   if (error) {
     throw new Error(`No se pudieron leer productos: ${error.message}`);
   }
 
-  const monitorable = (products ?? []).filter(productHasMonitorableUrl);
+  const monitorable = (products ?? [])
+    .filter(productHasMonitorableUrl)
+    .sort((a, b) => {
+      const aUnavailable =
+        a.availability === ProductAvailability.OUT_OF_STOCK ? 1 : 0;
+      const bUnavailable =
+        b.availability === ProductAvailability.OUT_OF_STOCK ? 1 : 0;
+      if (aUnavailable !== bUnavailable) {
+        return aUnavailable - bUnavailable;
+      }
+      const aChecked = a.last_checked_at
+        ? new Date(a.last_checked_at).getTime()
+        : 0;
+      const bChecked = b.last_checked_at
+        ? new Date(b.last_checked_at).getTime()
+        : 0;
+      return aChecked - bChecked;
+    });
   const urlByAsin = buildAsinUrlMap(monitorable);
 
   const asins = (

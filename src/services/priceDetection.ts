@@ -1,5 +1,9 @@
 import { generateAffiliateUrl } from "@/lib/affiliate";
 import { calculateDiscountPercentage, requireNumber, roundMoney, toNumber } from "@/lib/money";
+import {
+  buildOutOfStockUpdate,
+  inStockAvailabilityPatch,
+} from "@/lib/out-of-stock-policy";
 import { computeMovingAverages } from "@/lib/price-history";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -82,6 +86,8 @@ export interface PriceDetectionStats {
   processed: number;
   updated: number;
   unchanged: number;
+  unavailable: number;
+  deactivated: number;
   dealsDetected: number;
   alertsMatched: number;
   notificationsCreated: number;
@@ -287,6 +293,8 @@ export async function runPriceDetection(
     processed: 0,
     updated: 0,
     unchanged: 0,
+    unavailable: 0,
+    deactivated: 0,
     dealsDetected: 0,
     alertsMatched: 0,
     notificationsCreated: 0,
@@ -314,6 +322,44 @@ export async function runPriceDetection(
         continue;
       }
 
+      const now = new Date().toISOString();
+
+      if (
+        quote.price === null &&
+        quote.availability === ProductAvailability.OUT_OF_STOCK
+      ) {
+        const oosPatch = buildOutOfStockUpdate(
+          product,
+          now,
+          mediaBackfillPatch(product, quote),
+        );
+        const { error: unavailableError } = await client
+          .from("products")
+          .update(oosPatch)
+          .eq("id", product.id);
+
+        if (unavailableError) {
+          stats.errors.push({
+            asin: product.asin,
+            message: unavailableError.message,
+          });
+        } else {
+          stats.unavailable += 1;
+          if (oosPatch.is_active === false) {
+            stats.deactivated += 1;
+          }
+        }
+        continue;
+      }
+
+      if (quote.price === null) {
+        stats.errors.push({
+          asin: product.asin,
+          message: "El proveedor no devolvió precio para este ASIN.",
+        });
+        continue;
+      }
+
       try {
         const storedPrice = requireNumber(product.current_price);
         const nextPrice = roundMoney(quote.price);
@@ -332,10 +378,10 @@ export async function runPriceDetection(
             ? roundMoney(quote.discountPercentage)
             : calculateDiscountPercentage(referencePrice, nextPrice);
         const priceChanged = nextPrice !== storedPrice;
-        const now = new Date().toISOString();
 
         // Aunque el precio no cambie, refrescar referencia Amazon + descuento.
         if (!priceChanged) {
+          const availability = availabilityFrom(quote.availability);
           const { error: touchError } = await client
             .from("products")
             .update({
@@ -343,8 +389,9 @@ export async function runPriceDetection(
                 referencePrice > nextPrice ? referencePrice : storedPrevious,
               discount_percentage: discountPercentage,
               last_checked_at: now,
-              availability: availabilityFrom(quote.availability),
+              availability,
               updated_at: now,
+              ...inStockAvailabilityPatch(availability),
               ...mediaBackfillPatch(product, quote),
             })
             .eq("id", product.id);
@@ -386,6 +433,7 @@ export async function runPriceDetection(
           previousPriceAgeHours: scoringContext.previousPriceAgeHours,
         });
 
+        const availability = availabilityFrom(quote.availability);
         const { error: updateError } = await client
           .from("products")
           .update({
@@ -396,9 +444,10 @@ export async function runPriceDetection(
             highest_price: highestPrice,
             discount_percentage: discountPercentage,
             currency: quote.currency,
-            availability: availabilityFrom(quote.availability),
+            availability,
             last_checked_at: now,
             updated_at: now,
+            ...inStockAvailabilityPatch(availability),
             ...mediaBackfillPatch(product, quote),
           })
           .eq("id", product.id);

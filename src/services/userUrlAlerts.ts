@@ -5,9 +5,11 @@ import {
   looksLikeAmazonUrl,
 } from "@/lib/affiliate";
 import { formatEuro, roundMoney, toNumber } from "@/lib/money";
+import { buildOutOfStockUpdate } from "@/lib/out-of-stock-policy";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
 import { ensureProductFromAmazonUrl } from "@/services/products";
+import { ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
@@ -120,6 +122,35 @@ export async function runUserUrlAlerts(options?: {
       const quote = await scrapeAmazonProductPage(pageUrl, asin, {
         timeoutMs: 12_000,
       });
+
+      if (quote.price === null) {
+        const nowIso = new Date().toISOString();
+        await client
+          .from("alerts")
+          .update({
+            last_checked_at: nowIso,
+            ...(productId ? { product_id: productId } : {}),
+          })
+          .eq("id", alert.id);
+
+        if (
+          productId &&
+          quote.availability === ProductAvailability.OUT_OF_STOCK
+        ) {
+          const { data: productRow } = await client
+            .from("products")
+            .select("availability, out_of_stock_at, is_active")
+            .eq("id", productId)
+            .maybeSingle();
+
+          await client
+            .from("products")
+            .update(buildOutOfStockUpdate(productRow ?? {}, nowIso))
+            .eq("id", productId);
+        }
+        continue;
+      }
+
       const currentPrice = roundMoney(quote.price);
       const previousKnown =
         alert.last_known_price === null || alert.last_known_price === undefined

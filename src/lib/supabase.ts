@@ -47,7 +47,7 @@ export function createSupabaseServiceClient(): TypedSupabaseClient {
         autoRefreshToken: false,
       },
       global: {
-        fetch: fetchWithTimeout(12_000),
+        fetch: fetchWithTimeout(18_000),
       },
     },
   );

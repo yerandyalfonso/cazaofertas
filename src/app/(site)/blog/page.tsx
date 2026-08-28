@@ -68,6 +68,7 @@ export default async function BlogPage() {
 
       <Link
         href={`/blog/${lead.slug}`}
+        prefetch={false}
         className="group mt-12 block border-t border-stone-300 pt-8"
       >
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-end">
@@ -103,6 +104,7 @@ export default async function BlogPage() {
           <article key={post.slug} className="flex flex-col">
             <Link
               href={`/blog/${post.slug}`}
+              prefetch={false}
               className="group flex flex-1 flex-col"
             >
               <div className="relative mb-5 aspect-[16/10] overflow-hidden bg-stone-200">

@@ -4,10 +4,13 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
+import { resolveAmazonProductCategoryId } from "@/lib/categories";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { toNumber } from "@/lib/money";
+import { availabilityLabel } from "@/lib/out-of-stock-policy";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { previewAmazonProductPage } from "@/providers/price";
 import { dealScoringService } from "@/services/deal-scoring";
 import { ProductAvailability } from "@/types";
 
@@ -76,6 +79,8 @@ export async function GET(request: NextRequest) {
           toNumber(row.discount_percentage) ?? scoring.discountPercentage,
         currency: row.currency,
         availability: row.availability,
+        availabilityLabel: availabilityLabel(row.availability),
+        outOfStockAt: row.out_of_stock_at,
         category: category
           ? { id: category.id, name: category.name, slug: category.slug }
           : null,
@@ -116,7 +121,19 @@ export async function DELETE(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as {
       id?: string;
       asin?: string;
+      ids?: string[];
     };
+    const ids = (body.ids ?? [])
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value));
+
+    if (ids.length > 0) {
+      const client = createSupabaseServiceClient();
+      const { error } = await client.from("products").delete().in("id", ids);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, deleted: ids.length });
+    }
+
     const id = body.id?.trim() || searchParams.get("id")?.trim();
     const asin = (body.asin?.trim() || searchParams.get("asin")?.trim() || "")
       .toUpperCase();
@@ -218,6 +235,26 @@ export async function POST(request: NextRequest) {
         ? Math.round(((referencePrice - price) / referencePrice) * 10000) / 100
         : 0;
 
+    let categoryId = body.categoryId?.trim() || null;
+    if (!categoryId) {
+      try {
+        const preview = await previewAmazonProductPage(resolvedUrl, {
+          timeoutMs: 18_000,
+        });
+        categoryId = await resolveAmazonProductCategoryId(client, {
+          categorySlug: preview.categorySlug,
+          breadcrumbs: preview.breadcrumbs,
+          title: preview.title ?? title,
+          brand: body.brand?.trim() || preview.brand,
+        });
+      } catch {
+        categoryId = await resolveAmazonProductCategoryId(client, {
+          title,
+          brand: body.brand?.trim() || null,
+        });
+      }
+    }
+
     const { data, error } = await client
       .from("products")
       .upsert(
@@ -231,7 +268,7 @@ export async function POST(request: NextRequest) {
             asin,
           }),
           brand: body.brand?.trim() || null,
-          category_id: body.categoryId || null,
+          category_id: categoryId,
           current_price: price,
           previous_price: referencePrice,
           lowest_price: Math.min(price, referencePrice),

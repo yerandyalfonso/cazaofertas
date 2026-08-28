@@ -3,6 +3,10 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
+import { inferAmazonCategorySlug } from "@/lib/amazon-category";
+import {
+  resolveCategoryIdBySlug,
+} from "@/lib/categories";
 import { roundMoney, toNumber } from "@/lib/money";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import {
@@ -53,6 +57,7 @@ async function maybeNotifyFlashChannel(
     affiliateUrl?: string | null;
     productSlug?: string | null;
     brand?: string | null;
+    categoryId?: string | null;
     categoryName?: string | null;
     imageUrl?: string | null;
     summary?: string | null;
@@ -63,7 +68,7 @@ async function maybeNotifyFlashChannel(
     asin: options.asin,
     title: options.title,
     brand: options.brand ?? null,
-    categoryId: null,
+    categoryId: options.categoryId ?? null,
     categoryName: options.categoryName ?? null,
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
@@ -143,6 +148,7 @@ interface CatalogRow {
   brand: string | null;
   image_url: string | null;
   description: string | null;
+  category_id: string | null;
 }
 
 /**
@@ -180,7 +186,7 @@ export async function runFlashDealsCheck(options?: {
   const { data: catalogRows, error: catalogError } = await client
     .from("products")
     .select(
-      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description",
+      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id",
     );
 
   if (catalogError) {
@@ -242,6 +248,8 @@ export async function runFlashDealsCheck(options?: {
       let imageUrl: string | null = existing?.image_url ?? null;
       let brand: string | null = existing?.brand ?? null;
       let description: string | null = existing?.description ?? null;
+      let categorySlugHint: string | undefined;
+      let categoryBreadcrumbs: string[] | undefined;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
@@ -258,6 +266,10 @@ export async function runFlashDealsCheck(options?: {
           if (preview.imageUrl) imageUrl = preview.imageUrl;
           if (preview.brand) brand = preview.brand;
           if (preview.description) description = preview.description;
+          if (preview.categorySlug) categorySlugHint = preview.categorySlug;
+          if (preview.breadcrumbs?.length) {
+            categoryBreadcrumbs = preview.breadcrumbs;
+          }
         } catch (enrichError) {
           // Live/injected: sin ficha no insertamos. Simulación: hints ok.
           if (item.origin !== "simulated" || price == null) {
@@ -297,6 +309,19 @@ export async function runFlashDealsCheck(options?: {
         item.origin === "simulated" ||
         item.origin === "live";
 
+      const resolvedCategorySlug =
+        categorySlugHint ??
+        inferAmazonCategorySlug({
+          breadcrumbs: categoryBreadcrumbs,
+          title,
+          brand,
+        }) ??
+        null;
+      const categoryMeta = resolvedCategorySlug
+        ? await resolveCategoryIdBySlug(client, resolvedCategorySlug)
+        : null;
+      const scoringCategorySlug = resolvedCategorySlug ?? "general";
+
       if (wasNewToCatalog) {
         const slug = slugify(`${title}-${item.asin}`);
         const now = new Date().toISOString();
@@ -304,7 +329,7 @@ export async function runFlashDealsCheck(options?: {
           currentPrice: price,
           previousPrice: reference > price ? reference : null,
           lowestPrice: price,
-          categorySlug: "general",
+          categorySlug: scoringCategorySlug,
         });
 
         const { error: slugCleanupError } = await client
@@ -331,6 +356,7 @@ export async function runFlashDealsCheck(options?: {
             brand,
             image_url: imageUrl,
             description,
+            category_id: categoryMeta?.id ?? null,
             current_price: price,
             previous_price: reference,
             lowest_price: price,
@@ -429,6 +455,7 @@ export async function runFlashDealsCheck(options?: {
           brand,
           image_url: imageUrl,
           description,
+          category_id: categoryMeta?.id ?? null,
         });
 
         inserted += 1;
@@ -448,6 +475,8 @@ export async function runFlashDealsCheck(options?: {
             amazonUrl,
             productSlug: slug,
             brand,
+            categoryId: categoryMeta?.id ?? null,
+            categoryName: categoryMeta?.name ?? null,
             imageUrl,
             summary: description || brand,
           });
@@ -512,7 +541,7 @@ export async function runFlashDealsCheck(options?: {
             currentPrice: price,
             previousPrice: reference > price ? reference : storedPrice,
             lowestPrice: previousLowest,
-            categorySlug: "general",
+            categorySlug: scoringCategorySlug,
           });
           const now = new Date().toISOString();
 
@@ -529,6 +558,9 @@ export async function runFlashDealsCheck(options?: {
               ...(imageUrl ? { image_url: imageUrl } : {}),
               ...(brand ? { brand } : {}),
               ...(description ? { description } : {}),
+              ...(!existing!.category_id && categoryMeta?.id
+                ? { category_id: categoryMeta.id }
+                : {}),
             })
             .eq("id", existing!.id);
 
@@ -560,6 +592,8 @@ export async function runFlashDealsCheck(options?: {
               affiliateUrl: existing!.affiliate_url,
               productSlug: existing!.slug,
               brand: brand ?? existing!.brand,
+              categoryId: categoryMeta?.id ?? existing!.category_id,
+              categoryName: categoryMeta?.name ?? null,
               imageUrl: imageUrl ?? existing!.image_url,
               summary:
                 description ||

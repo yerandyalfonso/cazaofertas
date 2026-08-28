@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
       isFlashDeal: preview.isFlashDeal,
       amazonUrl: preview.amazonUrl,
       availability: preview.availability,
+      categorySlug: preview.categorySlug ?? null,
+      breadcrumbs: preview.breadcrumbs ?? [],
     });
   } catch (error) {
     return NextResponse.json(

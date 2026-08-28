@@ -3,6 +3,7 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
+import { resolveAmazonProductCategoryId } from "@/lib/categories";
 import { roundMoney, toNumber } from "@/lib/money";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
@@ -120,7 +121,7 @@ export async function ensureProductFromAmazonUrl(
 
   const { data: existing, error: lookupError } = await client
     .from("products")
-    .select("id, asin, title, amazon_url, current_price, image_url, brand")
+    .select("id, asin, title, amazon_url, current_price, image_url, brand, category_id")
     .eq("asin", asin)
     .maybeSingle();
 
@@ -132,8 +133,9 @@ export async function ensureProductFromAmazonUrl(
     const needsMedia =
       options?.scrape !== false &&
       (!existing.image_url || !existing.brand);
+    const needsCategory = options?.scrape !== false && !existing.category_id;
 
-    if (needsMedia) {
+    if (needsMedia || needsCategory) {
       try {
         const quote = await scrapeAmazonProductPage(amazonUrl, asin, {
           timeoutMs: 12_000,
@@ -141,6 +143,7 @@ export async function ensureProductFromAmazonUrl(
         const patch: {
           image_url?: string;
           brand?: string | null;
+          category_id?: string | null;
           updated_at: string;
         } = { updated_at: new Date().toISOString() };
         if (!existing.image_url && quote.imageUrl) {
@@ -149,7 +152,15 @@ export async function ensureProductFromAmazonUrl(
         if (!existing.brand && quote.brand) {
           patch.brand = quote.brand;
         }
-        if (patch.image_url || patch.brand) {
+        if (needsCategory) {
+          const categoryId = await resolveAmazonProductCategoryId(client, {
+            categorySlug: quote.categorySlug,
+            title: quote.title ?? existing.title,
+            brand: quote.brand ?? existing.brand,
+          });
+          if (categoryId) patch.category_id = categoryId;
+        }
+        if (patch.image_url || patch.brand || patch.category_id) {
           await client.from("products").update(patch).eq("id", existing.id);
         }
       } catch {
@@ -175,6 +186,14 @@ export async function ensureProductFromAmazonUrl(
     timeoutMs: 12_000,
   });
 
+  if (quote.price === null) {
+    throw new Error(
+      quote.availability === ProductAvailability.OUT_OF_STOCK
+        ? "El producto está agotado en Amazon."
+        : "No se pudo obtener el precio en Amazon.",
+    );
+  }
+
   const price = roundMoney(quote.price);
   const previous =
     quote.previousPrice != null ? roundMoney(quote.previousPrice) : price;
@@ -183,6 +202,11 @@ export async function ensureProductFromAmazonUrl(
   const now = new Date().toISOString();
   const discount =
     previous > price ? roundMoney(((previous - price) / previous) * 100) : 0;
+  const categoryId = await resolveAmazonProductCategoryId(client, {
+    categorySlug: quote.categorySlug,
+    title,
+    brand: quote.brand,
+  });
 
   const { error: slugCleanupError } = await client
     .from("products")
@@ -207,6 +231,7 @@ export async function ensureProductFromAmazonUrl(
       }),
       image_url: quote.imageUrl ?? null,
       brand: quote.brand ?? null,
+      category_id: categoryId,
       current_price: price,
       previous_price: previous,
       lowest_price: price,

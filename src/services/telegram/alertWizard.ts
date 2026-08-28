@@ -2,6 +2,8 @@
  * Wizard interactivo de alertas Telegram (inline keyboards + estado).
  */
 
+import { resolveCategoryIdBySlug } from "@/lib/categories";
+import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { Json } from "@/types/database";
 
@@ -58,15 +60,7 @@ const WIZARD_TTL_MS = 30 * 60 * 1000;
 
 const memory = new Map<number, AlertWizardDraft>();
 
-export const WIZARD_CATEGORIES = [
-  { label: "Electrónica", slug: "tecnologia" },
-  { label: "Hogar", slug: "hogar" },
-  { label: "Moda", slug: "moda" },
-  { label: "Belleza", slug: "belleza" },
-  { label: "Deportes", slug: "deportes" },
-  { label: "Juguetes", slug: "juguetes" },
-  { label: "Informática", slug: "informatica" },
-] as const;
+export const WIZARD_CATEGORIES = WIZARD_CATEGORY_OPTIONS;
 
 export const DISCOUNT_OPTIONS = [
   { label: "−10%", value: 10 },
@@ -200,9 +194,18 @@ export function buildWizardModeMarkup(): InlineKeyboardMarkup {
 }
 
 export function buildWizardCategoryMarkup(): InlineKeyboardMarkup {
-  const rows: InlineKeyboardButton[][] = WIZARD_CATEGORIES.map((cat) => [
-    { text: cat.label, callback_data: `wiz:cat:${cat.slug}` },
-  ]);
+  const rows: InlineKeyboardButton[][] = [];
+  for (let index = 0; index < WIZARD_CATEGORIES.length; index += 2) {
+    const left = WIZARD_CATEGORIES[index]!;
+    const right = WIZARD_CATEGORIES[index + 1];
+    const row: InlineKeyboardButton[] = [
+      { text: left.label, callback_data: `wiz:cat:${left.slug}` },
+    ];
+    if (right) {
+      row.push({ text: right.label, callback_data: `wiz:cat:${right.slug}` });
+    }
+    rows.push(row);
+  }
   rows.push([{ text: "🌐 Cualquier categoría", callback_data: "wiz:cat:any" }]);
   rows.push(navRow(true));
   return { inline_keyboard: rows };
@@ -300,13 +303,8 @@ function escapeHtml(value: string): string {
 export async function resolveCategoryId(
   slug: string | null | undefined,
 ): Promise<{ id: string; name: string } | null> {
-  if (!slug) return null;
   const client = createSupabaseServiceClient();
-  const { data } = await client
-    .from("categories")
-    .select("id, name")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .maybeSingle();
-  return data ?? null;
+  const row = await resolveCategoryIdBySlug(client, slug);
+  if (!row) return null;
+  return { id: row.id, name: row.name };
 }

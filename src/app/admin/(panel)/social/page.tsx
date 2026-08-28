@@ -1,5 +1,5 @@
-import { SocialAdminClient } from "@/components/admin/SocialAdminClient";
+import { SocialCardListClient } from "@/components/admin/SocialCardListClient";
 
 export default function AdminSocialPage() {
-  return <SocialAdminClient />;
+  return <SocialCardListClient />;
 }

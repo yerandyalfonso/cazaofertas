@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
+import { inferAmazonCategorySlug } from "@/lib/amazon-category";
 import { resolveProxyFetch } from "@/lib/proxyFetch";
 import { formatDescriptionForStorage } from "@/lib/product-description";
 import type { PriceProvider, ProductPriceData } from "@/providers/price/types";
@@ -517,13 +518,25 @@ function priceFromPageScripts(html: string): number | null {
   return null;
 }
 
+function isOutOfStockText(text: string): boolean {
+  return /agotado temporalmente|temporalmente agotado|agotado|no disponible|currently unavailable|out of stock|sin stock|no hay stock|volver a tenerlo en stock|no sabemos si|cuando estará disponible|when this item will be back/i.test(
+    text,
+  );
+}
+
 function availabilityFromHtml($: cheerio.CheerioAPI): ProductAvailability {
-  const availability = $("#availability").text().toLowerCase();
-  if (
-    availability.includes("no disponible") ||
-    availability.includes("agotado") ||
-    availability.includes("currently unavailable")
-  ) {
+  const availability = [
+    $("#availability").text(),
+    $("#outOfStock").text(),
+    $("#availability_feature_div").text(),
+    $("[data-feature-name='availability']").text(),
+    $("#buybox .a-color-state").text(),
+    $("#buybox").find(".a-color-price").text(),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (isOutOfStockText(availability)) {
     return ProductAvailability.OUT_OF_STOCK;
   }
   if (availability.includes("preventa") || availability.includes("pre-order")) {
@@ -607,6 +620,72 @@ function detectFlashDeal($: cheerio.CheerioAPI, html: string): boolean {
   return false;
 }
 
+function extractBreadcrumbsFromAmazonHtml(
+  $: cheerio.CheerioAPI,
+  html: string,
+): string[] {
+  const crumbs: string[] = [];
+
+  const pushCrumb = (value: string | undefined) => {
+    const text = value?.replace(/\s+/g, " ").trim();
+    if (!text || text.length < 2) return;
+    if (/^(inicio|volver|resultados|amazon)$/i.test(text)) return;
+    if (!crumbs.includes(text)) crumbs.push(text);
+  };
+
+  $(
+    "#wayfinding-breadcrumbs_feature_div a, #desktop-breadcrumbs_feature_div a, .a-breadcrumb a",
+  ).each((_, el) => {
+    pushCrumb($(el).text());
+  });
+
+  if (crumbs.length === 0) {
+    $("#nav-subnav").attr("data-category")?.split(/\s+/).forEach((part) => {
+      pushCrumb(part.replace(/[_-]+/g, " "));
+    });
+  }
+
+  if (crumbs.length === 0) {
+    $("script[type='application/ld+json']").each((_, el) => {
+      const raw = $(el).html()?.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        const nodes = Array.isArray(parsed) ? parsed : [parsed];
+        for (const node of nodes) {
+          if (!node || typeof node !== "object") continue;
+          const record = node as Record<string, unknown>;
+          if (record["@type"] !== "BreadcrumbList") continue;
+          const items = record.itemListElement;
+          if (!Array.isArray(items)) continue;
+          for (const item of items) {
+            if (!item || typeof item !== "object") continue;
+            const entry = item as Record<string, unknown>;
+            const nested = entry.item;
+            if (nested && typeof nested === "object") {
+              pushCrumb((nested as Record<string, unknown>).name as string);
+            } else {
+              pushCrumb(entry.name as string);
+            }
+          }
+        }
+      } catch {
+        // Ignorar JSON-LD inválido.
+      }
+    });
+  }
+
+  if (crumbs.length === 0) {
+    const match = html.match(/"breadcrumb[^"]*"\s*:\s*\[([^\]]{10,2000})\]/i);
+    if (match?.[1]) {
+      const quoted = [...match[1].matchAll(/"([^"]{2,80})"/g)].map((m) => m[1]);
+      for (const crumb of quoted) pushCrumb(crumb);
+    }
+  }
+
+  return crumbs;
+}
+
 /**
  * Precio actual (a pagar) vs referencia (precio recomendado / lista).
  * Evita tomar el «mínimo 30 días» como lista y precios de widgets secundarios.
@@ -621,6 +700,8 @@ export function extractPriceFromAmazonHtml(html: string): {
   imageUrl?: string;
   description?: string;
   availability: ProductAvailability;
+  breadcrumbs?: string[];
+  categorySlug?: string;
 } {
   const $ = cheerio.load(html);
 
@@ -815,6 +896,25 @@ export function extractPriceFromAmazonHtml(html: string): {
       Math.round(((listPrice - price) / listPrice) * 10000) / 100;
   }
 
+  let availability = availabilityFromHtml($);
+  if (price === null && availability === ProductAvailability.IN_STOCK) {
+    const hint = [
+      $("#availability").text(),
+      $("#outOfStock").text(),
+      $("#availability_feature_div").text(),
+    ].join(" ");
+    if (isOutOfStockText(hint)) {
+      availability = ProductAvailability.OUT_OF_STOCK;
+    }
+  }
+
+  const breadcrumbs = extractBreadcrumbsFromAmazonHtml($, html);
+  const categorySlug = inferAmazonCategorySlug({
+    breadcrumbs,
+    title,
+    brand: cleanBrand,
+  });
+
   return {
     price,
     listPrice,
@@ -824,7 +924,9 @@ export function extractPriceFromAmazonHtml(html: string): {
     brand: cleanBrand,
     imageUrl: cleanImageUrl,
     description,
-    availability: availabilityFromHtml($),
+    availability,
+    breadcrumbs,
+    categorySlug: categorySlug ?? undefined,
   };
 }
 
@@ -993,6 +1095,8 @@ export async function previewAmazonProductPage(
   brand?: string;
   imageUrl?: string;
   description?: string;
+  breadcrumbs?: string[];
+  categorySlug?: string;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -1023,6 +1127,8 @@ export async function previewAmazonProductPage(
     brand: extracted.brand,
     imageUrl: extracted.imageUrl,
     description: extracted.description,
+    breadcrumbs: extracted.breadcrumbs,
+    categorySlug: extracted.categorySlug,
   };
 }
 
@@ -1039,6 +1145,21 @@ export async function scrapeAmazonProductPage(
   const extracted = extractPriceFromAmazonHtml(html);
 
   if (extracted.price === null) {
+    if (extracted.availability === ProductAvailability.OUT_OF_STOCK) {
+      return {
+        asin,
+        price: null,
+        currency: "EUR",
+        availability: ProductAvailability.OUT_OF_STOCK,
+        title: extracted.title,
+        brand: extracted.brand,
+        imageUrl: extracted.imageUrl,
+        amazonUrl,
+        previousPrice: extracted.listPrice ?? undefined,
+        discountPercentage: extracted.discountPercentage ?? undefined,
+        categorySlug: extracted.categorySlug,
+      };
+    }
     throw new Error("No se pudo extraer el precio del HTML de Amazon.");
   }
 
@@ -1053,6 +1174,7 @@ export async function scrapeAmazonProductPage(
     amazonUrl,
     previousPrice: extracted.listPrice ?? undefined,
     discountPercentage: extracted.discountPercentage ?? undefined,
+    categorySlug: extracted.categorySlug,
   };
 }
 

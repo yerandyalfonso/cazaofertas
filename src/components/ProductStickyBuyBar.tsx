@@ -2,11 +2,13 @@
 
 import { formatEuro } from "@/lib/money";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
+import { retailerLabel } from "@/lib/retailers";
 import { telegramAlertForAsin } from "@/lib/telegram-links";
 
 interface ProductStickyBuyBarProps {
   productId: string;
   asin: string;
+  retailer: string;
   currentPrice: number;
   previousPrice: number | null;
 }
@@ -14,6 +16,7 @@ interface ProductStickyBuyBarProps {
 export function ProductStickyBuyBar({
   productId,
   asin,
+  retailer,
   currentPrice,
   previousPrice,
 }: ProductStickyBuyBarProps) {
@@ -47,7 +50,7 @@ export function ProductStickyBuyBar({
           rel="noopener noreferrer sponsored"
           className="inline-flex h-11 shrink-0 items-center bg-ink px-4 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper"
         >
-          Amazon
+          {retailerLabel(retailer)}
         </a>
       </div>
     </div>

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { extractAsin } from "@/lib/affiliate";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
+import { availabilityLabel } from "@/lib/out-of-stock-policy";
 import { splitProductDescription } from "@/lib/product-description";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
@@ -51,6 +52,8 @@ interface AdminProduct {
   discountPercentage: number;
   currency?: string;
   availability?: string;
+  availabilityLabel?: string;
+  outOfStockAt?: string | null;
   category: { id: string; name: string; slug: string } | null;
   isActive: boolean;
   isFeatured?: boolean;
@@ -79,6 +82,29 @@ type SortKey =
 
 type SortDir = "asc" | "desc";
 type StaleFilter = "all" | "fresh" | "stale" | "never";
+
+function productStatusBadges(product: AdminProduct) {
+  const badges: Array<{ key: string; label: string; className: string }> = [];
+
+  if (product.availability === "OUT_OF_STOCK") {
+    badges.push({
+      key: "oos",
+      label: "Agotado",
+      className:
+        "border-amber-300 bg-amber-50 text-amber-900",
+    });
+  }
+
+  if (!product.isActive) {
+    badges.push({
+      key: "inactive",
+      label: "Inactivo",
+      className: "border-stone-300 bg-stone-100 text-stone-600",
+    });
+  }
+
+  return badges;
+}
 
 function freshnessMeta(lastCheckedAt: string | null): {
   label: string;
@@ -156,6 +182,8 @@ export default function ProductsAdminClient() {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [updatingAsin, setUpdatingAsin] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -198,6 +226,14 @@ export default function ProductsAdminClient() {
       }
       setProducts(data.products ?? []);
       setCategories(data.categories ?? []);
+      setSelectedIds((prev) => {
+        const valid = new Set((data.products ?? []).map((p) => p.id));
+        const next = new Set<string>();
+        for (const id of prev) {
+          if (valid.has(id)) next.add(id);
+        }
+        return next;
+      });
     } catch {
       setError("Error de red al cargar productos.");
       toast.error("Error de red al cargar productos.");
@@ -601,6 +637,78 @@ export default function ProductsAdminClient() {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = visibleProducts.map((p) => p.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.add(id);
+        return next;
+      });
+    }
+  }
+
+  async function onBatchDelete() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+
+    const ok = window.confirm(
+      `¿Eliminar ${ids.length} producto(s) seleccionado(s)? Esta acción no se puede deshacer.`,
+    );
+    if (!ok) return;
+
+    setBatchDeleting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        deleted?: number;
+      };
+      if (!response.ok || !data.ok) {
+        const message = data.error ?? "No se pudo eliminar.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      const count = data.deleted ?? ids.length;
+      setMessage(`Eliminados ${count} producto(s).`);
+      toast.success(`Eliminados ${count} producto(s).`);
+      setSelectedIds(new Set());
+      setOpen(false);
+      setEditingAsin(null);
+      await load();
+    } catch {
+      setError("Error de red al eliminar.");
+      toast.error("Error de red al eliminar.");
+    } finally {
+      setBatchDeleting(false);
+    }
+  }
+
   async function onUpdatePrice(product: AdminProduct) {
     setUpdatingAsin(product.asin);
     setError(null);
@@ -617,10 +725,11 @@ export default function ProductsAdminClient() {
         provider?: string;
         quotes?: Array<{
           asin: string;
-          price: number;
+          price: number | null;
           listPrice: number | null;
           discountPercentage: number | null;
           updated: boolean;
+          unavailable?: boolean;
         }>;
         stats?: {
           updated: number;
@@ -643,14 +752,16 @@ export default function ProductsAdminClient() {
       } else {
         const quote = data.quotes?.find((item) => item.asin === product.asin);
         const message = quote
-          ? `${product.asin}: ${quote.price.toFixed(2)} €` +
-            (quote.listPrice != null
-              ? ` (ref. ${quote.listPrice.toFixed(2)} €)`
-              : "") +
-            (quote.discountPercentage != null
-              ? ` · −${Math.round(quote.discountPercentage)}%`
-              : "") +
-            (quote.updated ? " · actualizado" : " · sin cambio de precio")
+          ? quote.unavailable || quote.price === null
+            ? `${product.asin}: agotado en Amazon (sin precio)`
+            : `${product.asin}: ${quote.price.toFixed(2)} €` +
+              (quote.listPrice != null
+                ? ` (ref. ${quote.listPrice.toFixed(2)} €)`
+                : "") +
+              (quote.discountPercentage != null
+                ? ` · −${Math.round(quote.discountPercentage)}%`
+                : "") +
+              (quote.updated ? " · actualizado" : " · sin cambio de precio")
           : `Precio ${product.asin}: ${data.stats?.updated ? "actualizado" : "sin cambios"}`;
         setMessage(message);
         toast.success(message);
@@ -799,6 +910,22 @@ export default function ProductsAdminClient() {
             Limpiar filtros
           </button>
         ) : null}
+
+        {selectedIds.size > 0 ? (
+          <button
+            type="button"
+            disabled={batchDeleting}
+            onClick={() => void onBatchDelete()}
+            className="inline-flex h-10 items-center gap-2 border border-rose-300 bg-rose-50 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-rose-800 transition hover:border-rose-500 disabled:opacity-50"
+          >
+            {batchDeleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Eliminar seleccionados ({selectedIds.size})
+          </button>
+        ) : null}
       </div>
 
       {viewingProduct ? (
@@ -923,7 +1050,15 @@ export default function ProductsAdminClient() {
                     `${Math.round(viewingProduct.dealScore)} · ${viewingProduct.dealLabel}`,
                   ],
                   ["Nivel", viewingProduct.dealLevel ?? "—"],
-                  ["Disponibilidad", viewingProduct.availability ?? "—"],
+                  ["Disponibilidad", viewingProduct.availabilityLabel ?? availabilityLabel(viewingProduct.availability)],
+                  [
+                    "Agotado desde",
+                    viewingProduct.outOfStockAt
+                      ? new Date(viewingProduct.outOfStockAt).toLocaleString(
+                          "es-ES",
+                        )
+                      : "—",
+                  ],
                   ["Moneda", viewingProduct.currency ?? "EUR"],
                   ["Activo", viewingProduct.isActive ? "Sí" : "No"],
                   ["Destacado", viewingProduct.isFeatured ? "Sí" : "No"],
@@ -1232,6 +1367,19 @@ export default function ProductsAdminClient() {
         <table className="w-full min-w-[72rem] text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={
+                    visibleProducts.length > 0 &&
+                    visibleProducts.every((p) => selectedIds.has(p.id))
+                  }
+                  onChange={toggleSelectAllVisible}
+                  disabled={loading || visibleProducts.length === 0}
+                  aria-label="Seleccionar todos los productos visibles"
+                  className="h-4 w-4 accent-ink"
+                />
+              </th>
               <th className="px-4 py-3">
                 <SortButton column="title" label="Título" />
               </th>
@@ -1261,19 +1409,19 @@ export default function ProductsAdminClient() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-stone-500">
+                <td colSpan={9} className="px-4 py-8 text-stone-500">
                   Cargando…
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-stone-500">
+                <td colSpan={9} className="px-4 py-8 text-stone-500">
                   No hay productos todavía. Añade el primero con «Nuevo producto».
                 </td>
               </tr>
             ) : visibleProducts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-stone-500">
+                <td colSpan={9} className="px-4 py-8 text-stone-500">
                   Ningún producto coincide con la búsqueda o los filtros.{" "}
                   <button
                     type="button"
@@ -1290,6 +1438,15 @@ export default function ProductsAdminClient() {
                   key={product.id}
                   className="border-t border-stone-100 align-middle hover:bg-stone-50/80"
                 >
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(product.id)}
+                      onChange={() => toggleSelect(product.id)}
+                      aria-label={`Seleccionar ${product.title}`}
+                      className="h-4 w-4 accent-ink"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex min-w-[280px] max-w-xl items-start gap-3">
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden bg-stone-200">
@@ -1318,6 +1475,22 @@ export default function ProductsAdminClient() {
                             {product.brand}
                           </p>
                         ) : null}
+                        {(() => {
+                          const badges = productStatusBadges(product);
+                          if (badges.length === 0) return null;
+                          return (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {badges.map((badge) => (
+                                <span
+                                  key={badge.key}
+                                  className={`inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${badge.className}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </td>

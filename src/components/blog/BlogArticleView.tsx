@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { RemoteImage } from "@/components/RemoteImage";
 import Link from "next/link";
 import { BlogContent } from "@/components/BlogContent";
 import { ArticleContextNote } from "@/components/blog/ArticleContextNote";
@@ -113,7 +113,7 @@ function ArticleHeader({
       <header className="border-b border-stone-300">
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 md:grid-cols-2 md:items-end md:gap-12 md:px-8 md:py-14">
           <div className="relative aspect-[4/5] overflow-hidden bg-stone-200 md:aspect-[5/6]">
-            <Image
+            <RemoteImage
               src={post.coverImage}
               alt={post.coverAlt}
               fill
@@ -157,7 +157,7 @@ function ArticleHeader({
               </p>
             </div>
             <div className="relative aspect-[16/11] overflow-hidden bg-stone-200 lg:aspect-[5/4]">
-              <Image
+              <RemoteImage
                 src={post.coverImage}
                 alt={post.coverAlt}
                 fill
@@ -197,7 +197,7 @@ function ArticleHeader({
       </div>
 
       <div className="relative mx-auto mt-10 aspect-[21/9] max-w-6xl overflow-hidden bg-stone-200 md:mt-14">
-        <Image
+        <RemoteImage
           src={post.coverImage}
           alt={post.coverAlt}
           fill

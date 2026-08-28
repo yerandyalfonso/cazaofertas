@@ -1,14 +1,22 @@
-import { generateAffiliateUrl } from "@/lib/affiliate";
+import {
+  normalizeRetailer,
+  resolveProductBuyUrl,
+  resolveProductPageUrl,
+  type ProductRetailer,
+} from "@/lib/retailers";
 import { toNumber } from "@/lib/money";
 import {
   computeMovingAverages,
   downsamplePoints,
   type PricePoint,
 } from "@/lib/price-history";
+import { withRetry } from "@/lib/retry";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { dealScoringService } from "@/services/deal-scoring";
 import { DealLevel, ProductAvailability } from "@/types";
 import type { Database } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 
 export type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 export type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
@@ -16,6 +24,9 @@ export type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 export interface CatalogProduct {
   id: string;
   asin: string;
+  retailer: ProductRetailer;
+  externalId: string | null;
+  productUrl: string;
   title: string;
   slug: string;
   description: string | null;
@@ -76,9 +87,15 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     categorySlug: category?.slug,
   });
 
+  const retailer = normalizeRetailer(product.retailer);
+  const productUrl = resolveProductPageUrl(product);
+
   return {
     id: product.id,
     asin: product.asin,
+    retailer,
+    externalId: product.external_id ?? (retailer === "amazon" ? product.asin : null),
+    productUrl,
     title: product.title,
     slug: product.slug,
     description: product.description,
@@ -96,11 +113,13 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     availability: product.availability ?? ProductAvailability.UNKNOWN,
     isFeatured: product.is_featured,
     lastCheckedAt: product.last_checked_at,
-    affiliateUrl: generateAffiliateUrl({
-      asin: product.asin,
-      amazon_url: product.amazon_url,
-      affiliate_url: product.affiliate_url,
-    }),
+    affiliateUrl: (() => {
+      try {
+        return resolveProductBuyUrl(product);
+      } catch {
+        return product.affiliate_url?.trim() || productUrl || product.amazon_url;
+      }
+    })(),
     category: category
       ? { id: category.id, name: category.name, slug: category.slug }
       : null,
@@ -165,28 +184,45 @@ export async function getTopDealProducts(limit = 8): Promise<CatalogProduct[]> {
     .slice(0, limit);
 }
 
-export async function getProductBySlug(
+async function loadProductBySlug(
   slug: string,
 ): Promise<CatalogProduct | null> {
   const client = getClient();
   if (!client) return null;
 
-  const { data, error } = await client
-    .from("products")
-    .select("*, categories(id, name, slug)")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .maybeSingle();
+  try {
+    const data = await withRetry(async () => {
+      const { data: row, error } = await client
+        .from("products")
+        .select("*, categories(id, name, slug)")
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .maybeSingle();
 
-  if (error || !data) {
-    console.error("[catalog] getProductBySlug", error?.message);
+      if (error) throw new Error(error.message);
+      return row;
+    });
+
+    if (!data) return null;
+    return mapProduct(data);
+  } catch (error) {
+    console.error(
+      "[catalog] getProductBySlug",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
-
-  return mapProduct(data);
 }
 
-export async function getProductsBySlugs(
+export const getProductBySlug = cache((slug: string) =>
+  unstable_cache(
+    () => loadProductBySlug(slug),
+    ["catalog-product", slug],
+    { revalidate: 300 },
+  )(),
+);
+
+async function loadProductsBySlugs(
   slugs: string[],
 ): Promise<CatalogProduct[]> {
   if (slugs.length === 0) return [];
@@ -195,22 +231,39 @@ export async function getProductsBySlugs(
   if (!client) return [];
 
   const unique = [...new Set(slugs)];
-  const { data, error } = await client
-    .from("products")
-    .select("*, categories(id, name, slug)")
-    .in("slug", unique)
-    .eq("is_active", true);
 
-  if (error || !data) {
-    console.error("[catalog] getProductsBySlugs", error?.message);
+  try {
+    const data = await withRetry(async () => {
+      const { data: rows, error } = await client
+        .from("products")
+        .select("*, categories(id, name, slug)")
+        .in("slug", unique)
+        .eq("is_active", true);
+
+      if (error) throw new Error(error.message);
+      return rows ?? [];
+    });
+
+    const bySlug = new Map(data.map((row) => [row.slug, mapProduct(row)]));
+    return unique
+      .map((slug) => bySlug.get(slug))
+      .filter((product): product is CatalogProduct => Boolean(product));
+  } catch (error) {
+    console.error(
+      "[catalog] getProductsBySlugs",
+      error instanceof Error ? error.message : error,
+    );
     return [];
   }
-
-  const bySlug = new Map(data.map((row) => [row.slug, mapProduct(row)]));
-  return unique
-    .map((slug) => bySlug.get(slug))
-    .filter((product): product is CatalogProduct => Boolean(product));
 }
+
+export const getProductsBySlugs = cache((slugs: string[]) =>
+  unstable_cache(
+    () => loadProductsBySlugs(slugs),
+    ["catalog-products", ...[...new Set(slugs)].sort()],
+    { revalidate: 300 },
+  )(),
+);
 
 export interface GetPriceHistoryOptions {
   /** Ventana temporal en días (default 90 para medias 30/90). */

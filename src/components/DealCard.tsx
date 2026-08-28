@@ -4,6 +4,7 @@ import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
+import { retailerLabel, retailerViewCtaLabel } from "@/lib/retailers";
 import { splitProductDescription } from "@/lib/product-description";
 
 interface DealCardProps {
@@ -107,7 +108,7 @@ export function DealCard({
               rel="noopener noreferrer sponsored"
               className="text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-900 underline-offset-2 hover:underline"
             >
-              Amazon
+              {retailerLabel(product.retailer)}
             </a>
             <span className="text-stone-300">·</span>
             <Link
@@ -184,7 +185,7 @@ export function DealCard({
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 items-center justify-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
             >
-              Ver en Amazon
+              {retailerViewCtaLabel(product.retailer)}
             </a>
           </div>
         </div>

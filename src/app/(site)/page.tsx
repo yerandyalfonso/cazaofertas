@@ -70,6 +70,7 @@ export default async function HomePage() {
                 <>
                   <Link
                     href={`/blog/${lead.slug}`}
+                    prefetch={false}
                     className="group block animate-fade"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden bg-stone-200 md:aspect-[16/9]">
@@ -104,6 +105,7 @@ export default async function HomePage() {
                       <Link
                         key={post.slug}
                         href={`/blog/${post.slug}`}
+                        prefetch={false}
                         className={`group animate-rise border-t border-stone-300 pt-5 ${
                           index === 0
                             ? "animate-rise-delay-1"
@@ -205,6 +207,7 @@ export default async function HomePage() {
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}
+              prefetch={false}
               className="group border-t border-stone-300 pt-5 transition hover:border-ink"
             >
               <div className="relative mb-4 aspect-[16/10] overflow-hidden bg-stone-200">

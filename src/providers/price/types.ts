@@ -2,7 +2,8 @@ import { ProductAvailability } from "@/types";
 
 export interface ProductPriceData {
   asin: string;
-  price: number;
+  /** Null cuando la ficha existe pero no hay precio (p. ej. agotado). */
+  price: number | null;
   currency: string;
   availability: ProductAvailability;
   title?: string;

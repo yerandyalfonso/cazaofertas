@@ -12,7 +12,7 @@ export enum ProductAvailability {
   UNKNOWN = "UNKNOWN",
 }
 
-export type PriceSource = "seed" | "mock" | "amazon" | "keepa";
+export type PriceSource = "seed" | "mock" | "amazon" | "keepa" | "kiabi";
 
 export type {
   PriceProvider,

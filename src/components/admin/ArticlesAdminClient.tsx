@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface LinkedProduct {
@@ -35,6 +35,46 @@ const STATUS_LABEL: Record<string, string> = {
   archived: "Archivado",
 };
 
+type SortKey = "title" | "updatedAt" | "status" | "category" | "products";
+type SortDir = "asc" | "desc";
+
+function sortArticles(
+  items: AdminArticle[],
+  key: SortKey,
+  dir: SortDir,
+): AdminArticle[] {
+  const sorted = [...items].sort((a, b) => {
+    let av: string | number = "";
+    let bv: string | number = "";
+    switch (key) {
+      case "title":
+        av = a.title.toLocaleLowerCase("es");
+        bv = b.title.toLocaleLowerCase("es");
+        break;
+      case "updatedAt":
+        av = new Date(a.updatedAt).getTime();
+        bv = new Date(b.updatedAt).getTime();
+        break;
+      case "status":
+        av = a.status;
+        bv = b.status;
+        break;
+      case "category":
+        av = a.category.toLocaleLowerCase("es");
+        bv = b.category.toLocaleLowerCase("es");
+        break;
+      case "products":
+        av = a.products.length;
+        bv = b.products.length;
+        break;
+    }
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+    return 0;
+  });
+  return dir === "asc" ? sorted : sorted.reverse();
+}
+
 const iconBtnClass =
   "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:opacity-40";
 
@@ -47,6 +87,8 @@ export function ArticlesAdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [associateId, setAssociateId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +153,50 @@ export function ArticlesAdminClient() {
     () => articles.find((item) => item.id === associateId) ?? null,
     [articles, associateId],
   );
+
+  const visibleArticles = useMemo(
+    () => sortArticles(articles, sortKey, sortDir),
+    [articles, sortKey, sortDir],
+  );
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "title" || key === "category" ? "asc" : "desc");
+  }
+
+  function SortButton({
+    column,
+    label,
+  }: {
+    column: SortKey;
+    label: string;
+  }) {
+    const active = sortKey === column;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(column)}
+        className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-ink ${
+          active ? "text-ink" : "text-stone-500"
+        }`}
+      >
+        {label}
+        {active ? (
+          sortDir === "asc" ? (
+            <ArrowUp className="h-3 w-3" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3 w-3" aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden />
+        )}
+      </button>
+    );
+  }
 
   return (
     <div>
@@ -195,11 +281,21 @@ export function ArticlesAdminClient() {
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
             <tr>
-              <th className="px-4 py-3 font-semibold">Título</th>
-              <th className="px-4 py-3 font-semibold">Fecha</th>
-              <th className="px-4 py-3 font-semibold">Estado</th>
-              <th className="px-4 py-3 font-semibold">Categoría</th>
-              <th className="px-4 py-3 font-semibold">Productos</th>
+              <th className="px-4 py-3">
+                <SortButton column="title" label="Título" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="updatedAt" label="Fecha" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="status" label="Estado" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="category" label="Categoría" />
+              </th>
+              <th className="px-4 py-3">
+                <SortButton column="products" label="Productos" />
+              </th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
           </thead>
@@ -217,7 +313,7 @@ export function ArticlesAdminClient() {
                 </td>
               </tr>
             ) : (
-              articles.map((article) => (
+              visibleArticles.map((article) => (
                 <tr
                   key={article.id}
                   className="border-t border-stone-100 align-middle"

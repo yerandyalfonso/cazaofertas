@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { RemoteImage } from "@/components/RemoteImage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
@@ -21,6 +21,7 @@ import {
   productJsonLd,
 } from "@/lib/seo";
 import { telegramAlertForAsin } from "@/lib/telegram-links";
+import { retailerBuyCtaLabel, retailerLabel } from "@/lib/retailers";
 import { ProductAvailability } from "@/types";
 
 function availabilityLabel(value: ProductAvailability): string {
@@ -135,7 +136,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <div className="grid gap-10 lg:grid-cols-2">
         <div className="relative w-full bg-transparent">
           {product.imageUrl ? (
-            <Image
+            <RemoteImage
               src={product.imageUrl}
               alt={product.title}
               width={1200}
@@ -169,7 +170,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <p className="text-sm uppercase tracking-[0.16em] text-stone-500">
               {product.brand}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-sm uppercase tracking-[0.16em] text-stone-500">
+              {retailerLabel(product.retailer)}
+            </p>
+          )}
 
           <Price
             current={product.currentPrice}
@@ -275,7 +280,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               rel="noopener noreferrer sponsored"
               className="inline-flex h-12 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.16em] text-paper transition hover:bg-teal-900"
             >
-              Ir a Amazon
+              {retailerBuyCtaLabel(product.retailer)}
             </a>
             <a
               href={telegramAlertForAsin(product.asin)}
@@ -311,6 +316,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <ProductStickyBuyBar
         productId={product.id}
         asin={product.asin}
+        retailer={product.retailer}
         currentPrice={product.currentPrice}
         previousPrice={product.previousPrice}
       />

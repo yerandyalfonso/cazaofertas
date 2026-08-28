@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogArticleView } from "@/components/blog/BlogArticleView";
+import { BlogArticleAutoRefresh } from "@/components/blog/BlogArticleAutoRefresh";
 import { JsonLd } from "@/components/JsonLd";
+import { collectProductSlugs } from "@/lib/blog";
 import {
   articleJsonLd,
   breadcrumbJsonLd,
@@ -13,8 +15,8 @@ interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
 
-/** CMS + Supabase: no prerender en build (evita timeouts de 60s en Vercel). */
-export const dynamic = "force-dynamic";
+/** CMS + Supabase: caché corta para evitar cold starts en cada visita. */
+export const revalidate = 60;
 
 export async function generateMetadata({
   params,
@@ -47,9 +49,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   if (!result) notFound();
 
   const { post, products } = result;
+  const expectedProductSlugs = collectProductSlugs(post);
+  const needsDataRefresh =
+    expectedProductSlugs.length > 0 && products.length === 0;
 
   return (
     <>
+      <BlogArticleAutoRefresh enabled={needsDataRefresh} />
       <JsonLd
         data={[
           articleJsonLd(post),

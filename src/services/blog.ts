@@ -15,8 +15,11 @@ import {
   toCatalogProduct,
   type CatalogProduct,
 } from "@/lib/catalog";
+import { withRetry } from "@/lib/retry";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { ArticleRow, CategoryRow, Json, ProductRow } from "@/types/database";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 
 type ProductWithCategory = ProductRow & {
   categories?:
@@ -306,31 +309,34 @@ export async function getFeaturedArticles(): Promise<BlogPost[]> {
   return featured.length > 0 ? featured : posts.slice(0, 2);
 }
 
-export async function getArticleBySlug(
+async function loadArticleBySlug(
   slug: string,
 ): Promise<BlogArticleResult | null> {
   const client = getClient();
 
   if (client) {
     try {
-      const { data, error } = await client
-        .from("articles")
-        .select(
-          `
+      const data = await withRetry(async () => {
+        const { data: row, error } = await client
+          .from("articles")
+          .select(
+            `
         *,
         article_products (
           position,
           products (*, categories(id, name, slug))
         )
       `,
-        )
-        .eq("slug", slug)
-        .eq("status", "published")
-        .maybeSingle();
+          )
+          .eq("slug", slug)
+          .eq("status", "published")
+          .maybeSingle();
 
-      if (error) {
-        console.error("[blog] getArticleBySlug", error.message);
-      } else if (data) {
+        if (error) throw new Error(error.message);
+        return row;
+      });
+
+      if (data) {
         const row = data as ArticleQueryRow;
         const post = mapArticleRow(row);
         const products = await mergeProducts(post, productsFromArticleJoin(row));
@@ -354,6 +360,14 @@ export async function getArticleBySlug(
     return { post: fallback, products: [], source: "fallback" };
   }
 }
+
+export const getArticleBySlug = cache((slug: string) =>
+  unstable_cache(
+    () => loadArticleBySlug(slug),
+    ["blog-article", slug],
+    { revalidate: 60 },
+  )(),
+);
 
 export async function getArticleSlugs(): Promise<string[]> {
   const posts = await getPublishedArticles();

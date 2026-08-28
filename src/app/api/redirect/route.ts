@@ -3,7 +3,7 @@ import {
   ADMIN_COOKIE,
   getExpectedAdminToken,
 } from "@/lib/admin-auth";
-import { generateAffiliateUrl } from "@/lib/affiliate";
+import { resolveProductBuyUrl } from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const client = createSupabaseServiceClient();
     const { data: product, error } = await client
       .from("products")
-      .select("id, asin, amazon_url, affiliate_url, is_active")
+      .select("id, asin, retailer, product_url, amazon_url, affiliate_url, is_active")
       .eq("id", productId)
       .maybeSingle();
 
@@ -103,11 +103,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const destination = generateAffiliateUrl({
-      amazon_url: product.amazon_url,
-      affiliate_url: product.affiliate_url,
-      asin: product.asin,
-    });
+    const destination = resolveProductBuyUrl(product);
 
     const response = NextResponse.redirect(destination, 302);
     response.headers.set("X-Robots-Tag", "noindex, nofollow");

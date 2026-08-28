@@ -7,7 +7,8 @@ DOMAIN="gui/$(id -u)"
 for label in \
   com.cazaofertas.cron.check-prices \
   com.cazaofertas.cron.flash-deals \
-  com.cazaofertas.cron.user-alerts
+  com.cazaofertas.cron.user-alerts \
+  com.cazaofertas.cron.kiabi-deals
 do
   plist="$AGENTS_DIR/${label}.plist"
   if [[ -f "$plist" ]]; then

@@ -1,5 +1,6 @@
 import { generateAffiliateUrl, generateAmazonUrl } from "@/lib/affiliate";
 import { BLOG_POSTS, collectProductSlugs } from "@/lib/blog";
+import { SITE_CATEGORIES } from "@/lib/site-categories";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import {
   DEFAULT_MOCK_CATALOG,
@@ -23,57 +24,14 @@ export interface MockProductMeta {
   is_featured?: boolean;
 }
 
-export const SEED_CATEGORIES: SeedCategory[] = [
-  {
-    name: "Hogar",
-    slug: "hogar",
-    description: "Ofertas para el hogar, cocina y organización.",
-    image_url:
-      "https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Belleza",
-    slug: "belleza",
-    description: "Cuidado personal, cosmética y bienestar.",
-    image_url:
-      "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Tecnología",
-    slug: "tecnologia",
-    description: "Electrónica de consumo, audio y gadgets.",
-    image_url:
-      "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Deportes",
-    slug: "deportes",
-    description: "Fitness, outdoor y material deportivo.",
-    image_url:
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Moda",
-    slug: "moda",
-    description: "Ropa, calzado y complementos.",
-    image_url:
-      "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Juguetes",
-    slug: "juguetes",
-    description: "Juegos, construcción y entretenimiento infantil.",
-    image_url:
-      "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    name: "Informática",
-    slug: "informatica",
-    description: "Portátiles, periféricos y componentes.",
-    image_url:
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1200&q=80",
-  },
-];
+export const SEED_CATEGORIES: SeedCategory[] = SITE_CATEGORIES.map(
+  ({ name, slug, description, image_url }) => ({
+    name,
+    slug,
+    description,
+    image_url,
+  }),
+);
 
 /** Metadatos editoriales por ASIN (precios vienen del MockPriceProvider). */
 export const MOCK_PRODUCT_META: Record<string, MockProductMeta> = {
@@ -231,8 +189,9 @@ export async function seedFromMockProvider(
       throw new Error(`Categoría no encontrada: ${categorySlug}`);
     }
 
-    const currentPrice = quote.price;
-    const previousPrice = quote.previousPrice ?? item.previousPrice ?? currentPrice;
+    const currentPrice = quote.price ?? item.price;
+    const previousPrice =
+      quote.previousPrice ?? item.previousPrice ?? currentPrice;
     const lowestPrice = Math.min(
       currentPrice,
       previousPrice,
@@ -335,8 +294,13 @@ export async function seedFromMockProvider(
     }
 
     const quote = quotes[index];
-    const previousPrice = quote.previousPrice ?? item.previousPrice ?? quote.price;
-    const highestPrice = Math.max(quote.price, previousPrice, item.price * 1.15);
+    const previousPrice =
+      quote.previousPrice ?? item.previousPrice ?? quote.price ?? item.price;
+    const highestPrice = Math.max(
+      quote.price ?? item.price,
+      previousPrice,
+      item.price * 1.15,
+    );
     const now = Date.now();
 
     return [
@@ -354,7 +318,7 @@ export async function seedFromMockProvider(
       },
       {
         product_id: productId,
-        price: quote.price,
+        price: quote.price ?? item.price,
         timestamp: new Date(now).toISOString(),
         source: "seed" as const,
       },

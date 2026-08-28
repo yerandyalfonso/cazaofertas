@@ -28,6 +28,11 @@ export const DEFAULT_DEAL_SCORING_CONFIG: DealScoringConfig = {
     deportes: 2,
     moda: 1,
     juguetes: 2,
+    videojuegos: 5,
+    bebe: 2,
+    mascotas: 2,
+    jardin: 2,
+    automovil: 2,
   },
 };
 

@@ -9,9 +9,11 @@ import { AdminToastProvider } from "@/components/admin/AdminToast";
 const NAV = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/products", label: "Productos" },
+  { href: "/admin/categories", label: "Categorías" },
   { href: "/admin/articles", label: "Artículos" },
   { href: "/admin/cron", label: "Monitorización / Cron" },
   { href: "/admin/social", label: "Redes / Tarjetas" },
+  { href: "/admin/carousels", label: "Carruseles" },
 ] as const;
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

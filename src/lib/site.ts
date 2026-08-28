@@ -27,3 +27,12 @@ export function absoluteUrl(path: string): string {
   if (!path || path === "/") return base;
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+/** Handle de Instagram / redes para carruseles y pie de tarjetas. */
+export function getSocialHandle(): string {
+  const raw = process.env.NEXT_PUBLIC_SOCIAL_HANDLE?.trim();
+  if (raw) {
+    return raw.startsWith("@") ? raw : `@${raw}`;
+  }
+  return "@cazaoferta";
+}

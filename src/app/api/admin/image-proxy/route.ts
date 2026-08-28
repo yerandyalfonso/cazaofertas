@@ -21,7 +21,9 @@ function isAllowedImageUrl(raw: string): boolean {
       ALLOWED_HOSTS.has(host) ||
       host.endsWith(".media-amazon.com") ||
       host.endsWith(".ssl-images-amazon.com") ||
-      host.endsWith(".images-amazon.com")
+      host.endsWith(".images-amazon.com") ||
+      host === "images.unsplash.com" ||
+      host.endsWith(".supabase.co")
     );
   } catch {
     return false;

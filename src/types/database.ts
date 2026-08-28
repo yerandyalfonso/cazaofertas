@@ -62,7 +62,11 @@ export type Database = {
           discount_percentage: number | null;
           currency: string;
           availability: ProductAvailability;
+          retailer: string;
+          external_id: string | null;
+          product_url: string | null;
           last_checked_at: string | null;
+          out_of_stock_at: string | null;
           last_telegram_notified_at: string | null;
           last_telegram_notified_price: number | null;
           last_telegram_notified_score: number | null;
@@ -91,7 +95,11 @@ export type Database = {
           discount_percentage?: number | null;
           currency?: string;
           availability?: ProductAvailability;
+          retailer?: string;
+          external_id?: string | null;
+          product_url?: string | null;
           last_checked_at?: string | null;
+          out_of_stock_at?: string | null;
           last_telegram_notified_at?: string | null;
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;
@@ -120,7 +128,11 @@ export type Database = {
           discount_percentage?: number | null;
           currency?: string;
           availability?: ProductAvailability;
+          retailer?: string;
+          external_id?: string | null;
+          product_url?: string | null;
           last_checked_at?: string | null;
+          out_of_stock_at?: string | null;
           last_telegram_notified_at?: string | null;
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;

@@ -1,10 +1,11 @@
-import Image from "next/image";
+import { RemoteImage } from "@/components/RemoteImage";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
 import { splitProductDescription } from "@/lib/product-description";
+import { retailerViewCtaLabel } from "@/lib/retailers";
 
 interface InlineDealCardProps {
   product: CatalogProduct;
@@ -19,12 +20,14 @@ interface InlineDealCardProps {
 export function InlineDealCard({
   product,
   href,
-  buyLabel = "Ver en Amazon",
+  buyLabel,
   variant = "horizontal",
   articleId,
   clickSource = "blog_inline",
 }: InlineDealCardProps) {
   const detailHref = href ?? `/producto/${product.slug}`;
+  const resolvedBuyLabel =
+    buyLabel ?? retailerViewCtaLabel(product.retailer);
   const buyHref = buildTrackedAffiliatePath({
     productId: product.id,
     source: clickSource,
@@ -39,7 +42,7 @@ export function InlineDealCard({
           className="relative aspect-[4/3] w-full shrink-0 bg-stone-100"
         >
           {product.imageUrl ? (
-            <Image
+            <RemoteImage
               src={product.imageUrl}
               alt={product.title}
               fill
@@ -89,7 +92,7 @@ export function InlineDealCard({
               rel="noopener noreferrer sponsored"
               className="inline-flex h-10 w-full items-center justify-center bg-ink text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900"
             >
-              {buyLabel}
+              {resolvedBuyLabel}
             </a>
           </div>
         </div>
@@ -102,7 +105,7 @@ export function InlineDealCard({
       <div className="grid min-h-[148px] grid-cols-[112px_minmax(0,1fr)] sm:grid-cols-[148px_minmax(0,1fr)]">
         <Link href={detailHref} className="relative min-h-full bg-transparent">
           {product.imageUrl ? (
-            <Image
+            <RemoteImage
               src={product.imageUrl}
               alt={product.title}
               fill
@@ -161,7 +164,7 @@ export function InlineDealCard({
               rel="noopener noreferrer sponsored"
               className="inline-flex h-9 shrink-0 items-center self-end bg-ink px-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900 sm:h-10 sm:px-4"
             >
-              {buyLabel}
+              {resolvedBuyLabel}
             </a>
           </div>
         </div>

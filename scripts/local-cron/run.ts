@@ -8,9 +8,18 @@ import { resolve } from "node:path";
 loadEnv({ path: resolve(process.cwd(), ".env.local") });
 loadEnv({ path: resolve(process.cwd(), ".env") });
 
-type LocalCronJob = "check-prices" | "flash-deals" | "user-alerts";
+type LocalCronJob =
+  | "check-prices"
+  | "flash-deals"
+  | "user-alerts"
+  | "kiabi-deals";
 
-const JOBS: LocalCronJob[] = ["check-prices", "flash-deals", "user-alerts"];
+const JOBS: LocalCronJob[] = [
+  "check-prices",
+  "flash-deals",
+  "user-alerts",
+  "kiabi-deals",
+];
 
 function parseJob(raw: string | undefined): LocalCronJob {
   const job = (raw ?? "check-prices").trim().toLowerCase();
@@ -82,6 +91,18 @@ async function runUserAlerts(): Promise<void> {
   await reviewUserAlertsResult(result);
 }
 
+async function runKiabiDeals(): Promise<void> {
+  const { runKiabiDealsCheck } = await import("@/services/kiabiDeals");
+  const { reviewKiabiDealsResult } = await import("./notify");
+  const result = await runKiabiDealsCheck({
+    limit: 6,
+    notify: true,
+    delayMs: 2_000,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  await reviewKiabiDealsResult(result);
+}
+
 async function main(): Promise<void> {
   const job = parseJob(process.argv[2]);
   const started = new Date().toISOString();
@@ -102,6 +123,9 @@ async function main(): Promise<void> {
       break;
     case "user-alerts":
       await runUserAlerts();
+      break;
+    case "kiabi-deals":
+      await runKiabiDeals();
       break;
   }
 
