@@ -23,10 +23,19 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { extractAsin } from "@/lib/affiliate";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import { availabilityLabel } from "@/lib/out-of-stock-policy";
 import { splitProductDescription } from "@/lib/product-description";
+import {
+  detectRetailerFromUrl,
+  getRetailerDefinition,
+  isProductRetailer,
+  PRODUCT_RETAILERS,
+  retailerBuyCtaLabel,
+  retailerLabel,
+  retailerScrapeSupported,
+  type ProductRetailer,
+} from "@/lib/retailers";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface AdminProduct {
@@ -34,8 +43,11 @@ interface AdminProduct {
   title: string;
   slug: string;
   asin: string;
+  retailer: string;
+  externalId: string | null;
   brand: string | null;
   description?: string | null;
+  productUrl: string;
   amazonUrl: string;
   affiliateUrl?: string | null;
   imageUrl?: string | null;
@@ -159,12 +171,16 @@ function sortValue(product: AdminProduct, key: SortKey): string | number {
 }
 
 const emptyForm = {
-  amazonUrl: "",
+  retailer: "amazon" as ProductRetailer,
+  productUrl: "",
+  externalId: "",
   title: "",
   categoryId: "",
   referencePrice: "",
   currentPrice: "",
   brand: "",
+  imageUrl: "",
+  description: "",
 };
 
 const iconBtnClass =
@@ -206,6 +222,12 @@ export default function ProductsAdminClient() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const deferredQuery = useDeferredValue(query);
   const toast = useAdminToast();
+
+  const formRetailerDef = useMemo(
+    () => getRetailerDefinition(form.retailer),
+    [form.retailer],
+  );
+  const formScrapeSupported = retailerScrapeSupported(form.retailer);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -284,6 +306,8 @@ export default function ProductsAdminClient() {
       const haystack = [
         product.title,
         product.asin,
+        product.externalId ?? "",
+        retailerLabel(product.retailer),
         product.brand ?? "",
         product.category?.name ?? "",
         product.dealLabel,
@@ -409,30 +433,44 @@ export default function ProductsAdminClient() {
   function openEdit(product: AdminProduct) {
     setViewingProduct(null);
     setEditingAsin(product.asin);
+    const retailer = isProductRetailer(product.retailer)
+      ? product.retailer
+      : "amazon";
     setForm({
-      amazonUrl: product.amazonUrl,
+      retailer,
+      productUrl: product.productUrl || product.amazonUrl,
+      externalId: product.externalId ?? "",
       title: product.title,
       categoryId: product.category?.id ?? "",
       referencePrice: String(product.referencePrice),
       currentPrice: String(product.currentPrice),
       brand: product.brand ?? "",
+      imageUrl: product.imageUrl ?? "",
+      description: product.description ?? "",
     });
     setShowNewCategory(false);
     setNewCategoryName("");
     setScrapedDiscount(
       product.discountPercentage > 0 ? product.discountPercentage : null,
     );
-    lastScrapedUrl.current = product.amazonUrl;
+    lastScrapedUrl.current = product.productUrl || product.amazonUrl;
     setMessage(null);
     setError(null);
     setOpen(true);
   }
 
   function onUrlChange(value: string) {
+    const detected = detectRetailerFromUrl(value);
     setForm((prev) => ({
       ...prev,
-      amazonUrl: value,
+      productUrl: value,
+      retailer: detected ?? prev.retailer,
     }));
+  }
+
+  function onRetailerChange(value: string) {
+    if (!isProductRetailer(value)) return;
+    setForm((prev) => ({ ...prev, retailer: value }));
   }
 
   async function createCategory() {
@@ -478,12 +516,26 @@ export default function ProductsAdminClient() {
   }
 
   async function scrapeFromUrl(force = false) {
-    const url = form.amazonUrl.trim();
-    if (!url || !extractAsin(url)) {
-      if (force) setError("Pega una URL de Amazon válida con ASIN.");
+    const url = form.productUrl.trim();
+    const scrapeInput = url || form.externalId.trim();
+
+    if (!scrapeInput) {
+      if (force) {
+        setError("Pega la URL del producto o su identificador.");
+      }
       return;
     }
-    if (!force && lastScrapedUrl.current === url) return;
+
+    if (!formScrapeSupported) {
+      if (force) {
+        setError(
+          `${formRetailerDef.label} no tiene extracción automática. Rellena los campos manualmente.`,
+        );
+      }
+      return;
+    }
+
+    if (!force && lastScrapedUrl.current === scrapeInput) return;
 
     setScraping(true);
     setError(null);
@@ -491,39 +543,66 @@ export default function ProductsAdminClient() {
       const response = await fetch("/api/admin/products/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amazonUrl: url }),
+        body: JSON.stringify({
+          productUrl: scrapeInput,
+          retailer: form.retailer,
+        }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
+        partial?: boolean;
+        warning?: string | null;
         title?: string | null;
+        brand?: string | null;
         price?: number | null;
         listPrice?: number | null;
         referencePrice?: number | null;
         discountPercentage?: number | null;
+        productUrl?: string;
         amazonUrl?: string;
         asin?: string;
+        externalId?: string;
+        retailer?: ProductRetailer;
+        categorySlug?: string | null;
+        imageUrl?: string | null;
+        description?: string | null;
       };
 
       if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo extraer datos de Amazon.");
+        setError(data.error ?? "No se pudo extraer datos de la ficha.");
         return;
       }
 
-      lastScrapedUrl.current = data.amazonUrl ?? url;
+      if (data.warning) {
+        toast.info(data.warning);
+      }
+
+      lastScrapedUrl.current = data.productUrl ?? data.amazonUrl ?? scrapeInput;
       const current = data.price;
       const reference =
         data.listPrice ??
         data.referencePrice ??
         (current != null ? current : null);
 
+      const matchedCategory =
+        data.categorySlug != null
+          ? categories.find((c) => c.slug === data.categorySlug)
+          : undefined;
+
       setForm((prev) => ({
         ...prev,
-        amazonUrl: data.amazonUrl ?? prev.amazonUrl,
+        retailer: data.retailer ?? prev.retailer,
+        productUrl: data.productUrl ?? data.amazonUrl ?? prev.productUrl,
+        externalId: data.externalId ?? prev.externalId,
         title: data.title?.trim() || prev.title,
+        brand: data.brand?.trim() || prev.brand,
         currentPrice: current != null ? String(current) : prev.currentPrice,
         referencePrice:
           reference != null ? String(reference) : prev.referencePrice,
+        categoryId: matchedCategory?.id ?? prev.categoryId,
+        imageUrl: data.imageUrl?.trim() || prev.imageUrl,
+        description: data.description?.trim() || prev.description,
       }));
       setScrapedDiscount(
         data.discountPercentage != null && data.discountPercentage > 0
@@ -539,17 +618,20 @@ export default function ProductsAdminClient() {
         data.discountPercentage != null && data.discountPercentage > 0
           ? ` · −${Math.round(data.discountPercentage)}%`
           : "";
+      const partialNote = data.partial ? " (extracción parcial)" : "";
       setMessage(
-        current != null
-          ? `Extraído: ${data.title ?? "sin título"} · oferta ${current.toFixed(2)} €${
-              data.listPrice != null
-                ? ` (antes ${data.listPrice.toFixed(2)} €)`
-                : ""
-            }${discountLabel}`
-          : `Título extraído${data.title ? `: ${data.title}` : ""}. Precio no disponible.`,
+        data.warning
+          ? data.warning
+          : current != null
+            ? `Extraído${partialNote}: ${data.title ?? "sin título"} · oferta ${current.toFixed(2)} €${
+                data.listPrice != null
+                  ? ` (antes ${data.listPrice.toFixed(2)} €)`
+                  : ""
+              }${discountLabel}`
+            : `Título extraído${partialNote}${data.title ? `: ${data.title}` : ""}. Precio no disponible — complétalo manualmente.`,
       );
     } catch {
-      setError("Error de red al consultar Amazon.");
+      setError("Error de red al consultar la tienda.");
     } finally {
       setScraping(false);
     }
@@ -565,7 +647,9 @@ export default function ProductsAdminClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amazonUrl: form.amazonUrl,
+          retailer: form.retailer,
+          productUrl: form.productUrl,
+          externalId: form.externalId || undefined,
           title: form.title,
           categoryId: form.categoryId || undefined,
           referencePrice: Number(form.referencePrice),
@@ -573,6 +657,8 @@ export default function ProductsAdminClient() {
             ? Number(form.currentPrice)
             : undefined,
           brand: form.brand || undefined,
+          imageUrl: form.imageUrl || undefined,
+          description: form.description || undefined,
         }),
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
@@ -858,7 +944,7 @@ export default function ProductsAdminClient() {
             ref={searchInputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar título, ASIN, marca… (/)"
+            placeholder="Buscar título, ID, marca… (/)"
             className={`${toolbarFieldClass} w-full pl-9 pr-9`}
           />
           {query ? (
@@ -953,14 +1039,17 @@ export default function ProductsAdminClient() {
               </a>
               <a
                 href={
+                  viewingProduct.productUrl ||
                   viewingProduct.amazonUrl ||
-                  `https://www.amazon.es/dp/${viewingProduct.asin}`
+                  (viewingProduct.retailer === "amazon"
+                    ? `https://www.amazon.es/dp/${viewingProduct.asin}`
+                    : "#")
                 }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-9 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper hover:bg-teal-900"
               >
-                Ir a Amazon
+                {retailerBuyCtaLabel(viewingProduct.retailer)}
               </a>
               <button
                 type="button"
@@ -1001,7 +1090,12 @@ export default function ProductsAdminClient() {
             <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
               {(
                 [
-                  ["ASIN", viewingProduct.asin],
+                  ["Tienda", retailerLabel(viewingProduct.retailer)],
+                  [
+                    "ID",
+                    viewingProduct.externalId ?? viewingProduct.asin,
+                  ],
+                  ["Código interno", viewingProduct.asin],
                   ["Slug", viewingProduct.slug],
                   ["Marca", viewingProduct.brand ?? "—"],
                   ["Categoría", viewingProduct.category?.name ?? "—"],
@@ -1119,10 +1213,10 @@ export default function ProductsAdminClient() {
           <div className="mt-6 grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-2">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Amazon URL
+                URL del producto
               </p>
               <p className="mt-1 break-all text-sm text-ink">
-                {viewingProduct.amazonUrl || "—"}
+                {viewingProduct.productUrl || viewingProduct.amazonUrl || "—"}
               </p>
             </div>
             <div>
@@ -1187,31 +1281,76 @@ export default function ProductsAdminClient() {
             onSubmit={(event) => void onSave(event)}
             className="mt-6 grid gap-4 md:grid-cols-2"
           >
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
               <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                URL de Amazon
+                Tienda
+                <select
+                  value={form.retailer}
+                  onChange={(event) => onRetailerChange(event.target.value)}
+                  className="mt-2 h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                >
+                  {PRODUCT_RETAILERS.map((retailer) => (
+                    <option key={retailer} value={retailer}>
+                      {retailerLabel(retailer)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                ID en tienda
+                <span className="ml-1 font-normal normal-case text-stone-400">
+                  ({formRetailerDef.externalIdHint})
+                </span>
                 <input
-                  required
-                  value={form.amazonUrl}
-                  onChange={(event) => onUrlChange(event.target.value)}
-                  onBlur={() => void scrapeFromUrl(false)}
-                  placeholder="https://www.amazon.es/.../dp/B0XXXXXXXX/"
+                  value={form.externalId}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      externalId: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    form.retailer === "amazon" ? "B0XXXXXXXXXX" : "Opcional si está en la URL"
+                  }
                   className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
                 />
               </label>
-              <button
-                type="button"
-                disabled={scraping || !form.amazonUrl.trim()}
-                onClick={() => void scrapeFromUrl(true)}
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-teal-800 hover:underline disabled:opacity-50"
-              >
-                {scraping ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                ) : null}
-                {scraping
-                  ? "Extrayendo de Amazon…"
-                  : "Extraer título y precios ahora"}
-              </button>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                URL del producto
+                <input
+                  required
+                  value={form.productUrl}
+                  onChange={(event) => onUrlChange(event.target.value)}
+                  onBlur={() => void scrapeFromUrl(false)}
+                  placeholder={formRetailerDef.urlPlaceholder}
+                  className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                />
+              </label>
+              {formScrapeSupported ? (
+                <button
+                  type="button"
+                  disabled={
+                    scraping ||
+                    (!form.productUrl.trim() && !form.externalId.trim())
+                  }
+                  onClick={() => void scrapeFromUrl(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-teal-800 hover:underline disabled:opacity-50"
+                >
+                  {scraping ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : null}
+                  {scraping
+                    ? `Extrayendo de ${formRetailerDef.label}…`
+                    : `Extraer título y precios de ${formRetailerDef.label}`}
+                </button>
+              ) : (
+                <p className="mt-2 text-xs text-stone-500">
+                  {formRetailerDef.label} no tiene extracción automática todavía.
+                  Rellena título y precios manualmente.
+                </p>
+              )}
             </div>
             <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
               Título
@@ -1328,6 +1467,43 @@ export default function ProductsAdminClient() {
                 className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
               />
             </label>
+            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              URL de imagen
+              <input
+                value={form.imageUrl}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    imageUrl: event.target.value,
+                  }))
+                }
+                placeholder="https://static.carrefour.es/..."
+                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              />
+            </label>
+            {form.imageUrl.trim() ? (
+              <div className="md:col-span-2">
+                <img
+                  src={form.imageUrl.trim()}
+                  alt="Vista previa"
+                  className="h-32 w-32 rounded-sm border border-stone-200 bg-white object-contain p-2"
+                />
+              </div>
+            ) : null}
+            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Descripción
+              <textarea
+                value={form.description}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    description: event.target.value,
+                  }))
+                }
+                rows={4}
+                className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              />
+            </label>
             {liveDiscount != null && liveDiscount > 0 ? (
               <p className="md:col-span-2 text-sm text-amber-800">
                 Descuento detectado:{" "}
@@ -1384,7 +1560,7 @@ export default function ProductsAdminClient() {
                 <SortButton column="title" label="Título" />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="asin" label="ASIN" />
+                <SortButton column="asin" label="Tienda / ID" />
               </th>
               <th className="px-4 py-3">
                 <SortButton column="currentPrice" label="Precio" />
@@ -1494,8 +1670,13 @@ export default function ProductsAdminClient() {
                       </div>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                    {product.asin}
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <p className="text-xs font-semibold text-stone-700">
+                      {retailerLabel(product.retailer)}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] text-stone-500">
+                      {product.externalId ?? product.asin}
+                    </p>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     {product.currentPrice.toFixed(2)} €
@@ -1553,8 +1734,8 @@ export default function ProductsAdminClient() {
                         })}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Ver en Amazon (clic de prueba)"
-                        aria-label="Ver en Amazon (clic de prueba)"
+                        title={`Ver en ${retailerLabel(product.retailer)} (clic de prueba)`}
+                        aria-label={`Ver en ${retailerLabel(product.retailer)} (clic de prueba)`}
                         className={iconBtnClass}
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -1570,9 +1751,16 @@ export default function ProductsAdminClient() {
                       </button>
                       <button
                         type="button"
-                        title="Revisar precio ahora"
+                        title={
+                          product.retailer === "amazon"
+                            ? "Revisar precio ahora"
+                            : "Revisar precio solo disponible para Amazon"
+                        }
                         aria-label="Revisar precio ahora"
-                        disabled={updatingAsin === product.asin}
+                        disabled={
+                          updatingAsin === product.asin ||
+                          product.retailer !== "amazon"
+                        }
                         onClick={() => void onUpdatePrice(product)}
                         className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-teal-800 bg-teal-50 px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-teal-900 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >

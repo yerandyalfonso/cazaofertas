@@ -4,13 +4,14 @@ import {
   notifyCronFailure,
 } from "@/services/cronNotify";
 import type { FlashDealsRunResult } from "@/services/flashDeals";
+import type { RetailPriceCheckResult } from "@/services/retailPriceCheck";
 import type { KiabiDealsRunResult } from "@/services/kiabiDeals";
 import type { UserUrlAlertsResult } from "@/services/userUrlAlerts";
 
 const JOB_PREFIX = "local";
 
-function isKiabiDataDomeError(message: string): boolean {
-  return /403|datadome|anti-bot|bloqueó/i.test(message);
+function isRetailBlockedError(message: string): boolean {
+  return /403|datadome|anti-bot|bloqueó|cloudflare|blocked/i.test(message);
 }
 
 function jobId(name: string): string {
@@ -64,12 +65,63 @@ export async function reviewCheckPricesResult(
 
   await notifyCronAlert({
     job,
-    headline: "Errores en revisión de precios",
+    headline: "Errores en revisión de precios (Amazon)",
     lines: [
       `Procesados: ${result.stats.processed}`,
       `Errores: ${errors.length}/${result.scoped}`,
       sample,
       errors.length > 3 ? `… y ${errors.length - 3} más` : "",
+    ],
+  });
+}
+
+export async function reviewRetailPricesResult(
+  result: RetailPriceCheckResult,
+): Promise<void> {
+  const job = jobId("check-prices");
+  const errors = result.stats.errors ?? [];
+  const blockedOnly =
+    errors.length > 0 &&
+    errors.every((error) => isRetailBlockedError(error.message));
+
+  if (
+    errors.length === 0 &&
+    result.stats.skippedBlocked === 0
+  ) {
+    return;
+  }
+
+  if (errors.length === 0 && result.stats.skippedBlocked > 0) {
+    await notifyCronAlert({
+      job,
+      headline: "Kiabi: scrape omitido (anti-bot)",
+      lines: [
+        `Omitidos por bloqueo: ${result.stats.skippedBlocked}`,
+        "El producto mantiene el último precio conocido.",
+      ],
+    });
+    return;
+  }
+
+  if (errors.length === 0) return;
+
+  await notifyCronAlert({
+    job,
+    headline: blockedOnly
+      ? "Kiabi: bloqueo al revisar precios"
+      : "Errores en revisión de precios (Kiabi)",
+    lines: [
+      `Monitorizables: ${result.monitorable}`,
+      `Procesados: ${result.stats.processed}`,
+      `Actualizados: ${result.stats.updated}`,
+      `Omitidos (bloqueo): ${result.stats.skippedBlocked}`,
+      `Errores: ${errors.length}/${result.scoped}`,
+      ...errors
+        .slice(0, 3)
+        .map((error) => `• ${error.asin}: ${error.message}`),
+      blockedOnly
+        ? "Exporta cookies del navegador → KIABI_COOKIES_FILE en .env.local"
+        : "",
     ],
   });
 }
@@ -134,7 +186,7 @@ export async function reviewKiabiDealsResult(
   const feedErrors = result.discovery?.feedErrors ?? [];
   const dataDomeOnly =
     feedErrors.length > 0 &&
-    feedErrors.every((e) => isKiabiDataDomeError(e.message)) &&
+    feedErrors.every((e) => isRetailBlockedError(e.message)) &&
     errors.length === 0;
   const hasWork =
     result.inserted > 0 ||

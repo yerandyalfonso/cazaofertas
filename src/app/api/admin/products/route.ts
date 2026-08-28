@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  extractAsin,
   generateAffiliateUrl,
-  generateAmazonUrl,
 } from "@/lib/affiliate";
-import { resolveAmazonProductCategoryId } from "@/lib/categories";
+import {
+  resolveAmazonProductCategoryId,
+  resolveCategoryIdBySlug,
+} from "@/lib/categories";
+import { inferCarrefourCategorySlug } from "@/lib/carrefour-category";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { toNumber } from "@/lib/money";
 import { availabilityLabel } from "@/lib/out-of-stock-policy";
+import {
+  detectRetailerFromUrl,
+  extractExternalId,
+  getRetailerDefinition,
+  isProductRetailer,
+  resolveCanonicalProductUrl,
+  syntheticAsinForRetailer,
+  type ProductRetailer,
+} from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { previewAmazonProductPage } from "@/providers/price";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -60,8 +71,11 @@ export async function GET(request: NextRequest) {
         title: row.title,
         slug: row.slug,
         asin: row.asin,
+        retailer: row.retailer ?? "amazon",
+        externalId: row.external_id,
         brand: row.brand,
         description: row.description,
+        productUrl: row.product_url ?? row.amazon_url,
         amazonUrl: row.amazon_url,
         affiliateUrl: row.affiliate_url,
         imageUrl: row.image_url,
@@ -168,7 +182,10 @@ export async function POST(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
     const body = (await request.json()) as {
+      retailer?: string;
+      productUrl?: string;
       amazonUrl?: string;
+      externalId?: string;
       title?: string;
       categoryId?: string;
       referencePrice?: number;
@@ -176,20 +193,37 @@ export async function POST(request: NextRequest) {
       asin?: string;
       slug?: string;
       brand?: string;
+      imageUrl?: string;
+      description?: string;
     };
 
-    const amazonUrl = body.amazonUrl?.trim() ?? "";
-    const asin =
-      body.asin?.trim().toUpperCase() ||
-      extractAsin(amazonUrl) ||
-      extractAsin(body.asin ?? "");
+    const productUrlInput =
+      body.productUrl?.trim() || body.amazonUrl?.trim() || "";
+    const retailer: ProductRetailer =
+      body.retailer && isProductRetailer(body.retailer)
+        ? body.retailer
+        : detectRetailerFromUrl(productUrlInput) ?? "amazon";
 
-    if (!asin) {
+    const definition = getRetailerDefinition(retailer);
+    const externalId =
+      body.externalId?.trim() ||
+      extractExternalId(retailer, productUrlInput) ||
+      extractExternalId(retailer, body.asin ?? "");
+
+    if (!externalId) {
       return NextResponse.json(
-        { ok: false, error: "ASIN o URL de Amazon no válidos." },
+        {
+          ok: false,
+          error: `No se pudo obtener el identificador del producto (${definition.externalIdHint}).`,
+        },
         { status: 400 },
       );
     }
+
+    const asin =
+      retailer === "amazon"
+        ? externalId
+        : syntheticAsinForRetailer(retailer, externalId);
 
     const title = body.title?.trim();
     if (!title) {
@@ -199,8 +233,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resolvedUrl =
-      amazonUrl || generateAmazonUrl(asin);
+    const resolvedUrl = resolveCanonicalProductUrl(
+      retailer,
+      productUrlInput,
+      externalId,
+    );
+
+    if (!resolvedUrl) {
+      return NextResponse.json(
+        { ok: false, error: "La URL del producto es obligatoria." },
+        { status: 400 },
+      );
+    }
+
     const referencePrice = Number(body.referencePrice);
     const currentPrice = Number(
       body.currentPrice ?? body.referencePrice ?? NaN,
@@ -213,9 +258,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const price = Number.isFinite(currentPrice) && currentPrice > 0
-      ? currentPrice
-      : referencePrice;
+    const price =
+      Number.isFinite(currentPrice) && currentPrice > 0
+        ? currentPrice
+        : referencePrice;
 
     const client = createSupabaseServiceClient();
     const slug = (body.slug?.trim() || slugify(title)).slice(0, 80);
@@ -237,37 +283,64 @@ export async function POST(request: NextRequest) {
 
     let categoryId = body.categoryId?.trim() || null;
     if (!categoryId) {
-      try {
-        const preview = await previewAmazonProductPage(resolvedUrl, {
-          timeoutMs: 18_000,
-        });
-        categoryId = await resolveAmazonProductCategoryId(client, {
-          categorySlug: preview.categorySlug,
-          breadcrumbs: preview.breadcrumbs,
-          title: preview.title ?? title,
-          brand: body.brand?.trim() || preview.brand,
-        });
-      } catch {
-        categoryId = await resolveAmazonProductCategoryId(client, {
+      if (retailer === "amazon") {
+        try {
+          const preview = await previewAmazonProductPage(resolvedUrl, {
+            timeoutMs: 18_000,
+          });
+          categoryId = await resolveAmazonProductCategoryId(client, {
+            categorySlug: preview.categorySlug,
+            breadcrumbs: preview.breadcrumbs,
+            title: preview.title ?? title,
+            brand: body.brand?.trim() || preview.brand,
+          });
+        } catch {
+          categoryId = await resolveAmazonProductCategoryId(client, {
+            title,
+            brand: body.brand?.trim() || null,
+          });
+        }
+      } else if (definition.defaultCategorySlug) {
+        const category = await resolveCategoryIdBySlug(
+          client,
+          definition.defaultCategorySlug,
+        );
+        categoryId = category?.id ?? null;
+      } else if (retailer === "carrefour") {
+        const slug = inferCarrefourCategorySlug({
           title,
-          brand: body.brand?.trim() || null,
+          feedUrl: resolvedUrl,
         });
+        if (slug) {
+          const category = await resolveCategoryIdBySlug(client, slug);
+          categoryId = category?.id ?? null;
+        }
       }
     }
+
+    const affiliateUrl =
+      retailer === "amazon"
+        ? generateAffiliateUrl({
+            amazon_url: resolvedUrl,
+            asin,
+          })
+        : resolvedUrl;
 
     const { data, error } = await client
       .from("products")
       .upsert(
         {
+          retailer,
+          external_id: externalId,
+          product_url: resolvedUrl,
           asin,
           title,
           slug,
           amazon_url: resolvedUrl,
-          affiliate_url: generateAffiliateUrl({
-            amazon_url: resolvedUrl,
-            asin,
-          }),
-          brand: body.brand?.trim() || null,
+          affiliate_url: affiliateUrl,
+          brand: body.brand?.trim() || definition.defaultBrand || null,
+          image_url: body.imageUrl?.trim() || null,
+          description: body.description?.trim() || null,
           category_id: categoryId,
           current_price: price,
           previous_price: referencePrice,
@@ -281,7 +354,7 @@ export async function POST(request: NextRequest) {
         },
         { onConflict: "asin" },
       )
-      .select("id, asin, slug, title")
+      .select("id, asin, slug, title, retailer")
       .single();
 
     if (error) {

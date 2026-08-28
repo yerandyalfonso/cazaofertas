@@ -1,4 +1,11 @@
 import {
+  detectRetailerFromUrl,
+  normalizeRetailer,
+  resolveProductPageUrl,
+  retailerScrapeSupported,
+  type ProductRetailer,
+} from "@/lib/retailers";
+import {
   extractAsin,
   generateAffiliateUrl,
   generateAmazonUrl,
@@ -46,9 +53,31 @@ export function isValidAmazonUrl(value: string | null | undefined): boolean {
   }
 }
 
+export function isSyntheticRetailAsin(asin: string | null | undefined): boolean {
+  return /^(KB-|CF-|RT-)/i.test(asin?.trim() ?? "");
+}
+
+export function inferRetailerFromAsin(asin: string): ProductRetailer {
+  const normalized = asin.trim().toUpperCase();
+  if (normalized.startsWith("KB-")) return "kiabi";
+  if (normalized.startsWith("CF-")) return "carrefour";
+  return "amazon";
+}
+
 export function resolveProductAmazonUrl(
-  product: Pick<ProductRow, "amazon_url" | "asin">,
+  product: Pick<ProductRow, "amazon_url" | "asin"> & {
+    retailer?: string | null;
+  },
 ): string | null {
+  const retailer =
+    product.retailer != null
+      ? normalizeRetailer(product.retailer)
+      : inferRetailerFromAsin(product.asin);
+
+  if (retailer !== "amazon" || isSyntheticRetailAsin(product.asin)) {
+    return null;
+  }
+
   if (isValidAmazonUrl(product.amazon_url)) {
     return product.amazon_url!.trim();
   }
@@ -59,9 +88,28 @@ export function resolveProductAmazonUrl(
 }
 
 export function productHasMonitorableUrl(
-  product: Pick<ProductRow, "amazon_url" | "asin">,
+  product: Pick<ProductRow, "amazon_url" | "asin"> & {
+    retailer?: string | null;
+  },
 ): boolean {
   return Boolean(resolveProductAmazonUrl(product));
+}
+
+export function productHasRetailMonitorableUrl(
+  product: Pick<ProductRow, "retailer" | "product_url" | "amazon_url" | "asin">,
+): boolean {
+  const retailer =
+    product.retailer != null
+      ? normalizeRetailer(product.retailer)
+      : inferRetailerFromAsin(product.asin);
+
+  if (retailer === "amazon") return false;
+  if (!retailerScrapeSupported(retailer)) return false;
+
+  const url = resolveProductPageUrl(product);
+  if (!url) return false;
+
+  return detectRetailerFromUrl(url) === retailer;
 }
 
 export function buildAsinUrlMap(

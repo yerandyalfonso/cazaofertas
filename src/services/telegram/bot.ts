@@ -559,13 +559,34 @@ async function advanceWizardAfterTarget(
   draft: AlertWizardDraft,
 ): Promise<void> {
   await saveWizardDraft(telegramId, { ...draft, step: "pick_discount" });
-  const productLine = draft.productTitle
-    ? [`🎯 <b>Alerta · ${escapeHtml(draft.productTitle)}</b>`, ""]
-    : [];
+
+  const headerLines: string[] = [];
+  if (draft.mode === "category") {
+    headerLines.push(
+      `📂 <b>Alerta · ${escapeHtml(draft.categoryLabel ?? "Cualquiera")}</b>`,
+      "",
+    );
+  } else if (draft.mode === "keyword" && draft.keyword) {
+    headerLines.push(
+      `🔤 <b>Alerta · «${escapeHtml(draft.keyword)}»</b>`,
+      "",
+    );
+  } else if (draft.mode === "brand" && draft.brand) {
+    headerLines.push(
+      `🏷️ <b>Alerta · ${escapeHtml(draft.brand)}</b>`,
+      "",
+    );
+  } else if (draft.productTitle) {
+    headerLines.push(
+      `🎯 <b>Alerta · ${escapeHtml(draft.productTitle)}</b>`,
+      "",
+    );
+  }
+
   await sendTelegramMessage({
     chatId,
     text: [
-      ...productLine,
+      ...headerLines,
       `📉 <b>${wizardStepLabel("pick_discount")} · descuento mínimo</b>`,
       "",
       "¿A partir de qué descuento quieres que te avise?",
@@ -906,6 +927,9 @@ async function commitWizardAlert(options: {
 
   const lines = [
     "✅ <b>Alerta creada</b>",
+    draft.mode === "category"
+      ? `📂 Categoría: <b>${escapeHtml(draft.categoryLabel ?? "Cualquiera")}</b>`
+      : "",
     "",
     formatWizardSummary({ ...draft, step: "confirm" })
       .replace(/^📋 <b>Resumen — confirmación<\/b>\n\n/, "")
@@ -1158,11 +1182,25 @@ interface UserAlertRow {
   min_price: number | null;
   product_id: string | null;
   category_id: string | null;
+  categories?: { id: string; name: string; slug: string } | null;
+}
+
+function resolveAlertCategory(
+  categories: UserAlertRow["categories"] | UserAlertRow["categories"][] | undefined,
+): UserAlertRow["categories"] {
+  if (!categories) return null;
+  if (Array.isArray(categories)) return categories[0] ?? null;
+  return categories;
 }
 
 function formatAlertLine(index: number, alert: UserAlertRow): string {
   const parts: string[] = [];
+  const category = resolveAlertCategory(alert.categories);
 
+  if (alert.category_id) {
+    const categoryName = category?.name?.trim() || "Categoría desconocida";
+    parts.push(`📂 ${escapeHtml(categoryName)}`);
+  }
   if (alert.url) {
     parts.push(`🔗 URL Amazon`);
   }
@@ -1170,13 +1208,10 @@ function formatAlertLine(index: number, alert: UserAlertRow): string {
     parts.push(`🔑 ${escapeHtml(alert.keyword)}`);
   }
   if (alert.brand) {
-    parts.push(`Marca: ${escapeHtml(alert.brand)}`);
+    parts.push(`🏷️ ${escapeHtml(alert.brand)}`);
   }
   if (alert.product_id) {
     parts.push("Producto específico");
-  }
-  if (alert.category_id) {
-    parts.push("Por categoría");
   }
   if (alert.min_discount_percentage !== null) {
     parts.push(`Dto. mín.: ${alert.min_discount_percentage}%`);
@@ -1200,8 +1235,11 @@ function formatAlertLine(index: number, alert: UserAlertRow): string {
 function buildDeleteAlertsMarkup(alerts: UserAlertRow[]): InlineKeyboardMarkup {
   return {
     inline_keyboard: alerts.map((alert) => {
+      const category = resolveAlertCategory(alert.categories);
       const label =
-        alert.keyword?.trim() || (alert.url ? "URL Amazon" : "alerta");
+        category?.name?.trim() ||
+        alert.keyword?.trim() ||
+        (alert.url ? "URL Amazon" : alert.brand?.trim() || "Alerta");
       const truncated =
         label.length > 40 ? `${label.slice(0, 37)}…` : label;
 
@@ -1250,7 +1288,7 @@ async function fetchUserAlerts(telegramId: number): Promise<{
     const { data: alerts, error: alertsError } = await client
       .from("alerts")
       .select(
-        "id, keyword, url, brand, min_discount_percentage, max_price, min_price, is_active, product_id, category_id",
+        "id, keyword, url, brand, min_discount_percentage, max_price, min_price, is_active, product_id, category_id, categories(id, name, slug)",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -1274,17 +1312,25 @@ async function fetchUserAlerts(telegramId: number): Promise<{
       return { text: EMPTY_ALERTS_MESSAGE };
     }
 
+    const normalizedAlerts = (alerts ?? []).map((row) => ({
+      ...(row as UserAlertRow),
+      categories: resolveAlertCategory(
+        (row as { categories?: UserAlertRow["categories"] | UserAlertRow["categories"][] })
+          .categories,
+      ),
+    }));
+
     const lines = [
       "⚙️ <b>Tus alertas activas</b>",
       "",
-      ...alerts.map((alert, index) => formatAlertLine(index, alert)),
+      ...normalizedAlerts.map((alert, index) => formatAlertLine(index, alert)),
       "",
       "Pulsa un botón ❌ para eliminar una alerta:",
     ];
 
     return {
       text: lines.join("\n"),
-      replyMarkup: buildDeleteAlertsMarkup(alerts),
+      replyMarkup: buildDeleteAlertsMarkup(normalizedAlerts),
     };
   } catch (error) {
     console.error("[telegram] Mis alertas: excepción inesperada", error);

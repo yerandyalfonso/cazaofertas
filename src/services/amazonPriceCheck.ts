@@ -60,7 +60,7 @@ export async function runAmazonPriceCheck(options?: {
   const { data: products, error } = await client
     .from("products")
     .select(
-      "id, asin, amazon_url, affiliate_url, current_price, previous_price, title, is_active, last_checked_at, availability",
+      "id, asin, retailer, amazon_url, affiliate_url, product_url, current_price, previous_price, title, is_active, last_checked_at, availability",
     )
     .eq("is_active", true);
 

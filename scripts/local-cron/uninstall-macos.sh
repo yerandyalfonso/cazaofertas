@@ -8,7 +8,9 @@ for label in \
   com.cazaofertas.cron.check-prices \
   com.cazaofertas.cron.flash-deals \
   com.cazaofertas.cron.user-alerts \
-  com.cazaofertas.cron.kiabi-deals
+  com.cazaofertas.cron.kiabi-deals \
+  com.cazaofertas.cron.carrefour-deals \
+  com.cazaofertas.cron.carrefour-deals-test
 do
   plist="$AGENTS_DIR/${label}.plist"
   if [[ -f "$plist" ]]; then

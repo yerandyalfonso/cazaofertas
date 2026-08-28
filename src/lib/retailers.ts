@@ -1,7 +1,79 @@
-import { generateAffiliateUrl, type AffiliateProductInput } from "@/lib/affiliate";
+import {
+  extractAsin,
+  generateAmazonUrl,
+  generateAffiliateUrl,
+  type AffiliateProductInput,
+} from "@/lib/affiliate";
 
 export const PRODUCT_RETAILERS = ["amazon", "kiabi", "carrefour"] as const;
 export type ProductRetailer = (typeof PRODUCT_RETAILERS)[number];
+
+export interface RetailerDefinition {
+  id: ProductRetailer;
+  label: string;
+  hostPatterns: RegExp[];
+  urlPlaceholder: string;
+  scrapeSupported: boolean;
+  externalIdHint: string;
+  defaultBrand?: string;
+  defaultCategorySlug?: string;
+}
+
+/** Registro de tiendas: añade una entrada aquí al integrar una nueva. */
+export const RETAILER_DEFINITIONS: RetailerDefinition[] = [
+  {
+    id: "amazon",
+    label: "Amazon",
+    hostPatterns: [/amazon\.(es|com|de|fr|it|co\.uk)/i],
+    urlPlaceholder: "https://www.amazon.es/.../dp/B0XXXXXXXX/",
+    scrapeSupported: true,
+    externalIdHint: "ASIN (10 caracteres)",
+  },
+  {
+    id: "kiabi",
+    label: "Kiabi",
+    hostPatterns: [/kiabi\.(es|com|fr)/i],
+    urlPlaceholder: "https://www.kiabi.es/..._P########C####.html",
+    scrapeSupported: true,
+    externalIdHint: "P…C… (en la URL)",
+    defaultBrand: "Kiabi",
+    defaultCategorySlug: "moda",
+  },
+  {
+    id: "carrefour",
+    label: "Carrefour",
+    hostPatterns: [/carrefour\.es/i],
+    urlPlaceholder: "https://www.carrefour.es/...",
+    scrapeSupported: false,
+    externalIdHint: "skuId o VC4A-… en la URL",
+  },
+];
+
+export function getRetailerDefinition(
+  retailer: ProductRetailer,
+): RetailerDefinition {
+  return (
+    RETAILER_DEFINITIONS.find((item) => item.id === retailer) ??
+    RETAILER_DEFINITIONS[0]
+  );
+}
+
+export function detectRetailerFromUrl(url: string): ProductRetailer | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  for (const definition of RETAILER_DEFINITIONS) {
+    if (definition.hostPatterns.some((pattern) => pattern.test(trimmed))) {
+      return definition.id;
+    }
+  }
+
+  return null;
+}
+
+export function retailerScrapeSupported(retailer: ProductRetailer): boolean {
+  return getRetailerDefinition(retailer).scrapeSupported;
+}
 
 export function isProductRetailer(value: string): value is ProductRetailer {
   return (PRODUCT_RETAILERS as readonly string[]).includes(value);
@@ -33,6 +105,49 @@ export function extractKiabiProductId(urlOrId: string): string | null {
 
   if (/^P\d+C\d+$/i.test(trimmed)) return trimmed.toUpperCase();
   return null;
+}
+
+function extractCarrefourProductId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  const skuFromQuery = trimmed.match(/[?&]skuId=(\d+)/i);
+  if (skuFromQuery?.[1]) return skuFromQuery[1];
+
+  const pathSku = trimmed.match(/(VC4A-\d+)/i);
+  if (pathSku?.[1]) return pathSku[1].toUpperCase();
+
+  if (/^VC4A-\d+$/i.test(trimmed)) return trimmed.toUpperCase();
+  if (/^\d{8,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+export function extractExternalId(
+  retailer: ProductRetailer,
+  urlOrId: string,
+): string | null {
+  const trimmed = urlOrId.trim();
+  if (!trimmed) return null;
+
+  switch (retailer) {
+    case "amazon":
+      return extractAsin(trimmed)?.toUpperCase() ?? null;
+    case "kiabi":
+      return extractKiabiProductId(trimmed);
+    case "carrefour":
+      return extractCarrefourProductId(trimmed);
+    default:
+      return trimmed.length >= 3 ? trimmed : null;
+  }
+}
+
+export function resolveCanonicalProductUrl(
+  retailer: ProductRetailer,
+  input: string,
+  externalId: string,
+): string {
+  const trimmed = input.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (retailer === "amazon") return generateAmazonUrl(externalId);
+  return trimmed;
 }
 
 export function isKiabiProductUrl(url: string): boolean {
@@ -92,14 +207,11 @@ export function resolveProductBuyUrl(product: ProductLinkFields): string {
 }
 
 export function retailerLabel(retailer: string | null | undefined): string {
-  switch (normalizeRetailer(retailer)) {
-    case "kiabi":
-      return "Kiabi";
-    case "carrefour":
-      return "Carrefour";
-    default:
-      return "Amazon";
+  if (!retailer) return "Amazon";
+  if (isProductRetailer(retailer)) {
+    return getRetailerDefinition(retailer).label;
   }
+  return retailer.charAt(0).toUpperCase() + retailer.slice(1);
 }
 
 /** CTA principal en ficha de producto: "Ir a Kiabi", "Ir a Amazon", etc. */
