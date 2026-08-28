@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
+import { resolveProxyFetch } from "@/lib/proxyFetch";
 import { formatDescriptionForStorage } from "@/lib/product-description";
 import type { PriceProvider, ProductPriceData } from "@/providers/price/types";
 import { ProductAvailability } from "@/types";
@@ -849,7 +850,7 @@ async function fetchAmazonPageHtml(
     pinSpainDelivery?: boolean;
   } = {},
 ): Promise<string> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = resolveProxyFetch(options.fetchImpl);
   const timeoutMs = options.timeoutMs ?? 12_000;
   const pinSpainDelivery = options.pinSpainDelivery !== false;
   // En Vercel las IPs de datacenter fallan más: más reintentos y backoff.
@@ -1070,7 +1071,7 @@ export class AmazonHtmlPriceProvider implements PriceProvider {
     const onVercel = Boolean(process.env.VERCEL);
     this.delayMs = options.delayMs ?? (onVercel ? 2_200 : 1_250);
     this.timeoutMs = options.timeoutMs ?? (onVercel ? 18_000 : 12_000);
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = resolveProxyFetch(options.fetchImpl);
   }
 
   async getProduct(asin: string): Promise<ProductPriceData> {

@@ -1,15 +1,8 @@
-# Crons rotativos vía GitHub Actions (lotes pequeños para no saturar Amazon).
-# Secrets del repo: APP_URL (https://tudominio.com), CRON_SECRET (igual que Vercel).
+# Desactivado: el scrape corre en el Mac local (scripts/local-cron).
+# Solo manual desde GitHub si hace falta probar el endpoint en Vercel.
 name: Cron Amazon
 
 on:
-  schedule:
-    # Precios: cada 2 h (UTC) → ~12 lotes/día × 10 productos
-    - cron: "0 */2 * * *"
-    # Flash: 3 veces al día, desfasado de precios (minuto 30)
-    - cron: "30 7,13,19 * * *"
-    # Alertas usuario: 2 veces al día
-    - cron: "15 6,18 * * *"
   workflow_dispatch:
     inputs:
       job:

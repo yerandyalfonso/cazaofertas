@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx --env-file=.env.local src/database/run-seed.ts",
-    "seed:blog": "tsx --env-file=.env.local src/database/seed-blog.ts"
+    "seed:blog": "tsx --env-file=.env.local src/database/seed-blog.ts",
+    "cron:local": "tsx --env-file=.env.local scripts/local-cron/run.ts",
+    "cron:local:prices": "npm run cron:local -- check-prices",
+    "cron:local:flash": "npm run cron:local -- flash-deals",
+    "cron:local:alerts": "npm run cron:local -- user-alerts",
+    "cron:local:install": "bash scripts/local-cron/install-macos.sh",
+    "cron:local:uninstall": "bash scripts/local-cron/uninstall-macos.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -19,6 +25,7 @@
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "undici": "^7.29.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
