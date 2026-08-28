@@ -223,6 +223,21 @@ function emptyNotificationStats(): NotificationDispatchResult {
   };
 }
 
+/** Rellena imagen/marca si el scrape las trae y en BD faltan. */
+function mediaBackfillPatch(
+  product: ProductWithCategory,
+  quote: { imageUrl?: string; brand?: string },
+): { image_url?: string; brand?: string } {
+  const patch: { image_url?: string; brand?: string } = {};
+  if (!product.image_url?.trim() && quote.imageUrl?.trim()) {
+    patch.image_url = quote.imageUrl.trim();
+  }
+  if (!product.brand?.trim() && quote.brand?.trim()) {
+    patch.brand = quote.brand.trim();
+  }
+  return patch;
+}
+
 export async function runPriceDetection(
   options: RunPriceDetectionOptions = {},
 ): Promise<PriceDetectionStats> {
@@ -330,6 +345,7 @@ export async function runPriceDetection(
               last_checked_at: now,
               availability: availabilityFrom(quote.availability),
               updated_at: now,
+              ...mediaBackfillPatch(product, quote),
             })
             .eq("id", product.id);
 
@@ -383,6 +399,7 @@ export async function runPriceDetection(
             availability: availabilityFrom(quote.availability),
             last_checked_at: now,
             updated_at: now,
+            ...mediaBackfillPatch(product, quote),
           })
           .eq("id", product.id);
 
