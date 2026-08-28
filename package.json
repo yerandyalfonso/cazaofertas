@@ -14,7 +14,8 @@
     "cron:local:flash": "npm run cron:local -- flash-deals",
     "cron:local:alerts": "npm run cron:local -- user-alerts",
     "cron:local:install": "bash scripts/local-cron/install-macos.sh",
-    "cron:local:uninstall": "bash scripts/local-cron/uninstall-macos.sh"
+    "cron:local:uninstall": "bash scripts/local-cron/uninstall-macos.sh",
+    "cron:local:test-notify": "tsx --env-file=.env.local scripts/local-cron/test-notify.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
