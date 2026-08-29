@@ -27,9 +27,17 @@ export async function notifyLocalCronFailure(
 
 export async function reviewCheckPricesResult(
   result: AmazonPriceCheckResult,
+  extras?: {
+    flash?: FlashDealsRunResult & {
+      pause?: { activated: boolean; denials: number };
+    };
+  },
 ): Promise<void> {
   const job = jobId("check-prices");
   const errors = result.stats.errors ?? [];
+  const flash = extras?.flash;
+  const flashErrors = flash?.errors ?? [];
+  const flashFeedErrors = flash?.discovery?.feedErrors ?? [];
 
   if (result.pause?.activated) {
     await notifyCronAlert({
@@ -48,29 +56,65 @@ export async function reviewCheckPricesResult(
     return;
   }
 
-  if (errors.length === 0) return;
+  if (flash?.pause?.activated) {
+    await notifyCronAlert({
+      job,
+      headline: "Flash: pausa preventiva",
+      lines: [`Denegaciones: ${flash.pause.denials}`],
+    });
+    return;
+  }
 
-  const allFailed =
-    result.scoped > 0 && errors.length >= result.scoped;
-  const mostlyFailed =
-    result.stats.processed > 0 &&
-    errors.length / result.stats.processed >= 0.5;
+  const amazonFailed =
+    errors.length > 0 &&
+    ((result.scoped > 0 && errors.length >= result.scoped) ||
+      (result.stats.processed > 0 &&
+        errors.length / result.stats.processed >= 0.5) ||
+      errors.length >= 2);
 
-  if (!allFailed && !mostlyFailed && errors.length < 2) return;
+  if (amazonFailed || flashErrors.length > 0 || flashFeedErrors.length > 0) {
+    await notifyCronAlert({
+      job,
+      headline: "Errores en revisión Amazon / flash",
+      lines: [
+        `Precios: ${result.stats.processed} procesados · ${errors.length} errores`,
+        ...errors.slice(0, 2).map((e) => `• ${e.asin}: ${e.message}`),
+        flash
+          ? `Flash: ${
+              (flash.inserted ?? 0) +
+              (flash.updated ?? 0) +
+              (flash.unchanged ?? 0)
+            } procesados · ${flashErrors.length} errores`
+          : "",
+        ...flashErrors
+          .slice(0, 2)
+          .map((e) => `• Flash ${e.asin}: ${e.message}`),
+        ...flashFeedErrors
+          .slice(0, 1)
+          .map((e) => `• Feed: ${e.message}`),
+      ],
+    });
+    return;
+  }
 
-  const sample = errors
-    .slice(0, 3)
-    .map((e) => `• ${e.asin}: ${e.message}`)
-    .join("\n");
+  const updated = result.stats.updated ?? 0;
+  const unchanged = result.stats.unchanged ?? 0;
+  const deals = result.stats.dealsDetected ?? 0;
+  const flashInserted = flash?.inserted ?? 0;
+  const flashUpdated = flash?.updated ?? 0;
+  const flashUnchanged = flash?.unchanged ?? 0;
+  const flashChannel = flash?.channelNotificationsSent ?? 0;
 
   await notifyCronAlert({
     job,
-    headline: "Errores en revisión de precios (Amazon)",
+    headline: "Amazon: revisión OK",
     lines: [
-      `Procesados: ${result.stats.processed}`,
-      `Errores: ${errors.length}/${result.scoped}`,
-      sample,
-      errors.length > 3 ? `… y ${errors.length - 3} más` : "",
+      `${result.stats.processed} revisados · ${updated} actualizados · ${unchanged} sin cambios`,
+      deals > 0 ? `Rebajas detectadas: ${deals}` : "",
+      flash
+        ? `Flash: ${flashInserted} nuevos · ${flashUpdated} actualizados · ${flashUnchanged} sin cambios` +
+          (flashChannel > 0 ? ` · canal ${flashChannel}` : "")
+        : "",
     ],
   });
 }

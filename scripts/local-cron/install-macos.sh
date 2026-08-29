@@ -99,23 +99,24 @@ echo "Logs: $LOG_DIR"
 echo
 
 write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20 *:30 *:40 *:50"
-write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "" "0:30 3:30 6:30 9:30 12:30 15:30 18:30 21:30"
 write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 
 echo
 echo "Cargando LaunchAgents..."
 load_agent "com.cazaofertas.cron.check-prices"
-load_agent "com.cazaofertas.cron.flash-deals"
+# Flash deals van dentro de check-prices (1 por ciclo); retirar el agente suelto si existía.
+unload_if_loaded "com.cazaofertas.cron.flash-deals"
+rm -f "$AGENTS_DIR/com.cazaofertas.cron.flash-deals.plist"
 load_agent "com.cazaofertas.cron.user-alerts"
 load_agent "com.cazaofertas.cron.kiabi-deals"
 
 echo
 echo "Listo. Horarios (hora local del Mac):"
-echo "  • check-prices: 2 productos — :00, :10, :20, :30, :40, :50 (2,5 s entre ellos)"
-echo "  • flash-deals:  3 productos — 00:30, 03:30, … cada 3 h (5 min entre ellos)"
+echo "  • check-prices: 2 precios Amazon + 1 flash deal — :00, :10, :20, :30, :40, :50"
 echo "  • user-alerts:  08:15 y 20:15 (1 min entre alertas)"
 echo "  • kiabi-deals:  09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1)"
+echo "  • flash-deals:  integrado en check-prices (ya no hay cron aparte)"
 echo
 echo "Prueba manual:"
 echo "  cd \"$REPO_ROOT\" && npm run cron:local:prices"

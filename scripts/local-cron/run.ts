@@ -32,6 +32,8 @@ function parseJob(raw: string | undefined): LocalCronJob {
 async function runCheckPrices(): Promise<void> {
   const { runAmazonPriceCheck } = await import("@/services/amazonPriceCheck");
   const { runRetailPriceCheck } = await import("@/services/retailPriceCheck");
+  const { runFlashDealsCheck } = await import("@/services/flashDeals");
+  const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
   const { reviewCheckPricesResult, reviewRetailPricesResult } = await import(
     "./notify"
   );
@@ -44,7 +46,35 @@ async function runCheckPrices(): Promise<void> {
     delayMs: 2_500,
   });
   console.log(JSON.stringify({ amazon }, null, 2));
-  await reviewCheckPricesResult(amazon);
+
+  // 1 flash deal en el mismo ciclo que check-prices (antes cada 3 h aparte).
+  const flashRaw = await runFlashDealsCheck({
+    limit: 1,
+    notify: true,
+    allowSimulatedFallback: true,
+    includeCatalog: false,
+    delayMs: 0,
+  });
+  const flashProcessed =
+    (flashRaw.inserted ?? 0) +
+    (flashRaw.updated ?? 0) +
+    (flashRaw.unchanged ?? 0) +
+    (flashRaw.errors?.length ?? 0);
+  const flashPause = await maybePauseAfterAmazonErrors(
+    flashRaw.errors ?? [],
+    flashProcessed,
+  );
+  const flash = {
+    ...flashRaw,
+    pause: {
+      activated: flashPause.paused,
+      denials: flashPause.denials,
+      state: flashPause.state,
+    },
+  };
+  console.log(JSON.stringify({ flash }, null, 2));
+
+  await reviewCheckPricesResult(amazon, { flash });
 
   const retail = await runRetailPriceCheck({
     limit: 1,
