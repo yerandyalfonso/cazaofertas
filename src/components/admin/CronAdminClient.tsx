@@ -232,19 +232,25 @@ export function CronAdminClient() {
         toast.error(message);
       } else {
         const errCount = data.errors?.length ?? 0;
-        const changed = (data.inserted ?? 0) + (data.updated ?? 0);
-        if (changed === 0 && errCount > 0) {
+        const newFound = data.discovery?.newAsins ?? 0;
+        const inserted = data.inserted ?? 0;
+        if (inserted === 0 && errCount > 0) {
           const first = data.errors?.[0]?.message;
           const message =
-            `Flash sin actualizaciones (${errCount} errores de Amazon).` +
+            `Flash sin insertar (${errCount} errores de Amazon).` +
             (first ? ` ${first}` : "") +
             " En Vercel el HTML suele bloquearse; reintenta más tarde.";
           setError(message);
           toast.error(message);
+        } else if (inserted === 0 && newFound === 0) {
+          toast.success(
+            `Flash OK · sin ASINs nuevos (ya en catálogo ${data.discovery?.existingAsins ?? 0}). Precios → Revisar precios.`,
+          );
         } else {
           toast.success(
-            `Flash OK · +${data.inserted ?? 0} nuevos, ${data.updated ?? 0} actualizados` +
-              (errCount > 0 ? ` · ${errCount} errores` : ""),
+            `Flash OK · +${inserted} nuevos` +
+              (errCount > 0 ? ` · ${errCount} errores` : "") +
+              ` · Telegram ${data.channelNotificationsSent ?? 0}`,
           );
         }
       }
@@ -446,8 +452,9 @@ export function CronAdminClient() {
           Descubrir flash / canal
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
-          Descubre ASINs en Gold Box / Deals, inserta novedades y publica en el
-          canal si el score es alto.
+          Solo busca ASINs <strong>nuevos</strong> en Gold Box / Deals e
+          inserta + publica en Telegram si el score es alto. Lo ya indexado
+          lo vigila «Revisar precios» (bajadas → notificación).
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -512,7 +519,7 @@ export function CronAdminClient() {
           {flashResult.products && flashResult.products.length > 0 ? (
             <div className="border border-stone-300 bg-white">
               <div className="border-b border-stone-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
-                Productos Flash / cambios
+                Productos Flash insertados
               </div>
               <ul className="divide-y divide-stone-100">
                 {flashResult.products.map((product) => (

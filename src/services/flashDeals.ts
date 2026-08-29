@@ -7,7 +7,7 @@ import { inferAmazonCategorySlug } from "@/lib/amazon-category";
 import {
   resolveCategoryIdBySlug,
 } from "@/lib/categories";
-import { roundMoney, toNumber } from "@/lib/money";
+import { roundMoney } from "@/lib/money";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import {
   discoverFlashDealListings,
@@ -154,18 +154,21 @@ interface CatalogRow {
 }
 
 /**
- * Cron discovery-first:
- * 1) Lee listados flash (live / feeds / simulación)
+ * Descubridor flash:
+ * 1) Lee listados Gold Box / Deals
  * 2) Compara ASINs con Supabase
- * 3) INSERT de novedades; UPDATE de precio solo si ya existen
+ * 3) Solo INSERT de novedades (+ notificación canal si score alto)
+ *
+ * Los productos que ya están en catálogo NO se re-chequean aquí:
+ * eso lo hace el cron de precios (`check-prices`).
  */
 export async function runFlashDealsCheck(options?: {
-  /** Máximo de candidatos del listado a enriquecer (prioriza ASINs nuevos). */
+  /** Máximo de ASINs *nuevos* a enriquecer e insertar. */
   limit?: number;
   feedUrls?: string[];
   /** ASINs/URLs inyectados como feed dinámico. */
   injectedAsins?: string[];
-  /** @deprecated El catálogo completo ya no se escanea; solo coincidencias del listado. */
+  /** @deprecated Ignorado: el catálogo existente no se re-escanea. */
   includeCatalog?: boolean;
   allowSimulatedFallback?: boolean;
   notify?: boolean;
@@ -180,7 +183,7 @@ export async function runFlashDealsCheck(options?: {
   const discovery = await discoverFlashDealListings({
     feedUrls: options?.feedUrls,
     injectedAsins: options?.injectedAsins,
-    maxItems: Math.max(limit * 2, 40),
+    maxItems: Math.max(limit * 4, 60),
     delayMs: 800,
     allowSimulatedFallback: options?.allowSimulatedFallback ?? true,
   });
@@ -203,23 +206,18 @@ export async function runFlashDealsCheck(options?: {
 
   const discovered = discovery.items;
   const newCandidates: DiscoveredListingItem[] = [];
-  const existingCandidates: DiscoveredListingItem[] = [];
+  let existingAsins = 0;
 
   for (const item of discovered) {
     if (catalogByAsin.has(item.asin)) {
-      existingCandidates.push(item);
+      existingAsins += 1;
     } else {
       newCandidates.push(item);
     }
   }
 
-  // Foco: novedades primero; el cupo restante sirve para actualizar precios.
-  const newBudget = Math.min(newCandidates.length, limit);
-  const updateBudget = Math.max(0, limit - newBudget);
-  const queue = [
-    ...newCandidates.slice(0, newBudget),
-    ...existingCandidates.slice(0, updateBudget),
-  ];
+  // Solo ASINs nuevos. Los ya en BD los vigila check-prices (bajadas → notify).
+  const queue = newCandidates.slice(0, limit);
 
   const products: FlashDealProductReport[] = [];
   const errors: Array<{ asin: string; message: string }> = [];
@@ -234,8 +232,11 @@ export async function runFlashDealsCheck(options?: {
   for (let index = 0; index < queue.length; index += 1) {
     const item = queue[index]!;
     catalogScanned += 1;
-    const existing = catalogByAsin.get(item.asin);
-    const wasNewToCatalog = !existing;
+    // Defensa: ASIN indexado entre discovery y este paso → lo deja check-prices.
+    if (catalogByAsin.has(item.asin)) {
+      unchanged += 1;
+      continue;
+    }
 
     try {
       let title =
@@ -247,9 +248,9 @@ export async function runFlashDealsCheck(options?: {
         item.origin === "simulated" ? (item.listPriceHint ?? null) : null;
       let amazonUrl = item.amazonUrl || generateAmazonUrl(item.asin);
       let isFlashDeal = item.origin !== "live" || Boolean(listPrice && price);
-      let imageUrl: string | null = existing?.image_url ?? null;
-      let brand: string | null = existing?.brand ?? null;
-      let description: string | null = existing?.description ?? null;
+      let imageUrl: string | null = null;
+      let brand: string | null = null;
+      let description: string | null = null;
       let categorySlugHint: string | undefined;
       let categoryBreadcrumbs: string[] | undefined;
 
@@ -324,309 +325,131 @@ export async function runFlashDealsCheck(options?: {
         : null;
       const scoringCategorySlug = resolvedCategorySlug ?? "general";
 
-      if (wasNewToCatalog) {
-        const slug = slugify(`${title}-${item.asin}`);
-        const now = new Date().toISOString();
-        const scoring = dealScoringService.scoreProduct({
-          currentPrice: price,
-          previousPrice: reference > price ? reference : null,
-          lowestPrice: price,
-          categorySlug: scoringCategorySlug,
-        });
+      const slug = slugify(`${title}-${item.asin}`);
+      const now = new Date().toISOString();
+      const scoring = dealScoringService.scoreProduct({
+        currentPrice: price,
+        previousPrice: reference > price ? reference : null,
+        lowestPrice: price,
+        categorySlug: scoringCategorySlug,
+      });
 
-        const { error: slugCleanupError } = await client
-          .from("products")
-          .delete()
-          .eq("slug", slug)
-          .neq("asin", item.asin);
+      const { error: slugCleanupError } = await client
+        .from("products")
+        .delete()
+        .eq("slug", slug)
+        .neq("asin", item.asin);
 
-        if (slugCleanupError) {
-          throw new Error(slugCleanupError.message);
-        }
+      if (slugCleanupError) {
+        throw new Error(slugCleanupError.message);
+      }
 
-        const { data: insertedRow, error: insertError } = await client
-          .from("products")
-          .insert({
-            asin: item.asin,
-            title,
-            slug,
-            amazon_url: amazonUrl,
-            affiliate_url: generateAffiliateUrl({
-              amazon_url: amazonUrl,
-              asin: item.asin,
-            }),
-            brand,
-            image_url: imageUrl,
-            description,
-            category_id: categoryMeta?.id ?? null,
-            current_price: price,
-            previous_price: reference,
-            lowest_price: price,
-            highest_price: Math.max(price, reference),
-            discount_percentage: discount,
-            currency: "EUR",
-            availability: ProductAvailability.IN_STOCK,
-            is_active: true,
-            last_checked_at: now,
-            updated_at: now,
-          })
-          .select("id, asin, title, slug")
-          .single();
-
-        if (insertError) {
-          // Carrera / ASIN ya creado: actualizar solo precio.
-          if (insertError.code === "23505" || /duplicate|unique/i.test(insertError.message)) {
-            const { data: raced } = await client
-              .from("products")
-              .select(
-                "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description",
-              )
-              .eq("asin", item.asin)
-              .maybeSingle();
-
-            if (raced) {
-              catalogByAsin.set(item.asin, raced as CatalogRow);
-              // Caer al branch de update más abajo reutilizando lógica vía goto-style.
-              const storedPrice = toNumber(raced.current_price) ?? price;
-              const priceChanged = Math.abs(price - storedPrice) >= 0.01;
-              if (priceChanged) {
-                await client
-                  .from("products")
-                  .update({
-                    current_price: price,
-                    previous_price: reference,
-                    discount_percentage: discount,
-                    lowest_price: roundMoney(
-                      Math.min(toNumber(raced.lowest_price) ?? price, price),
-                    ),
-                    highest_price: roundMoney(
-                      Math.max(
-                        toNumber(raced.highest_price) ?? price,
-                        price,
-                        reference,
-                      ),
-                    ),
-                    last_checked_at: now,
-                    updated_at: now,
-                  })
-                  .eq("id", raced.id);
-                await client.from("price_history").insert({
-                  product_id: raced.id,
-                  price,
-                  source: "amazon",
-                });
-                updated += 1;
-                products.push({
-                  asin: item.asin,
-                  title: raced.title,
-                  action: "updated",
-                  isFlashDeal,
-                  isNewLow: false,
-                  currentPrice: price,
-                  listPrice: reference > price ? reference : null,
-                  discountPercentage: discount,
-                  amazonUrl,
-                  wasNewToCatalog: false,
-                });
-              } else {
-                unchanged += 1;
-              }
-              continue;
-            }
-          }
-          throw new Error(insertError.message);
-        }
-
-        await client.from("price_history").insert({
-          product_id: insertedRow.id,
-          price,
-          source: "amazon",
-        });
-
-        catalogByAsin.set(item.asin, {
-          id: insertedRow.id,
-          asin: insertedRow.asin,
-          title: insertedRow.title,
-          slug: insertedRow.slug ?? slug,
+      const { data: insertedRow, error: insertError } = await client
+        .from("products")
+        .insert({
+          asin: item.asin,
+          title,
+          slug,
           amazon_url: amazonUrl,
-          affiliate_url: null,
-          current_price: price,
-          previous_price: reference,
-          lowest_price: price,
-          highest_price: Math.max(price, reference),
+          affiliate_url: generateAffiliateUrl({
+            amazon_url: amazonUrl,
+            asin: item.asin,
+          }),
           brand,
           image_url: imageUrl,
           description,
           category_id: categoryMeta?.id ?? null,
-        });
+          current_price: price,
+          previous_price: reference,
+          lowest_price: price,
+          highest_price: Math.max(price, reference),
+          discount_percentage: discount,
+          currency: "EUR",
+          availability: ProductAvailability.IN_STOCK,
+          is_active: true,
+          last_checked_at: now,
+          updated_at: now,
+        })
+        .select("id, asin, title, slug")
+        .single();
 
-        inserted += 1;
-        newLows += 1;
-
-        if (shouldNotify) {
-          const channelStatus = await maybeNotifyFlashChannel(client, {
-            productId: insertedRow.id,
-            asin: item.asin,
-            title: insertedRow.title,
-            currentPrice: price,
-            previousPrice: reference,
-            discountPercentage: discount,
-            score: scoring.score,
-            dealLevel: scoring.level,
-            dealLabel: scoring.label,
-            amazonUrl,
-            productSlug: slug,
-            brand,
-            categoryId: categoryMeta?.id ?? null,
-            categoryName: categoryMeta?.name ?? null,
-            categorySlug: scoringCategorySlug,
-            imageUrl,
-            summary: description || brand,
-          });
-          if (channelStatus === "sent") channelNotificationsSent += 1;
-          if (channelStatus === "skipped") channelNotificationsSkipped += 1;
+      if (insertError) {
+        // Carrera / ASIN ya creado: lo vigila check-prices, no re-chequeamos aquí.
+        if (
+          insertError.code === "23505" ||
+          /duplicate|unique/i.test(insertError.message)
+        ) {
+          unchanged += 1;
+          continue;
         }
+        throw new Error(insertError.message);
+      }
 
-        products.push({
+      await client.from("price_history").insert({
+        product_id: insertedRow.id,
+        price,
+        source: "amazon",
+      });
+
+      catalogByAsin.set(item.asin, {
+        id: insertedRow.id,
+        asin: insertedRow.asin,
+        title: insertedRow.title,
+        slug: insertedRow.slug ?? slug,
+        amazon_url: amazonUrl,
+        affiliate_url: null,
+        current_price: price,
+        previous_price: reference,
+        lowest_price: price,
+        highest_price: Math.max(price, reference),
+        brand,
+        image_url: imageUrl,
+        description,
+        category_id: categoryMeta?.id ?? null,
+      });
+
+      inserted += 1;
+      newLows += 1;
+
+      if (shouldNotify) {
+        const channelStatus = await maybeNotifyFlashChannel(client, {
+          productId: insertedRow.id,
           asin: item.asin,
           title: insertedRow.title,
-          action: "inserted",
-          isFlashDeal,
-          isNewLow: true,
           currentPrice: price,
-          listPrice: reference > price ? reference : null,
+          previousPrice: reference,
           discountPercentage: discount,
-          dealLabel: scoring.label,
+          score: scoring.score,
           dealLevel: scoring.level,
+          dealLabel: scoring.label,
           amazonUrl,
+          productSlug: slug,
+          brand,
+          categoryId: categoryMeta?.id ?? null,
+          categoryName: categoryMeta?.name ?? null,
+          categorySlug: scoringCategorySlug,
           imageUrl,
-          wasNewToCatalog: true,
+          summary: description || brand,
         });
-      } else {
-        // Producto ya en catálogo: solo precio / descuento / histórico.
-        const storedPrice = toNumber(existing!.current_price) ?? price;
-        const previousLowest = toNumber(existing!.lowest_price);
-        const isNewLow =
-          previousLowest === null ? true : price < previousLowest - 0.001;
-        const priceChanged = Math.abs(price - storedPrice) >= 0.01;
-
-        if (!priceChanged && !isNewLow) {
-          await client
-            .from("products")
-            .update({ last_checked_at: new Date().toISOString() })
-            .eq("id", existing!.id);
-          unchanged += 1;
-          products.push({
-            asin: item.asin,
-            title: existing!.title,
-            action: "unchanged",
-            isFlashDeal,
-            isNewLow: false,
-            currentPrice: price,
-            listPrice: reference > price ? reference : null,
-            discountPercentage: discount,
-            amazonUrl,
-            imageUrl: imageUrl ?? existing!.image_url,
-            wasNewToCatalog: false,
-          });
-        } else {
-          const lowestPrice = roundMoney(
-            Math.min(previousLowest ?? price, price),
-          );
-          const highestPrice = roundMoney(
-            Math.max(
-              toNumber(existing!.highest_price) ?? price,
-              price,
-              reference,
-            ),
-          );
-          const scoring = dealScoringService.scoreProduct({
-            currentPrice: price,
-            previousPrice: reference > price ? reference : storedPrice,
-            lowestPrice: previousLowest,
-            categorySlug: scoringCategorySlug,
-          });
-          const now = new Date().toISOString();
-
-          const { error: updateError } = await client
-            .from("products")
-            .update({
-              current_price: price,
-              previous_price: reference,
-              lowest_price: lowestPrice,
-              highest_price: highestPrice,
-              discount_percentage: discount,
-              last_checked_at: now,
-              updated_at: now,
-              ...(imageUrl ? { image_url: imageUrl } : {}),
-              ...(brand ? { brand } : {}),
-              ...(description ? { description } : {}),
-              ...(!existing!.category_id && categoryMeta?.id
-                ? { category_id: categoryMeta.id }
-                : {}),
-            })
-            .eq("id", existing!.id);
-
-          if (updateError) {
-            throw new Error(updateError.message);
-          }
-
-          await client.from("price_history").insert({
-            product_id: existing!.id,
-            price,
-            source: "amazon",
-          });
-
-          updated += 1;
-          if (isNewLow) newLows += 1;
-
-          if (shouldNotify) {
-            const channelStatus = await maybeNotifyFlashChannel(client, {
-              productId: existing!.id,
-              asin: item.asin,
-              title: existing!.title,
-              currentPrice: price,
-              previousPrice: reference > price ? reference : storedPrice,
-              discountPercentage: discount,
-              score: scoring.score,
-              dealLevel: scoring.level,
-              dealLabel: scoring.label,
-              amazonUrl,
-              affiliateUrl: existing!.affiliate_url,
-              productSlug: existing!.slug,
-              brand: brand ?? existing!.brand,
-              categoryId: categoryMeta?.id ?? existing!.category_id,
-              categoryName: categoryMeta?.name ?? null,
-              categorySlug: scoringCategorySlug,
-              imageUrl: imageUrl ?? existing!.image_url,
-              summary:
-                description ||
-                existing!.description?.trim() ||
-                brand ||
-                existing!.brand ||
-                null,
-            });
-            if (channelStatus === "sent") channelNotificationsSent += 1;
-            if (channelStatus === "skipped") channelNotificationsSkipped += 1;
-          }
-
-          products.push({
-            asin: item.asin,
-            title: existing!.title,
-            action: "updated",
-            isFlashDeal,
-            isNewLow,
-            currentPrice: price,
-            listPrice: reference > price ? reference : null,
-            discountPercentage: discount,
-            dealLabel: scoring.label,
-            dealLevel: scoring.level,
-            amazonUrl,
-            imageUrl: imageUrl ?? existing!.image_url,
-            wasNewToCatalog: false,
-          });
-        }
+        if (channelStatus === "sent") channelNotificationsSent += 1;
+        if (channelStatus === "skipped") channelNotificationsSkipped += 1;
       }
+
+      products.push({
+        asin: item.asin,
+        title: insertedRow.title,
+        action: "inserted",
+        isFlashDeal,
+        isNewLow: true,
+        currentPrice: price,
+        listPrice: reference > price ? reference : null,
+        discountPercentage: discount,
+        dealLabel: scoring.label,
+        dealLevel: scoring.level,
+        amazonUrl,
+        imageUrl,
+        wasNewToCatalog: true,
+      });
     } catch (error) {
       errors.push({
         asin: item.asin,
@@ -647,7 +470,7 @@ export async function runFlashDealsCheck(options?: {
       feedsFetched: discovery.feedsFetched,
       candidates: discovered.length,
       newAsins: newCandidates.length,
-      existingAsins: existingCandidates.length,
+      existingAsins,
       usedSimulation: discovery.usedSimulation,
       feedErrors: discovery.feedErrors,
     },
