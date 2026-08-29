@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
-import { Download, Droplet, Loader2, Pipette, Save } from "lucide-react";
+import { Download, Loader2, Save } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { SocialCardStyleControls } from "@/components/admin/SocialCardStyleControls";
 import { formatEuro } from "@/lib/money";
 import {
   formatSocialProjectDate,
@@ -42,37 +43,6 @@ type ImageFit =
   | "blur"
   | "smart";
 
-const IMAGE_FITS: Array<{
-  id: ImageFit;
-  label: string;
-  hint: string;
-}> = [
-  {
-    id: "contain",
-    label: "Contain",
-    hint: "Imagen completa + color de fondo",
-  },
-  {
-    id: "cover",
-    label: "Cover",
-    hint: "Rellena y recorta al centro",
-  },
-  {
-    id: "cover-top",
-    label: "Cover top",
-    hint: "Rellena priorizando la parte superior",
-  },
-  {
-    id: "blur",
-    label: "Blur fill",
-    hint: "Completa + fondo difuminado de la foto",
-  },
-  {
-    id: "smart",
-    label: "Smart",
-    hint: "Elige solo: cover si encaja, si no blur",
-  },
-];
 
 interface ExportFormat {
   id: FormatId;
@@ -83,11 +53,6 @@ interface ExportFormat {
   height: number;
 }
 
-interface TemplateStyle {
-  id: StyleId;
-  label: string;
-  hint: string;
-}
 
 const FORMATS: ExportFormat[] = [
   {
@@ -147,28 +112,6 @@ const LAYOUTS: Array<{ id: LayoutId; label: string; hint: string }> = [
   },
 ];
 
-const STYLES: TemplateStyle[] = [
-  {
-    id: "cream",
-    label: "Soft Cream",
-    hint: "Degradado cálido coral / melocotón",
-  },
-  {
-    id: "border",
-    label: "Border",
-    hint: "Pasteles alegres (ámbar, rosa, cielo)",
-  },
-  {
-    id: "pastel",
-    label: "Soft Pastel",
-    hint: "Degradado suave melocotón → lavanda",
-  },
-  {
-    id: "sunset",
-    label: "Sunset",
-    hint: "Naranja y violeta difuminados",
-  },
-];
 
 const STYLE_THEME: Record<
   StyleId,
@@ -287,12 +230,6 @@ function toneLabel(tone: number): string {
   return "Pastel";
 }
 
-function toneHueDegrees(tone: number): number {
-  const t = Math.min(100, Math.max(0, tone)) / 100;
-  const band = t < 1 / 3 ? 0 : t < 2 / 3 ? 1 : 2;
-  const local = band === 0 ? t * 3 : band === 1 ? (t - 1 / 3) * 3 : (t - 2 / 3) * 3;
-  return Math.round((local * 360 + band * 47) % 360);
-}
 
 /**
  * Slider 0–100 → infinidad de fondos light con degradados.
@@ -692,7 +629,6 @@ export function SocialAdminClient({
   const [exporting, setExporting] = useState(false);
   const [imageReady, setImageReady] = useState(false);
   const [imageBgColor, setImageBgColor] = useState<string | null>(null);
-  const [pickingColor, setPickingColor] = useState(false);
 
   const selected = useMemo(
     () => products.find((p) => p.id === selectedId) ?? null,
@@ -1014,11 +950,14 @@ export function SocialAdminClient({
   function renderBadge(variant: "pill" | "seal" = "pill") {
     if (discount <= 0) return null;
     const isVibrant = colorTone >= 50 && colorTone < 80;
+    const badgeFont = isStory ? 42 : isLandscape ? 36 : 38;
+    const badgePadY = isStory ? 16 : 14;
+    const badgePadX = isStory ? 28 : 24;
 
     if (variant === "seal") {
-      const size = isStory ? 128 : isLandscape ? 108 : 116;
+      const size = isStory ? 168 : isLandscape ? 140 : 152;
       return (
-        <div className="absolute z-10" style={{ top: 22, right: 22 }}>
+        <div className="pointer-events-none absolute z-30" style={{ top: 24, right: 24 }}>
           <div
             className="relative flex items-center justify-center font-extrabold tracking-tight text-white"
             style={{
@@ -1027,8 +966,9 @@ export function SocialAdminClient({
               background: theme.sealBg,
               clipPath:
                 "polygon(50% 0%, 85% 15%, 100% 50%, 85% 85%, 50% 100%, 15% 85%, 0% 50%, 15% 15%)",
-              boxShadow: "0 14px 32px rgba(15, 23, 42, 0.22)",
-              fontSize: isStory ? 34 : 28,
+              boxShadow: "0 14px 36px rgba(15, 23, 42, 0.28)",
+              fontSize: isStory ? 44 : 38,
+              lineHeight: 1,
               transform: "rotate(-8deg)",
             }}
           >
@@ -1039,12 +979,13 @@ export function SocialAdminClient({
     }
 
     return (
-      <div className="absolute z-10" style={{ top: 28, right: 28 }}>
+      <div className="pointer-events-none absolute z-30" style={{ top: 24, right: 24 }}>
         <span
-          className="inline-flex items-center rounded-full font-bold tracking-wide text-white"
+          className="inline-flex items-center whitespace-nowrap rounded-full font-extrabold tracking-wide text-white"
           style={{
-            padding: isStory ? "14px 26px" : "12px 22px",
-            fontSize: isStory ? 28 : 22,
+            padding: `${badgePadY}px ${badgePadX}px`,
+            fontSize: badgeFont,
+            lineHeight: 1,
             background: isVibrant
               ? "linear-gradient(135deg, #f97316, #7c3aed)"
               : "#e11d48",
@@ -1309,13 +1250,14 @@ export function SocialAdminClient({
           >
             {bannerLabel}
           </p>
-          {discount > 0 ? (
+              {discount > 0 ? (
             <span
-              className="font-extrabold text-white"
+              className="whitespace-nowrap font-extrabold text-white"
               style={{
-                fontSize: isStory ? 28 : 22,
+                fontSize: isStory ? 42 : 36,
+                lineHeight: 1,
                 background: "rgba(255,255,255,0.22)",
-                padding: "8px 16px",
+                padding: isStory ? "16px 28px" : "14px 24px",
                 borderRadius: 999,
               }}
             >
@@ -1452,547 +1394,46 @@ export function SocialAdminClient({
       </header>
 
       <section className="mt-8 space-y-5 border border-stone-300 bg-white p-5 md:p-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Layout de tarjeta
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {LAYOUTS.map((item) => {
-              const active = item.id === layoutId;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setLayoutId(item.id)}
-                  className={`rounded-sm border px-4 py-3 text-left transition ${
-                    active
-                      ? "border-ink bg-ink text-paper"
-                      : "border-stone-300 bg-white text-ink hover:border-stone-500"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <p
-                    className={`mt-1 text-[11px] leading-snug ${
-                      active ? "text-paper/70" : "text-stone-500"
-                    }`}
-                  >
-                    {item.hint}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-          {layoutId === "float" ? (
-            <div className="mt-4 grid gap-3 border border-stone-200 bg-stone-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <p className="sm:col-span-2 lg:col-span-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Flotante: inclinación, posición y zoom
-              </p>
-              <label className="text-xs text-stone-600">
-                Ángulo ({floatRotate}°)
-                <input
-                  type="range"
-                  min={-15}
-                  max={15}
-                  step={0.5}
-                  value={floatRotate}
-                  onChange={(event) =>
-                    setFloatRotate(Number(event.target.value))
-                  }
-                  className="mt-1 w-full accent-ink"
-                />
-              </label>
-              <label className="text-xs text-stone-600">
-                Desplazamiento X ({floatOffsetX}px)
-                <input
-                  type="range"
-                  min={-120}
-                  max={120}
-                  step={1}
-                  value={floatOffsetX}
-                  onChange={(event) =>
-                    setFloatOffsetX(Number(event.target.value))
-                  }
-                  className="mt-1 w-full accent-ink"
-                />
-              </label>
-              <label className="text-xs text-stone-600">
-                Desplazamiento Y ({floatOffsetY}px)
-                <input
-                  type="range"
-                  min={-80}
-                  max={200}
-                  step={1}
-                  value={floatOffsetY}
-                  onChange={(event) =>
-                    setFloatOffsetY(Number(event.target.value))
-                  }
-                  className="mt-1 w-full accent-ink"
-                />
-              </label>
-              <label className="text-xs text-stone-600">
-                Zoom imagen ({Math.round(floatZoom * 100)}%)
-                <input
-                  type="range"
-                  min={0.5}
-                  max={1.6}
-                  step={0.05}
-                  value={floatZoom}
-                  onChange={(event) =>
-                    setFloatZoom(Number(event.target.value))
-                  }
-                  className="mt-1 w-full accent-ink"
-                />
-              </label>
-              <p className="sm:col-span-2 lg:col-span-4 text-[11px] text-stone-500">
-                La imagen flotante ya no se recorta contra el borde de la
-                tarjeta; usa zoom/posición si sobresale del lienzo.
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Paleta / fondo (light)
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {STYLES.map((item) => {
-              const active = Math.abs(colorTone - PRESET_TONE[item.id]) <= 1.5;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setStyleId(item.id);
-                    setColorTone(PRESET_TONE[item.id]);
-                  }}
-                  className={`rounded-sm border px-4 py-3 text-left transition ${
-                    active
-                      ? "border-ink bg-ink text-paper"
-                      : "border-stone-300 bg-white text-ink hover:border-stone-500"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <p
-                    className={`mt-1 text-[11px] leading-snug ${
-                      active ? "text-paper/70" : "text-stone-500"
-                    }`}
-                  >
-                    {item.hint}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 border border-stone-200 bg-stone-50/80 p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Tono del degradado
-              </p>
-              <p className="text-xs text-stone-600">
-                {toneName} · matiz {toneHueDegrees(colorTone)}° ·{" "}
-                {Math.round(colorTone)}
-              </p>
-            </div>
-            <p className="mt-1 text-[11px] text-stone-500">
-              0–33 normal, 34–66 vibrante, 67–100 pastel. En cada zona el matiz
-              rota (~360°) → muchas variaciones, no solo las 4 presets.
-            </p>
-            <div
-              className="mt-3 h-3 w-full border border-stone-200"
-              style={{
-                background: theme.canvasBg,
-              }}
-              aria-hidden
-            />
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={colorTone}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                setColorTone(next);
-                const match = (Object.keys(PRESET_TONE) as StyleId[]).find(
-                  (id) => Math.abs(PRESET_TONE[id] - next) <= 1.5,
-                );
-                if (match) setStyleId(match);
-              }}
-              className="mt-3 w-full accent-ink"
-              aria-label="Tono del degradado de fondo"
-            />
-            <div className="mt-1 flex justify-between text-[10px] uppercase tracking-[0.12em] text-stone-400">
-              <span>Normal</span>
-              <span>Vibrante</span>
-              <span>Pastel</span>
-            </div>
-          </div>
-
-          <div className="mt-4 border border-stone-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-              Fondo de la tarjeta
-            </p>
-            <p className="mt-1 text-[11px] text-stone-500">
-              Independiente del degradado del lienzo. Por defecto blanco.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-sm text-ink">
-                <span
-                  className="relative h-9 w-9 overflow-hidden rounded-sm border border-stone-300"
-                  style={{ background: cardSurfaceColor }}
-                >
-                  <input
-                    type="color"
-                    value={
-                      /^#[0-9a-fA-F]{6}$/.test(cardSurfaceColor)
-                        ? cardSurfaceColor
-                        : "#ffffff"
-                    }
-                    onChange={(event) =>
-                      setCardSurfaceColor(event.target.value)
-                    }
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    aria-label="Color de fondo de la tarjeta"
-                  />
-                </span>
-                <span className="font-mono text-xs uppercase">
-                  {cardSurfaceColor}
-                </span>
-              </label>
-              <button
-                type="button"
-                disabled={pickingColor}
-                onClick={async () => {
-                  const EyeDropperCtor = (
-                    window as Window & {
-                      EyeDropper?: new () => {
-                        open: () => Promise<{ sRGBHex: string }>;
-                      };
-                    }
-                  ).EyeDropper;
-                  if (!EyeDropperCtor) {
-                    toast.error(
-                      "Tu navegador no soporta el cuentagotas. Usa Chrome/Edge.",
-                    );
-                    return;
-                  }
-                  setPickingColor(true);
-                  try {
-                    const result = await new EyeDropperCtor().open();
-                    setCardSurfaceColor(result.sRGBHex);
-                  } catch {
-                    // usuario canceló
-                  } finally {
-                    setPickingColor(false);
-                  }
-                }}
-                className="inline-flex items-center gap-2 rounded-sm border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink hover:border-ink disabled:opacity-50"
-              >
-                {pickingColor ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Pipette className="h-3.5 w-3.5" />
-                )}
-                Cuentagotas
-              </button>
-              <button
-                type="button"
-                onClick={() => setCardSurfaceColor("#ffffff")}
-                className="inline-flex items-center gap-2 rounded-sm border border-stone-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-600 hover:border-ink hover:text-ink"
-              >
-                <Droplet className="h-3.5 w-3.5" />
-                Blanco
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Formato de exportación
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {FORMATS.map((item) => {
-              const active = item.id === formatId;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setFormatId(item.id)}
-                  className={`rounded-sm border px-4 py-3 text-left transition ${
-                    active
-                      ? "border-ink bg-ink text-paper"
-                      : "border-stone-300 bg-white text-ink hover:border-stone-500"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">
-                    {item.label}{" "}
-                    <span
-                      className={active ? "text-paper/70" : "text-stone-400"}
-                    >
-                      {item.ratio}
-                    </span>
-                  </p>
-                  <p
-                    className={`mt-1 text-[11px] leading-snug ${
-                      active ? "text-paper/70" : "text-stone-500"
-                    }`}
-                  >
-                    {item.width}×{item.height} · {item.hint}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Ajuste de imagen
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            {IMAGE_FITS.map((item) => {
-              const active = item.id === imageFit;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setImageFit(item.id)}
-                  className={`rounded-sm border px-4 py-3 text-left transition ${
-                    active
-                      ? "border-ink bg-ink text-paper"
-                      : "border-stone-300 bg-white text-ink hover:border-stone-500"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <p
-                    className={`mt-1 text-[11px] leading-snug ${
-                      active ? "text-paper/70" : "text-stone-500"
-                    }`}
-                  >
-                    {item.hint}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Padding lateral (izq. + der.)
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[0, 24, 40, 56, 72, 96].map((value) => (
-                  <button
-                    key={`x-${value}`}
-                    type="button"
-                    onClick={() => setImagePadX(value)}
-                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
-                      imagePadX === value
-                        ? "border-ink bg-ink text-paper"
-                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
-                  Custom
-                  <input
-                    type="number"
-                    min={0}
-                    max={200}
-                    value={imagePadX}
-                    onChange={(event) =>
-                      setImagePadX(
-                        Math.min(
-                          200,
-                          Math.max(0, Number(event.target.value) || 0),
-                        ),
-                      )
-                    }
-                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
-                  />
-                  <span className="text-stone-400">px</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Padding vertical (sup. + inf.)
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[0, 24, 40, 56, 72, 96].map((value) => (
-                  <button
-                    key={`y-${value}`}
-                    type="button"
-                    onClick={() => setImagePadY(value)}
-                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
-                      imagePadY === value
-                        ? "border-ink bg-ink text-paper"
-                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
-                  Custom
-                  <input
-                    type="number"
-                    min={0}
-                    max={200}
-                    value={imagePadY}
-                    onChange={(event) =>
-                      setImagePadY(
-                        Math.min(
-                          200,
-                          Math.max(0, Number(event.target.value) || 0),
-                        ),
-                      )
-                    }
-                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
-                  />
-                  <span className="text-stone-400">px</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Padding texto (horizontal)
-              </p>
-              <p className="mt-1 text-[11px] text-stone-500">
-                Aplica a los 4 layouts; el bloque de texto queda abajo.
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[24, 36, 44, 56, 72, 96].map((value) => (
-                  <button
-                    key={`tx-${value}`}
-                    type="button"
-                    onClick={() => setTextPadX(value)}
-                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
-                      textPadX === value
-                        ? "border-ink bg-ink text-paper"
-                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
-                  Custom
-                  <input
-                    type="number"
-                    min={8}
-                    max={160}
-                    value={textPadX}
-                    onChange={(event) =>
-                      setTextPadX(
-                        Math.min(
-                          160,
-                          Math.max(8, Number(event.target.value) || 8),
-                        ),
-                      )
-                    }
-                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
-                  />
-                  <span className="text-stone-400">px</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Padding texto (vertical)
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[16, 24, 32, 40, 56, 72].map((value) => (
-                  <button
-                    key={`ty-${value}`}
-                    type="button"
-                    onClick={() => setTextPadY(value)}
-                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
-                      textPadY === value
-                        ? "border-ink bg-ink text-paper"
-                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
-                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
-                  Custom
-                  <input
-                    type="number"
-                    min={8}
-                    max={160}
-                    value={textPadY}
-                    onChange={(event) =>
-                      setTextPadY(
-                        Math.min(
-                          160,
-                          Math.max(8, Number(event.target.value) || 8),
-                        ),
-                      )
-                    }
-                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
-                  />
-                  <span className="text-stone-400">px</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-              Border radius (card + zona imagen)
-            </p>
-            <p className="mt-1 text-[11px] text-stone-500">
-              Un solo valor para la card y la zona gris de la imagen (también con
-              padding).
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {[0, 16, 24, 32, 40, 56, 72].map((value) => (
-                <button
-                  key={`card-r-${value}`}
-                  type="button"
-                  onClick={() => setCardRadius(value)}
-                  className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
-                    cardRadius === value
-                      ? "border-ink bg-ink text-paper"
-                      : "border-stone-300 bg-white text-stone-700 hover:border-ink"
-                  }`}
-                >
-                  {value}
-                </button>
-              ))}
-              <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
-                Custom
-                <input
-                  type="number"
-                  min={0}
-                  max={200}
-                  value={cardRadius}
-                  onChange={(event) =>
-                    setCardRadius(
-                      Math.min(
-                        200,
-                        Math.max(0, Number(event.target.value) || 0),
-                      ),
-                    )
-                  }
-                  className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
-                />
-                <span className="text-stone-400">px</span>
-              </label>
-            </div>
-          </div>
-        </div>
+        <SocialCardStyleControls
+          value={{
+            layoutId,
+            formatId,
+            styleId,
+            colorTone,
+            imageFit,
+            imagePadX,
+            imagePadY,
+            cardRadius,
+            cardSurfaceColor,
+            floatRotate,
+            floatOffsetX,
+            floatOffsetY,
+            floatZoom,
+            textPadX,
+            textPadY,
+          }}
+          onChange={(patch) => {
+            if (patch.layoutId !== undefined) setLayoutId(patch.layoutId);
+            if (patch.formatId !== undefined) setFormatId(patch.formatId);
+            if (patch.styleId !== undefined) setStyleId(patch.styleId);
+            if (patch.colorTone !== undefined) setColorTone(patch.colorTone);
+            if (patch.imageFit !== undefined) setImageFit(patch.imageFit);
+            if (patch.imagePadX !== undefined) setImagePadX(patch.imagePadX);
+            if (patch.imagePadY !== undefined) setImagePadY(patch.imagePadY);
+            if (patch.cardRadius !== undefined) setCardRadius(patch.cardRadius);
+            if (patch.cardSurfaceColor !== undefined)
+              setCardSurfaceColor(patch.cardSurfaceColor);
+            if (patch.floatRotate !== undefined) setFloatRotate(patch.floatRotate);
+            if (patch.floatOffsetX !== undefined)
+              setFloatOffsetX(patch.floatOffsetX);
+            if (patch.floatOffsetY !== undefined)
+              setFloatOffsetY(patch.floatOffsetY);
+            if (patch.floatZoom !== undefined) setFloatZoom(patch.floatZoom);
+            if (patch.textPadX !== undefined) setTextPadX(patch.textPadX);
+            if (patch.textPadY !== undefined) setTextPadY(patch.textPadY);
+          }}
+          onNotify={(message) => toast.error(message)}
+        />
 
         <div className="grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-[1fr_1.4fr_auto] md:items-end">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">

@@ -137,6 +137,26 @@ export function socialCardFormatSize(formatId: SocialCardFormatId) {
   return FORMATS[formatId] ?? FORMATS.story;
 }
 
+function resolveDiscountPercent(product: SocialCardPreviewProduct): number {
+  if (product.discountPercentage > 0) {
+    return Math.max(0, Math.round(product.discountPercentage));
+  }
+  if (
+    product.previousPrice != null &&
+    product.previousPrice > product.currentPrice
+  ) {
+    return Math.max(
+      0,
+      Math.round(
+        ((product.previousPrice - product.currentPrice) /
+          product.previousPrice) *
+          100,
+      ),
+    );
+  }
+  return 0;
+}
+
 export function SocialCardPreview({
   product,
   style,
@@ -153,7 +173,7 @@ export function SocialCardPreview({
   const imageUrl = proxiedImageUrl(product.imageUrl);
   const [ready, setReady] = useState(false);
   const [bg, setBg] = useState<string | null>(null);
-  const discount = Math.max(0, Math.round(product.discountPercentage || 0));
+  const discount = resolveDiscountPercent(product);
   const previous =
     product.previousPrice != null &&
     product.previousPrice > product.currentPrice
@@ -171,6 +191,12 @@ export function SocialCardPreview({
   const floatZoom = Math.max(0.4, Math.min(2, style.floatZoom ?? 1));
   const imageAreaBg =
     style.imageFit === "blur" ? (bg ?? "#f5f5f4") : style.cardSurfaceColor;
+  // Tamaños pensados a resolución nativa (1080+); el preview escala con `scale`.
+  const badgeFont = isStory ? 42 : isLandscape ? 36 : 38;
+  const badgePadY = isStory ? 16 : 14;
+  const badgePadX = isStory ? 28 : 24;
+  const sealSize = isStory ? 168 : isLandscape ? 140 : 152;
+  const sealFont = isStory ? 44 : 38;
 
   useEffect(() => {
     setReady(false);
@@ -254,16 +280,17 @@ export function SocialCardPreview({
     if (style.layoutId === "seal") {
       return (
         <div
-          className="absolute z-[3] flex items-center justify-center font-extrabold text-white"
+          className="pointer-events-none absolute z-30 flex items-center justify-center font-extrabold tracking-tight text-white"
           style={{
-            top: 28,
-            right: 28,
-            width: isStory ? 140 : 120,
-            height: isStory ? 140 : 120,
+            top: 24,
+            right: 24,
+            width: sealSize,
+            height: sealSize,
             borderRadius: "50%",
             background: theme.sealBg,
-            fontSize: isStory ? 36 : 30,
-            boxShadow: "0 12px 28px rgba(0,0,0,0.2)",
+            fontSize: sealFont,
+            lineHeight: 1,
+            boxShadow: "0 14px 36px rgba(0,0,0,0.28)",
           }}
         >
           −{discount}%
@@ -272,14 +299,16 @@ export function SocialCardPreview({
     }
     return (
       <div
-        className="absolute z-[3] font-extrabold text-white"
+        className="pointer-events-none absolute z-30 whitespace-nowrap font-extrabold tracking-wide text-white"
         style={{
-          top: 28,
-          left: 28,
+          top: 24,
+          right: 24,
           background: theme.priceAccent,
-          padding: "10px 18px",
+          padding: `${badgePadY}px ${badgePadX}px`,
           borderRadius: 999,
-          fontSize: isStory ? 28 : 24,
+          fontSize: badgeFont,
+          lineHeight: 1,
+          boxShadow: "0 12px 28px rgba(15,23,42,0.28)",
         }}
       >
         −{discount}%
@@ -377,6 +406,20 @@ export function SocialCardPreview({
                 {product.brand ||
                   (discount > 0 ? `Chollo −${discount}%` : "CazaOfertas")}
               </p>
+              {discount > 0 ? (
+                <span
+                  className="whitespace-nowrap font-extrabold text-white"
+                  style={{
+                    fontSize: badgeFont,
+                    lineHeight: 1,
+                    background: "rgba(255,255,255,0.22)",
+                    padding: `${badgePadY}px ${badgePadX}px`,
+                    borderRadius: 999,
+                  }}
+                >
+                  −{discount}%
+                </span>
+              ) : null}
             </div>
             <div className="relative min-h-0 w-full flex-1">
               <Media width="100%" height="100%" radius={0} />

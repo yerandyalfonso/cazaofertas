@@ -13,6 +13,9 @@ import {
 import { flushSync } from "react-dom";
 import { toPng } from "html-to-image";
 import { Download, Loader2, Play, Save, Square } from "lucide-react";
+import {
+  SocialCardStyleControls,
+} from "@/components/admin/SocialCardStyleControls";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import {
   SocialCardPreview,
@@ -22,11 +25,7 @@ import {
 import {
   getSocialCardProject,
   loadSocialCardProjects,
-  type SocialCardFormatId,
-  type SocialCardImageFit,
-  type SocialCardLayoutId,
   type SocialCardProject,
-  type SocialCardStyleId,
 } from "@/lib/social-card-projects";
 import { formatEuro } from "@/lib/money";
 import {
@@ -93,43 +92,6 @@ interface CaptureSlide {
   product: AdminProduct;
   style: VideoCardStyle;
 }
-
-const PRESET_TONE: Record<SocialCardStyleId, number> = {
-  cream: 8,
-  border: 38,
-  sunset: 58,
-  pastel: 86,
-};
-
-const LAYOUTS: Array<{ id: SocialCardLayoutId; label: string }> = [
-  { id: "minimal", label: "Minimalista" },
-  { id: "float", label: "Flotante" },
-  { id: "banner", label: "Header Banner" },
-  { id: "seal", label: "Sello" },
-];
-
-const FORMATS: Array<{ id: SocialCardFormatId; label: string; ratio: string }> =
-  [
-    { id: "story", label: "Vertical", ratio: "9:16" },
-    { id: "square", label: "Cuadrado", ratio: "1:1" },
-    { id: "landscape", label: "Horizontal", ratio: "16:9" },
-    { id: "classic", label: "Clásico", ratio: "4:3" },
-  ];
-
-const IMAGE_FITS: Array<{ id: SocialCardImageFit; label: string }> = [
-  { id: "contain", label: "Contain" },
-  { id: "cover", label: "Cover" },
-  { id: "cover-top", label: "Cover top" },
-  { id: "blur", label: "Blur fill" },
-  { id: "smart", label: "Smart" },
-];
-
-const STYLES: Array<{ id: SocialCardStyleId; label: string }> = [
-  { id: "sunset", label: "Sunset" },
-  { id: "cream", label: "Soft Cream" },
-  { id: "border", label: "Border" },
-  { id: "pastel", label: "Soft Pastel" },
-];
 
 const TRANSITIONS: Array<{ id: VideoTransitionId; label: string }> = [
   { id: "fade", label: "Fade / opacidad" },
@@ -892,237 +854,15 @@ export function VideosAdminClient({
                 </ul>
               )}
 
-              <div className="space-y-4 border border-stone-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <div className="border border-stone-200 bg-white p-4 md:p-5">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
                   Estilo de tarjeta (productos)
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {LAYOUTS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => patchStyle({ layoutId: item.id })}
-                      className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
-                      style={chip(cardStyle.layoutId === item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                {cardStyle.layoutId === "float" ? (
-                  <div className="grid gap-3 border border-stone-200 bg-stone-50/80 p-3 sm:grid-cols-2">
-                    <p className="sm:col-span-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                      Flotante: ángulo / X / Y / zoom
-                    </p>
-                    <label className="text-xs text-stone-600">
-                      Ángulo ({cardStyle.floatRotate}°)
-                      <input
-                        type="range"
-                        min={-15}
-                        max={15}
-                        step={0.5}
-                        value={cardStyle.floatRotate}
-                        onChange={(event) =>
-                          patchStyle({
-                            floatRotate: Number(event.target.value),
-                          })
-                        }
-                        className="mt-1 w-full accent-ink"
-                      />
-                    </label>
-                    <label className="text-xs text-stone-600">
-                      X ({cardStyle.floatOffsetX}px)
-                      <input
-                        type="range"
-                        min={-120}
-                        max={120}
-                        step={1}
-                        value={cardStyle.floatOffsetX}
-                        onChange={(event) =>
-                          patchStyle({
-                            floatOffsetX: Number(event.target.value),
-                          })
-                        }
-                        className="mt-1 w-full accent-ink"
-                      />
-                    </label>
-                    <label className="text-xs text-stone-600">
-                      Y ({cardStyle.floatOffsetY}px)
-                      <input
-                        type="range"
-                        min={-80}
-                        max={200}
-                        step={1}
-                        value={cardStyle.floatOffsetY}
-                        onChange={(event) =>
-                          patchStyle({
-                            floatOffsetY: Number(event.target.value),
-                          })
-                        }
-                        className="mt-1 w-full accent-ink"
-                      />
-                    </label>
-                    <label className="text-xs text-stone-600">
-                      Zoom ({Math.round(cardStyle.floatZoom * 100)}%)
-                      <input
-                        type="range"
-                        min={0.5}
-                        max={1.6}
-                        step={0.05}
-                        value={cardStyle.floatZoom}
-                        onChange={(event) =>
-                          patchStyle({
-                            floatZoom: Number(event.target.value),
-                          })
-                        }
-                        className="mt-1 w-full accent-ink"
-                      />
-                    </label>
-                  </div>
-                ) : null}
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs text-stone-600">
-                    Pad. texto X
-                    <input
-                      type="number"
-                      min={8}
-                      max={160}
-                      value={cardStyle.textPadX}
-                      onChange={(event) =>
-                        patchStyle({
-                          textPadX: Math.max(
-                            8,
-                            Math.min(160, Number(event.target.value) || 8),
-                          ),
-                        })
-                      }
-                      className="mt-1 w-full border border-stone-300 px-2 py-1.5"
-                    />
-                  </label>
-                  <label className="text-xs text-stone-600">
-                    Pad. texto Y
-                    <input
-                      type="number"
-                      min={8}
-                      max={160}
-                      value={cardStyle.textPadY}
-                      onChange={(event) =>
-                        patchStyle({
-                          textPadY: Math.max(
-                            8,
-                            Math.min(160, Number(event.target.value) || 8),
-                          ),
-                        })
-                      }
-                      className="mt-1 w-full border border-stone-300 px-2 py-1.5"
-                    />
-                  </label>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {FORMATS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => patchStyle({ formatId: item.id })}
-                      className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
-                      style={chip(cardStyle.formatId === item.id)}
-                    >
-                      {item.label} {item.ratio}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {STYLES.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        patchStyle({
-                          styleId: item.id,
-                          colorTone: PRESET_TONE[item.id],
-                        })
-                      }
-                      className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
-                      style={chip(
-                        Math.abs(cardStyle.colorTone - PRESET_TONE[item.id]) <=
-                          1.5,
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <label className="block text-xs text-stone-600">
-                  Tono {Math.round(cardStyle.colorTone)}
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={cardStyle.colorTone}
-                    onChange={(event) =>
-                      patchStyle({ colorTone: Number(event.target.value) })
-                    }
-                    className="mt-1 w-full accent-ink"
-                  />
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {IMAGE_FITS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => patchStyle({ imageFit: item.id })}
-                      className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
-                      style={chip(cardStyle.imageFit === item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-xs text-stone-600">
-                    Padding
-                    <input
-                      type="number"
-                      min={0}
-                      max={80}
-                      value={cardStyle.imagePadX}
-                      onChange={(event) => {
-                        const v = Number(event.target.value) || 0;
-                        patchStyle({ imagePadX: v, imagePadY: v });
-                      }}
-                      className="mt-1 w-full border border-stone-300 px-2 py-1.5"
-                    />
-                  </label>
-                  <label className="text-xs text-stone-600">
-                    Radius
-                    <input
-                      type="number"
-                      min={0}
-                      max={80}
-                      value={cardStyle.cardRadius}
-                      onChange={(event) =>
-                        patchStyle({
-                          cardRadius: Number(event.target.value) || 0,
-                        })
-                      }
-                      className="mt-1 w-full border border-stone-300 px-2 py-1.5"
-                    />
-                  </label>
-                </div>
-                <label className="inline-flex items-center gap-2 text-xs text-stone-600">
-                  Fondo tarjeta
-                  <input
-                    type="color"
-                    value={
-                      /^#[0-9a-fA-F]{6}$/.test(cardStyle.cardSurfaceColor)
-                        ? cardStyle.cardSurfaceColor
-                        : "#ffffff"
-                    }
-                    onChange={(event) =>
-                      patchStyle({ cardSurfaceColor: event.target.value })
-                    }
-                  />
-                </label>
+                <SocialCardStyleControls
+                  value={cardStyle}
+                  onChange={(patch) => patchStyle(patch)}
+                  onNotify={(message) => toast.error(message)}
+                />
               </div>
             </>
           ) : (
