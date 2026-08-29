@@ -197,7 +197,7 @@ function enrichFromFallback(post: BlogPost): BlogPost {
       post.relatedProductSlugs && post.relatedProductSlugs.length > 0
         ? post.relatedProductSlugs
         : fallback.relatedProductSlugs,
-    coverImage: post.coverImage || fallback.coverImage,
+    coverImage: post.coverImage?.trim() || fallback.coverImage,
     coverAlt: post.coverAlt || fallback.coverAlt,
     template: post.template ?? fallback.template,
     pros: post.pros ?? fallback.pros,
@@ -208,7 +208,8 @@ function enrichFromFallback(post: BlogPost): BlogPost {
 }
 
 function mapArticleRow(row: ArticleQueryRow): BlogPost {
-  const coverImage = row.featured_image ?? BLOG_IMAGES.laptopDeals;
+  const coverImage =
+    row.featured_image?.trim() || BLOG_IMAGES.laptopDeals;
   const parsed = parseContent(row.content);
   const relatedFromJoin = productsFromArticleJoin(row).map((p) => p.slug);
 

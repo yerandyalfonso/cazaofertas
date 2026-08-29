@@ -197,14 +197,16 @@ function ArticleHeader({
       </div>
 
       <div className="relative mx-auto mt-10 aspect-[21/9] max-w-6xl overflow-hidden bg-stone-200 md:mt-14">
-        <RemoteImage
-          src={post.coverImage}
-          alt={post.coverAlt}
-          fill
-          priority
-          className="object-cover"
-          sizes="100vw"
-        />
+        {post.coverImage?.trim() ? (
+          <RemoteImage
+            src={post.coverImage}
+            alt={post.coverAlt}
+            fill
+            priority
+            className="object-cover"
+            sizes="100vw"
+          />
+        ) : null}
       </div>
     </header>
   );
