@@ -488,6 +488,7 @@ export async function runPriceDetection(
             brand: product.brand,
             categoryId: category?.id ?? product.category_id,
             categoryName: category?.name ?? null,
+            categorySlug: category?.slug ?? null,
             currentPrice: nextPrice,
             previousPrice:
               referencePrice > nextPrice ? referencePrice : storedPrice,

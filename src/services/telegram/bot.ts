@@ -10,6 +10,7 @@ import { absoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
+import { resolveTelegramTopicId } from "@/lib/telegram-topics";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { ensureProductFromAmazonUrl } from "@/services/products";
@@ -124,6 +125,7 @@ export async function sendTelegramMessage(options: {
   parseMode?: "HTML" | "MarkdownV2";
   replyMarkup?: InlineKeyboardMarkup;
   disableWebPagePreview?: boolean;
+  messageThreadId?: number | null;
 }): Promise<TelegramMessage> {
   return callTelegramApi<TelegramMessage>("sendMessage", {
     chat_id: options.chatId,
@@ -131,6 +133,9 @@ export async function sendTelegramMessage(options: {
     parse_mode: options.parseMode ?? "HTML",
     reply_markup: options.replyMarkup,
     disable_web_page_preview: options.disableWebPagePreview ?? true,
+    ...(options.messageThreadId != null
+      ? { message_thread_id: options.messageThreadId }
+      : {}),
   });
 }
 
@@ -140,6 +145,7 @@ export async function sendTelegramPhoto(options: {
   caption: string;
   parseMode?: "HTML" | "MarkdownV2";
   replyMarkup?: InlineKeyboardMarkup;
+  messageThreadId?: number | null;
 }): Promise<TelegramMessage> {
   return callTelegramApi<TelegramMessage>("sendPhoto", {
     chat_id: options.chatId,
@@ -147,6 +153,9 @@ export async function sendTelegramPhoto(options: {
     caption: options.caption,
     parse_mode: options.parseMode ?? "HTML",
     reply_markup: options.replyMarkup,
+    ...(options.messageThreadId != null
+      ? { message_thread_id: options.messageThreadId }
+      : {}),
   });
 }
 
@@ -396,6 +405,7 @@ export async function sendStartWelcome(chatId: number): Promise<TelegramMessage>
 export async function sendDealAlertMessage(options: {
   chatId: number | string;
   deal: DealCandidate;
+  messageThreadId?: number | null;
 }): Promise<TelegramMessage> {
   const replyMarkup = buildOfferActionMarkup({
     affiliateUrl: buildTrackedAffiliateUrl({
@@ -404,6 +414,7 @@ export async function sendDealAlertMessage(options: {
     }),
     productSlug: options.deal.productSlug,
   });
+  const messageThreadId = options.messageThreadId;
 
   const photoUrl = options.deal.imageUrl?.trim();
   if (photoUrl && /^https?:\/\//i.test(photoUrl)) {
@@ -413,6 +424,7 @@ export async function sendDealAlertMessage(options: {
         photoUrl,
         caption: buildDealAlertCaption(options.deal),
         replyMarkup,
+        messageThreadId,
       });
     } catch (error) {
       console.warn(
@@ -427,11 +439,13 @@ export async function sendDealAlertMessage(options: {
     text: buildDealAlertText(options.deal),
     disableWebPagePreview: true,
     replyMarkup,
+    messageThreadId,
   });
 }
 
 /**
- * Publica un chollo en el canal configurado (TELEGRAM_CHANNEL_ID).
+ * Publica un chollo en el grupo/canal (TELEGRAM_CHANNEL_ID).
+ * Si el grupo tiene temas, enruta por slug de categoría (`message_thread_id`).
  */
 export async function sendChannelDealAlert(
   deal: DealCandidate,
@@ -440,7 +454,8 @@ export async function sendChannelDealAlert(
   if (!channelId) {
     throw new Error("Falta TELEGRAM_CHANNEL_ID en el entorno.");
   }
-  return sendDealAlertMessage({ chatId: channelId, deal });
+  const messageThreadId = resolveTelegramTopicId(deal.categorySlug);
+  return sendDealAlertMessage({ chatId: channelId, deal, messageThreadId });
 }
 
 async function handleCreateAlert(chatId: number, telegramId?: number): Promise<void> {

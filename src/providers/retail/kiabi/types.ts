@@ -13,6 +13,7 @@ export interface KiabiProductQuote {
   productUrl: string;
   title: string;
   brand?: string;
+  description?: string;
   imageUrl?: string;
   price: number | null;
   listPrice: number | null;

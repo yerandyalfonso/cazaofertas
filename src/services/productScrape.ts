@@ -143,6 +143,7 @@ export async function previewProductPage(
         imageUrl: quote.imageUrl ?? null,
         categorySlug: "moda",
         breadcrumbs: [],
+        description: quote.description ?? null,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

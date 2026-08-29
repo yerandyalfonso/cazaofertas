@@ -128,25 +128,7 @@ export async function reviewRetailPricesResult(
     errors.length > 0 &&
     errors.every((error) => isRetailBlockedError(error.message));
 
-  if (
-    errors.length === 0 &&
-    result.stats.skippedBlocked === 0
-  ) {
-    return;
-  }
-
-  if (errors.length === 0 && result.stats.skippedBlocked > 0) {
-    await notifyCronAlert({
-      job,
-      headline: "Kiabi: scrape omitido (anti-bot)",
-      lines: [
-        `Omitidos por bloqueo: ${result.stats.skippedBlocked}`,
-        "El producto mantiene el último precio conocido.",
-      ],
-    });
-    return;
-  }
-
+  // Anti-bot omitido es esperado (DataDome); no spamear Telegram cada 10 min.
   if (errors.length === 0) return;
 
   await notifyCronAlert({

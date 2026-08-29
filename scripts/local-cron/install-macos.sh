@@ -115,7 +115,7 @@ echo
 echo "Listo. Horarios (hora local del Mac):"
 echo "  • check-prices: 2 precios Amazon + 1 flash deal — :00, :10, :20, :30, :40, :50"
 echo "  • user-alerts:  08:15 y 20:15 (1 min entre alertas)"
-echo "  • kiabi-deals:  09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1)"
+echo "  • kiabi-deals:  09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1; solo estas 2 pasadas)"
 echo "  • flash-deals:  integrado en check-prices (ya no hay cron aparte)"
 echo
 echo "Prueba manual:"

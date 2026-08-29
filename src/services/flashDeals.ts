@@ -59,6 +59,7 @@ async function maybeNotifyFlashChannel(
     brand?: string | null;
     categoryId?: string | null;
     categoryName?: string | null;
+    categorySlug?: string | null;
     imageUrl?: string | null;
     summary?: string | null;
   },
@@ -70,6 +71,7 @@ async function maybeNotifyFlashChannel(
     brand: options.brand ?? null,
     categoryId: options.categoryId ?? null,
     categoryName: options.categoryName ?? null,
+    categorySlug: options.categorySlug ?? null,
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,
@@ -477,6 +479,7 @@ export async function runFlashDealsCheck(options?: {
             brand,
             categoryId: categoryMeta?.id ?? null,
             categoryName: categoryMeta?.name ?? null,
+            categorySlug: scoringCategorySlug,
             imageUrl,
             summary: description || brand,
           });
@@ -594,6 +597,7 @@ export async function runFlashDealsCheck(options?: {
               brand: brand ?? existing!.brand,
               categoryId: categoryMeta?.id ?? existing!.category_id,
               categoryName: categoryMeta?.name ?? null,
+              categorySlug: scoringCategorySlug,
               imageUrl: imageUrl ?? existing!.image_url,
               summary:
                 description ||

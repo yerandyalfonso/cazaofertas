@@ -24,9 +24,10 @@ const FORMAT_LABEL: Record<string, string> = {
 
 const LAYOUT_LABEL: Record<string, string> = {
   minimal: "Minimal",
-  split: "Split",
+  float: "Flotante",
   banner: "Banner",
   seal: "Sello",
+  split: "Flotante",
 };
 
 export function SocialCardListClient() {
@@ -63,17 +64,11 @@ export function SocialCardListClient() {
 
   return (
     <div>
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
-            Redes sociales
-          </p>
-          <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
-            Tarjetas de oferta
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-stone-600">
-            Crea y gestiona diseños de tarjetas para Instagram, Telegram y más.
-            Se guardan en este navegador.
+          <h2 className="font-display text-2xl text-ink">Tarjetas guardadas</h2>
+          <p className="mt-1 max-w-xl text-sm text-stone-600">
+            Diseños para Instagram, Telegram y más. Se guardan en este navegador.
           </p>
         </div>
         <Link
@@ -83,7 +78,7 @@ export function SocialCardListClient() {
           <Plus className="h-4 w-4" aria-hidden />
           Nueva tarjeta
         </Link>
-      </header>
+      </div>
 
       <div className="mt-8 overflow-x-auto border border-stone-300 bg-white">
         <table className="min-w-full text-left text-sm">

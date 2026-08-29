@@ -31,12 +31,9 @@ function parseJob(raw: string | undefined): LocalCronJob {
 
 async function runCheckPrices(): Promise<void> {
   const { runAmazonPriceCheck } = await import("@/services/amazonPriceCheck");
-  const { runRetailPriceCheck } = await import("@/services/retailPriceCheck");
   const { runFlashDealsCheck } = await import("@/services/flashDeals");
   const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
-  const { reviewCheckPricesResult, reviewRetailPricesResult } = await import(
-    "./notify"
-  );
+  const { reviewCheckPricesResult } = await import("./notify");
 
   const amazon = await runAmazonPriceCheck({
     limit: 2,
@@ -75,13 +72,6 @@ async function runCheckPrices(): Promise<void> {
   console.log(JSON.stringify({ flash }, null, 2));
 
   await reviewCheckPricesResult(amazon, { flash });
-
-  const retail = await runRetailPriceCheck({
-    limit: 1,
-    delayMs: 2_500,
-  });
-  console.log(JSON.stringify({ retail }, null, 2));
-  await reviewRetailPricesResult(retail);
 }
 
 async function runFlashDeals(): Promise<void> {

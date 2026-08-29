@@ -13,6 +13,8 @@ export interface DealCandidate {
   brand: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  /** Slug de `categories` (estable; no usar el nombre para temas Telegram). */
+  categorySlug?: string | null;
   currentPrice: number;
   previousPrice: number;
   discountPercentage: number;

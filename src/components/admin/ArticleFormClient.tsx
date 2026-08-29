@@ -18,12 +18,21 @@ import {
 import type { QuickImportResult } from "@/lib/article-quick-import";
 import type { BlogBlock } from "@/lib/blog";
 import type { BlogTemplate } from "@/lib/blog-templates";
+import { formatEuro } from "@/lib/money";
 
 interface ProductOption {
   id: string;
   title: string;
   asin: string;
   slug: string;
+  imageUrl?: string | null;
+  currentPrice?: number;
+  previousPrice?: number | null;
+}
+
+function productThumb(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  return `/api/admin/image-proxy?url=${encodeURIComponent(url.trim())}`;
 }
 
 const CATEGORIES = [
@@ -601,11 +610,34 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
                   key={product.id}
                   className="flex items-center justify-between gap-3 border border-stone-200 px-3 py-2 text-sm"
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium text-ink">{product.title}</p>
-                    <p className="font-mono text-xs text-stone-500">
-                      {product.asin}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="relative h-12 w-12 shrink-0 overflow-hidden border border-stone-200 bg-stone-100">
+                      {productThumb(product.imageUrl) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={productThumb(product.imageUrl)!}
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <span className="flex h-full items-center justify-center text-[10px] text-stone-400">
+                          —
+                        </span>
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 font-medium leading-snug text-ink">
+                        {product.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        {typeof product.currentPrice === "number" ? (
+                          <span className="font-semibold text-ink">
+                            {formatEuro(product.currentPrice)}
+                          </span>
+                        ) : null}
+                        <span className="ml-2 font-mono">{product.asin}</span>
+                      </p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button
@@ -661,14 +693,33 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
                   setProductIds((prev) => [...prev, product.id]);
                   setProductQuery("");
                 }}
-                className="flex w-full items-center justify-between gap-3 border-b border-stone-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-stone-50"
+                className="flex w-full items-center gap-3 border-b border-stone-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-stone-50"
               >
-                <span>
-                  <span className="block font-medium text-ink">
+                <span className="relative h-12 w-12 shrink-0 overflow-hidden border border-stone-200 bg-stone-100">
+                  {productThumb(product.imageUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={productThumb(product.imageUrl)!}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="flex h-full items-center justify-center text-[10px] text-stone-400">
+                      —
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2 block font-medium leading-snug text-ink">
                     {product.title}
                   </span>
-                  <span className="font-mono text-xs text-stone-500">
-                    {product.asin}
+                  <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-stone-500">
+                    {typeof product.currentPrice === "number" ? (
+                      <span className="font-semibold text-ink">
+                        {formatEuro(product.currentPrice)}
+                      </span>
+                    ) : null}
+                    <span className="font-mono">{product.asin}</span>
                   </span>
                 </span>
                 <Plus className="h-3.5 w-3.5 shrink-0 text-teal-800" />

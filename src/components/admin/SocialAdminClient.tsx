@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
-import { Download, Loader2, Save } from "lucide-react";
+import { Download, Droplet, Loader2, Pipette, Save } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatEuro } from "@/lib/money";
 import {
@@ -34,7 +34,7 @@ interface SocialProduct {
 type FormatId = "square" | "story" | "landscape" | "classic";
 type StyleId = "cream" | "border" | "pastel" | "sunset";
 /** Layout de la tarjeta light. `minimal` = diseño actual (por defecto). */
-type LayoutId = "minimal" | "split" | "banner" | "seal";
+type LayoutId = "minimal" | "float" | "banner" | "seal";
 type ImageFit =
   | "contain"
   | "cover"
@@ -131,9 +131,9 @@ const LAYOUTS: Array<{ id: LayoutId; label: string; hint: string }> = [
     hint: "Diseño actual: tarjeta flotante, imagen limpia y precios horizontales",
   },
   {
-    id: "split",
-    label: "Split Lateral",
-    hint: "Dos columnas: imagen a un lado, textos y precios al otro",
+    id: "float",
+    label: "Flotante Asimétrico",
+    hint: "Imagen superpuesta en diagonal sobre panel de texto desplazado",
   },
   {
     id: "banner",
@@ -539,6 +539,7 @@ function ProductImage({
   fit,
   areaWidth,
   areaHeight,
+  zoom = 1,
 }: {
   src: string | null;
   ready: boolean;
@@ -549,10 +550,12 @@ function ProductImage({
   /** Proporción del área de imagen (para smart). */
   areaWidth: number;
   areaHeight: number;
+  zoom?: number;
 }) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(
     null,
   );
+  const zoomScale = Math.max(0.4, Math.min(2, zoom));
 
   if (!src) {
     return (
@@ -613,7 +616,11 @@ function ProductImage({
             onError();
           }}
           className="relative z-[1] h-full w-full object-contain"
-          style={{ opacity: ready ? 1 : 0.85 }}
+          style={{
+            opacity: ready ? 1 : 0.85,
+            transform: zoomScale !== 1 ? `scale(${zoomScale})` : undefined,
+            transformOrigin: "center center",
+          }}
         />
       </div>
     );
@@ -640,6 +647,8 @@ function ProductImage({
         objectFit,
         objectPosition,
         opacity: ready ? 1 : 0.85,
+        transform: zoomScale !== 1 ? `scale(${zoomScale})` : undefined,
+        transformOrigin: "center center",
       }}
     />
   );
@@ -665,17 +674,25 @@ export function SocialAdminClient({
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
-  const [formatId, setFormatId] = useState<FormatId>("square");
+  const [formatId, setFormatId] = useState<FormatId>("story");
   const [layoutId, setLayoutId] = useState<LayoutId>("minimal");
-  const [styleId, setStyleId] = useState<StyleId>("pastel");
-  const [colorTone, setColorTone] = useState(PRESET_TONE.pastel);
-  const [imageFit, setImageFit] = useState<ImageFit>("blur");
-  const [imagePadX, setImagePadX] = useState(0);
-  const [imagePadY, setImagePadY] = useState(0);
+  const [styleId, setStyleId] = useState<StyleId>("sunset");
+  const [colorTone, setColorTone] = useState(PRESET_TONE.sunset);
+  const [imageFit, setImageFit] = useState<ImageFit>("contain");
+  const [imagePadX, setImagePadX] = useState(40);
+  const [imagePadY, setImagePadY] = useState(40);
   const [cardRadius, setCardRadius] = useState(40);
+  const [cardSurfaceColor, setCardSurfaceColor] = useState("#ffffff");
+  const [floatRotate, setFloatRotate] = useState(-3);
+  const [floatOffsetX, setFloatOffsetX] = useState(0);
+  const [floatOffsetY, setFloatOffsetY] = useState(0);
+  const [floatZoom, setFloatZoom] = useState(1);
+  const [textPadX, setTextPadX] = useState(44);
+  const [textPadY, setTextPadY] = useState(40);
   const [exporting, setExporting] = useState(false);
   const [imageReady, setImageReady] = useState(false);
   const [imageBgColor, setImageBgColor] = useState<string | null>(null);
+  const [pickingColor, setPickingColor] = useState(false);
 
   const selected = useMemo(
     () => products.find((p) => p.id === selectedId) ?? null,
@@ -695,6 +712,13 @@ export function SocialAdminClient({
       imagePadX,
       imagePadY,
       cardRadius,
+      cardSurfaceColor,
+      floatRotate,
+      floatOffsetX,
+      floatOffsetY,
+      floatZoom,
+      textPadX,
+      textPadY,
     }),
     [
       projectName,
@@ -708,6 +732,13 @@ export function SocialAdminClient({
       imagePadX,
       imagePadY,
       cardRadius,
+      cardSurfaceColor,
+      floatRotate,
+      floatOffsetX,
+      floatOffsetY,
+      floatZoom,
+      textPadX,
+      textPadY,
     ],
   );
 
@@ -725,6 +756,13 @@ export function SocialAdminClient({
       setImagePadX(project.imagePadX);
       setImagePadY(project.imagePadY);
       setCardRadius(project.cardRadius);
+      setCardSurfaceColor(project.cardSurfaceColor ?? "#ffffff");
+      setFloatRotate(project.floatRotate ?? -3);
+      setFloatOffsetX(project.floatOffsetX ?? 0);
+      setFloatOffsetY(project.floatOffsetY ?? 0);
+      setFloatZoom(project.floatZoom ?? 1);
+      setTextPadX(project.textPadX ?? 44);
+      setTextPadY(project.textPadY ?? 40);
       window.setTimeout(() => {
         hydratingRef.current = false;
       }, 0);
@@ -782,14 +820,21 @@ export function SocialAdminClient({
     setCurrentProjectId(null);
     setProjectName("Nueva tarjeta");
     setSelectedId("");
-    setFormatId("square");
+    setFormatId("story");
     setLayoutId("minimal");
-    setStyleId("pastel");
-    setColorTone(PRESET_TONE.pastel);
-    setImageFit("blur");
-    setImagePadX(0);
-    setImagePadY(0);
+    setStyleId("sunset");
+    setColorTone(PRESET_TONE.sunset);
+    setImageFit("contain");
+    setImagePadX(40);
+    setImagePadY(40);
     setCardRadius(40);
+    setCardSurfaceColor("#ffffff");
+    setFloatRotate(-3);
+    setFloatOffsetX(0);
+    setFloatOffsetY(0);
+    setFloatZoom(1);
+    setTextPadX(44);
+    setTextPadY(40);
     setEditorReady(true);
   }, [applyProject, projectId, router, toast]);
 
@@ -802,6 +847,13 @@ export function SocialAdminClient({
     return () => window.clearTimeout(timer);
   }, [
     cardRadius,
+    cardSurfaceColor,
+    floatRotate,
+    floatOffsetX,
+    floatOffsetY,
+    floatZoom,
+    textPadX,
+    textPadY,
     colorTone,
     currentProjectId,
     editorReady,
@@ -949,7 +1001,10 @@ export function SocialAdminClient({
   const priceSize = isLandscape ? 58 : isStory ? 72 : 60;
   const strikeSize = isLandscape ? 36 : isStory ? 42 : 34;
   const pad = isLandscape ? 56 : isStory ? 64 : 48;
-  const imageAreaBg = imageBgColor ?? theme.fallbackImageBg;
+  const imageAreaBg =
+    imageFit === "blur"
+      ? (imageBgColor ?? theme.fallbackImageBg)
+      : cardSurfaceColor;
 
   const onImageError = () => {
     setImageReady(false);
@@ -1019,7 +1074,7 @@ export function SocialAdminClient({
         style={{
           minHeight: options.minHeight,
           padding: `${imagePadY}px ${imagePadX}px`,
-          background: hasImagePad ? theme.cardBg : imageAreaBg,
+          background: cardSurfaceColor,
           borderRadius: options.sectionRadius,
           overflow: "hidden",
         }}
@@ -1047,13 +1102,8 @@ export function SocialAdminClient({
             }
             areaHeight={
               (options.minHeight ??
-                (options.split
-                  ? format.height - pad * 2
-                  : isStory
-                    ? 1020
-                    : format.id === "classic"
-                      ? 380
-                      : 560)) - imagePadY * 2
+                Math.round((format.height - pad * 2) * 0.62)) -
+              imagePadY * 2
             }
           />
         </div>
@@ -1061,18 +1111,13 @@ export function SocialAdminClient({
     );
   }
 
-  function renderCopyBlock(options?: { split?: boolean; clamp?: number }) {
+  function renderCopyBlock(options?: { clamp?: number }) {
     if (!selected) return null;
-    const split = options?.split ?? false;
     return (
       <div
-        className={`flex flex-col justify-center ${split ? "w-[46%]" : "w-full"}`}
+        className="w-full shrink-0"
         style={{
-          padding: split
-            ? "48px 52px"
-            : isStory
-              ? "40px 52px 56px"
-              : "32px 44px 44px",
+          padding: `${textPadY}px ${textPadX}px`,
         }}
       >
         {selected.brand ? (
@@ -1090,14 +1135,14 @@ export function SocialAdminClient({
             fontSize: titleSize,
             color: theme.titleColor,
             display: "-webkit-box",
-            WebkitLineClamp: options?.clamp ?? (split ? 3 : 2),
+            WebkitLineClamp: options?.clamp ?? (isLandscape ? 2 : 3),
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
           }}
         >
           {selected.title}
         </h2>
-        <div style={{ marginTop: isStory ? 36 : 28 }}>
+        <div style={{ marginTop: Math.max(16, Math.round(textPadY * 0.55)) }}>
           <PriceRow
             current={selected.currentPrice}
             previous={previousPrice}
@@ -1118,6 +1163,7 @@ export function SocialAdminClient({
         style={{
           padding: pad,
           background: theme.canvasBg,
+          overflow: layoutId === "float" ? "visible" : "hidden",
         }}
       >
         {theme.canvasOverlay ? (
@@ -1134,20 +1180,14 @@ export function SocialAdminClient({
 
   function renderMinimalCard() {
     if (!selected) return null;
-    const split = isLandscape;
     const hasImagePad = imagePadX > 0 || imagePadY > 0;
-    const sectionRadius = split
-      ? `${cardRadius}px 0 0 ${cardRadius}px`
-      : `${cardRadius}px ${cardRadius}px 0 0`;
     const mediaRadius = hasImagePad ? cardRadius : 0;
 
     return renderCanvas(
       <div
-        className={`relative z-[1] flex w-full overflow-hidden ${
-          split ? "flex-row" : "flex-col"
-        }`}
+        className="relative z-[1] flex h-full w-full flex-col overflow-hidden"
         style={{
-          background: theme.cardBg,
+          background: cardSurfaceColor,
           border: theme.cardBorder,
           boxShadow: theme.cardShadow ?? "none",
           borderRadius: cardRadius,
@@ -1155,61 +1195,65 @@ export function SocialAdminClient({
       >
         {renderBadge("pill")}
         {renderProductMedia({
-          split,
-          sectionRadius,
+          split: false,
+          sectionRadius: "0",
           mediaRadius,
-          minHeight: split
-            ? undefined
-            : isStory
-              ? 1020
-              : format.id === "classic"
-                ? 380
-                : 560,
-          flexClass: split ? "h-full w-[54%] shrink-0" : "w-full flex-1",
+          flexClass: "min-h-0 w-full flex-1",
         })}
-        {renderCopyBlock({ split })}
+        {renderCopyBlock()}
       </div>,
     );
   }
 
-  function renderSplitCard() {
+  function renderFloatCard() {
     if (!selected) return null;
-    const hasImagePad = imagePadX > 0 || imagePadY > 0;
-    const sectionRadius = `${cardRadius}px 0 0 ${cardRadius}px`;
-    const mediaRadius = hasImagePad ? cardRadius : 0;
-    const imageShare = isStory ? 0.48 : 0.54;
+    const mediaH = isStory
+      ? "52%"
+      : isLandscape
+        ? "58%"
+        : format.id === "classic"
+          ? "48%"
+          : "50%";
+    const mediaW = isLandscape ? "52%" : "78%";
+    const zoom = Math.max(0.4, Math.min(2, floatZoom));
 
     return renderCanvas(
       <div
-        className="relative z-[1] flex w-full flex-row overflow-hidden"
+        className="relative z-[1] flex h-full w-full flex-col"
         style={{
-          background: theme.cardBg,
+          background: cardSurfaceColor,
           border: theme.cardBorder,
-          boxShadow: theme.cardShadow ?? "none",
+          boxShadow: theme.cardShadow ?? "0 28px 60px rgba(15,23,42,0.18)",
           borderRadius: cardRadius,
+          overflow: "visible",
         }}
       >
-        {renderBadge("pill")}
+        <div className="relative min-h-0 w-full flex-1" aria-hidden />
+        {renderCopyBlock({ clamp: isLandscape ? 2 : 4 })}
+
         <div
-          className="relative flex h-full shrink-0 items-center justify-center"
+          className="absolute z-[2] overflow-hidden"
           style={{
-            width: `${imageShare * 100}%`,
-            padding: `${imagePadY}px ${imagePadX}px`,
-            background: hasImagePad ? theme.cardBg : imageAreaBg,
-            borderRadius: sectionRadius,
-            overflow: "hidden",
+            top: (isLandscape ? 28 : 40) + floatOffsetY,
+            left: isLandscape
+              ? `calc(24% + ${floatOffsetX}px)`
+              : `calc(11% + ${floatOffsetX}px)`,
+            width: mediaW,
+            height: mediaH,
+            borderRadius: Math.max(24, cardRadius - 4),
+            background: imageAreaBg,
+            boxShadow: "0 24px 48px rgba(15,23,42,0.28)",
+            transform: `rotate(${floatRotate}deg)`,
+            transformOrigin: "center center",
+            padding: `${Math.max(8, imagePadY / 2)}px ${Math.max(8, imagePadX / 2)}px`,
           }}
         >
           <div
             className="relative h-full w-full overflow-hidden"
-            style={{
-              borderRadius: mediaRadius,
-              background: imageAreaBg,
-              minHeight: "100%",
-            }}
+            style={{ borderRadius: Math.max(16, cardRadius - 12) }}
           >
             <ProductImage
-              key={`${displayImageUrl}-${imageFit}-split`}
+              key={`${displayImageUrl}-${imageFit}-float-${zoom}`}
               src={displayImageUrl}
               ready={imageReady}
               onReady={() => setImageReady(true)}
@@ -1217,53 +1261,20 @@ export function SocialAdminClient({
               onBgColor={setImageBgColor}
               fit={imageFit}
               areaWidth={
-                Math.round((format.width - pad * 2) * imageShare) -
-                imagePadX * 2
+                Math.round(
+                  (format.width - pad * 2) * (isLandscape ? 0.52 : 0.78),
+                ) - Math.max(16, imagePadX)
               }
-              areaHeight={format.height - pad * 2 - imagePadY * 2}
+              areaHeight={
+                Math.round(
+                  (format.height - pad * 2) * (isLandscape ? 0.58 : 0.52),
+                ) - Math.max(16, imagePadY)
+              }
+              zoom={zoom}
             />
           </div>
         </div>
-        <div
-          className="flex h-full flex-col justify-center"
-          style={{
-            width: `${(1 - imageShare) * 100}%`,
-            padding: isStory ? "44px 48px" : "48px 52px",
-          }}
-        >
-          {selected.brand ? (
-            <p
-              className="font-bold uppercase tracking-[0.14em]"
-              style={{ fontSize: brandSize, color: theme.brandColor }}
-            >
-              {selected.brand}
-            </p>
-          ) : null}
-          <h2
-            className="font-semibold leading-snug"
-            style={{
-              marginTop: selected.brand ? 12 : 0,
-              fontSize: titleSize,
-              color: theme.titleColor,
-              display: "-webkit-box",
-              WebkitLineClamp: isStory ? 5 : 4,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {selected.title}
-          </h2>
-          <div style={{ marginTop: isStory ? 36 : 28 }}>
-            <PriceRow
-              current={selected.currentPrice}
-              previous={previousPrice}
-              priceSize={priceSize}
-              strikeSize={strikeSize}
-              accent={theme.priceAccent}
-              strike={theme.priceStrike}
-            />
-          </div>
-        </div>
+        {renderBadge("pill")}
       </div>,
     );
   }
@@ -1274,13 +1285,12 @@ export function SocialAdminClient({
     const bannerLabel =
       selected.brand?.trim() ||
       (discount > 0 ? `Chollo −${discount}%` : "CazaOfertas");
-    const imageMin = isStory ? 920 : format.id === "classic" ? 320 : 500;
 
     return renderCanvas(
       <div
-        className="relative z-[1] flex w-full flex-col overflow-hidden"
+        className="relative z-[1] flex h-full w-full flex-col overflow-hidden"
         style={{
-          background: theme.cardBg,
+          background: cardSurfaceColor,
           border: theme.cardBorder,
           boxShadow: theme.cardShadow ?? "none",
           borderRadius: cardRadius,
@@ -1290,12 +1300,12 @@ export function SocialAdminClient({
           className="flex shrink-0 items-center justify-between gap-4"
           style={{
             background: theme.bannerBg,
-            padding: isStory ? "22px 36px" : "18px 32px",
+            padding: isStory ? "18px 32px" : "14px 28px",
           }}
         >
           <p
             className="font-bold uppercase tracking-[0.16em] text-white"
-            style={{ fontSize: isStory ? 28 : 22 }}
+            style={{ fontSize: isStory ? 26 : 20 }}
           >
             {bannerLabel}
           </p>
@@ -1303,7 +1313,7 @@ export function SocialAdminClient({
             <span
               className="font-extrabold text-white"
               style={{
-                fontSize: isStory ? 30 : 24,
+                fontSize: isStory ? 28 : 22,
                 background: "rgba(255,255,255,0.22)",
                 padding: "8px 16px",
                 borderRadius: 999,
@@ -1318,30 +1328,23 @@ export function SocialAdminClient({
           split: false,
           sectionRadius: "0",
           mediaRadius: hasImagePad ? Math.max(0, cardRadius - 8) : 0,
-          minHeight: imageMin,
-          flexClass: "w-full flex-1",
+          flexClass: "min-h-0 w-full flex-1",
         })}
-        {renderCopyBlock({ clamp: 2 })}
+        {renderCopyBlock()}
       </div>,
     );
   }
 
   function renderSealCard() {
     if (!selected) return null;
-    const split = isLandscape;
     const hasImagePad = imagePadX > 0 || imagePadY > 0;
-    const sectionRadius = split
-      ? `${cardRadius}px 0 0 ${cardRadius}px`
-      : `${cardRadius}px ${cardRadius}px 0 0`;
     const mediaRadius = hasImagePad ? cardRadius : 0;
 
     return renderCanvas(
       <div
-        className={`relative z-[1] flex w-full overflow-hidden ${
-          split ? "flex-row" : "flex-col"
-        }`}
+        className="relative z-[1] flex h-full w-full flex-col overflow-hidden"
         style={{
-          background: theme.cardBg,
+          background: cardSurfaceColor,
           border: theme.cardBorder,
           boxShadow: theme.cardShadow ?? "none",
           borderRadius: cardRadius,
@@ -1349,27 +1352,20 @@ export function SocialAdminClient({
       >
         {renderBadge("seal")}
         {renderProductMedia({
-          split,
-          sectionRadius,
+          split: false,
+          sectionRadius: "0",
           mediaRadius,
-          minHeight: split
-            ? undefined
-            : isStory
-              ? 1020
-              : format.id === "classic"
-                ? 380
-                : 560,
-          flexClass: split ? "h-full w-[54%] shrink-0" : "w-full flex-1",
+          flexClass: "min-h-0 w-full flex-1",
         })}
-        {renderCopyBlock({ split })}
+        {renderCopyBlock()}
       </div>,
     );
   }
 
   function renderActiveCard() {
     switch (layoutId) {
-      case "split":
-        return renderSplitCard();
+      case "float":
+        return renderFloatCard();
       case "banner":
         return renderBannerCard();
       case "seal":
@@ -1486,6 +1482,73 @@ export function SocialAdminClient({
               );
             })}
           </div>
+          {layoutId === "float" ? (
+            <div className="mt-4 grid gap-3 border border-stone-200 bg-stone-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <p className="sm:col-span-2 lg:col-span-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Flotante: inclinación, posición y zoom
+              </p>
+              <label className="text-xs text-stone-600">
+                Ángulo ({floatRotate}°)
+                <input
+                  type="range"
+                  min={-15}
+                  max={15}
+                  step={0.5}
+                  value={floatRotate}
+                  onChange={(event) =>
+                    setFloatRotate(Number(event.target.value))
+                  }
+                  className="mt-1 w-full accent-ink"
+                />
+              </label>
+              <label className="text-xs text-stone-600">
+                Desplazamiento X ({floatOffsetX}px)
+                <input
+                  type="range"
+                  min={-120}
+                  max={120}
+                  step={1}
+                  value={floatOffsetX}
+                  onChange={(event) =>
+                    setFloatOffsetX(Number(event.target.value))
+                  }
+                  className="mt-1 w-full accent-ink"
+                />
+              </label>
+              <label className="text-xs text-stone-600">
+                Desplazamiento Y ({floatOffsetY}px)
+                <input
+                  type="range"
+                  min={-80}
+                  max={200}
+                  step={1}
+                  value={floatOffsetY}
+                  onChange={(event) =>
+                    setFloatOffsetY(Number(event.target.value))
+                  }
+                  className="mt-1 w-full accent-ink"
+                />
+              </label>
+              <label className="text-xs text-stone-600">
+                Zoom imagen ({Math.round(floatZoom * 100)}%)
+                <input
+                  type="range"
+                  min={0.5}
+                  max={1.6}
+                  step={0.05}
+                  value={floatZoom}
+                  onChange={(event) =>
+                    setFloatZoom(Number(event.target.value))
+                  }
+                  className="mt-1 w-full accent-ink"
+                />
+              </label>
+              <p className="sm:col-span-2 lg:col-span-4 text-[11px] text-stone-500">
+                La imagen flotante ya no se recorta contra el borde de la
+                tarjeta; usa zoom/posición si sobresale del lienzo.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div>
@@ -1564,6 +1627,84 @@ export function SocialAdminClient({
               <span>Normal</span>
               <span>Vibrante</span>
               <span>Pastel</span>
+            </div>
+          </div>
+
+          <div className="mt-4 border border-stone-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Fondo de la tarjeta
+            </p>
+            <p className="mt-1 text-[11px] text-stone-500">
+              Independiente del degradado del lienzo. Por defecto blanco.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-sm text-ink">
+                <span
+                  className="relative h-9 w-9 overflow-hidden rounded-sm border border-stone-300"
+                  style={{ background: cardSurfaceColor }}
+                >
+                  <input
+                    type="color"
+                    value={
+                      /^#[0-9a-fA-F]{6}$/.test(cardSurfaceColor)
+                        ? cardSurfaceColor
+                        : "#ffffff"
+                    }
+                    onChange={(event) =>
+                      setCardSurfaceColor(event.target.value)
+                    }
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Color de fondo de la tarjeta"
+                  />
+                </span>
+                <span className="font-mono text-xs uppercase">
+                  {cardSurfaceColor}
+                </span>
+              </label>
+              <button
+                type="button"
+                disabled={pickingColor}
+                onClick={async () => {
+                  const EyeDropperCtor = (
+                    window as Window & {
+                      EyeDropper?: new () => {
+                        open: () => Promise<{ sRGBHex: string }>;
+                      };
+                    }
+                  ).EyeDropper;
+                  if (!EyeDropperCtor) {
+                    toast.error(
+                      "Tu navegador no soporta el cuentagotas. Usa Chrome/Edge.",
+                    );
+                    return;
+                  }
+                  setPickingColor(true);
+                  try {
+                    const result = await new EyeDropperCtor().open();
+                    setCardSurfaceColor(result.sRGBHex);
+                  } catch {
+                    // usuario canceló
+                  } finally {
+                    setPickingColor(false);
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-sm border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink hover:border-ink disabled:opacity-50"
+              >
+                {pickingColor ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Pipette className="h-3.5 w-3.5" />
+                )}
+                Cuentagotas
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardSurfaceColor("#ffffff")}
+                className="inline-flex items-center gap-2 rounded-sm border border-stone-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-600 hover:border-ink hover:text-ink"
+              >
+                <Droplet className="h-3.5 w-3.5" />
+                Blanco
+              </button>
             </div>
           </div>
         </div>
@@ -1721,6 +1862,92 @@ export function SocialAdminClient({
             </div>
           </div>
 
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Padding texto (horizontal)
+              </p>
+              <p className="mt-1 text-[11px] text-stone-500">
+                Aplica a los 4 layouts; el bloque de texto queda abajo.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[24, 36, 44, 56, 72, 96].map((value) => (
+                  <button
+                    key={`tx-${value}`}
+                    type="button"
+                    onClick={() => setTextPadX(value)}
+                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
+                      textPadX === value
+                        ? "border-ink bg-ink text-paper"
+                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
+                  Custom
+                  <input
+                    type="number"
+                    min={8}
+                    max={160}
+                    value={textPadX}
+                    onChange={(event) =>
+                      setTextPadX(
+                        Math.min(
+                          160,
+                          Math.max(8, Number(event.target.value) || 8),
+                        ),
+                      )
+                    }
+                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
+                  />
+                  <span className="text-stone-400">px</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Padding texto (vertical)
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[16, 24, 32, 40, 56, 72].map((value) => (
+                  <button
+                    key={`ty-${value}`}
+                    type="button"
+                    onClick={() => setTextPadY(value)}
+                    className={`h-9 min-w-12 border px-2.5 text-xs font-semibold transition ${
+                      textPadY === value
+                        ? "border-ink bg-ink text-paper"
+                        : "border-stone-300 bg-white text-stone-700 hover:border-ink"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+                <label className="inline-flex h-9 items-center gap-1.5 border border-stone-300 bg-white px-2 text-xs text-stone-600">
+                  Custom
+                  <input
+                    type="number"
+                    min={8}
+                    max={160}
+                    value={textPadY}
+                    onChange={(event) =>
+                      setTextPadY(
+                        Math.min(
+                          160,
+                          Math.max(8, Number(event.target.value) || 8),
+                        ),
+                      )
+                    }
+                    className="h-7 w-14 border border-stone-200 px-1.5 text-sm text-ink outline-none focus:border-ink"
+                  />
+                  <span className="text-stone-400">px</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-4">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
               Border radius (card + zona imagen)
@@ -1767,7 +1994,7 @@ export function SocialAdminClient({
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <div className="grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-[1fr_1.4fr_auto] md:items-end">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
             Buscar
             <input
@@ -1777,30 +2004,72 @@ export function SocialAdminClient({
               className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
             />
           </label>
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Producto
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              disabled={loading || filtered.length === 0}
-              className="mt-2 h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink disabled:opacity-50"
-            >
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Producto
+            </p>
+            <ul className="mt-2 max-h-44 divide-y divide-stone-200 overflow-auto border border-stone-300 bg-white">
               {loading ? (
-                <option value="">Cargando…</option>
+                <li className="px-3 py-3 text-sm text-stone-500">Cargando…</li>
               ) : filtered.length === 0 ? (
-                <option value="">Sin productos</option>
+                <li className="px-3 py-3 text-sm text-stone-500">
+                  Sin productos
+                </li>
               ) : (
-                filtered.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.title.length > 70
-                      ? `${product.title.slice(0, 67)}…`
-                      : product.title}{" "}
-                    ({product.asin})
-                  </option>
-                ))
+                filtered.map((product) => {
+                  const thumb = product.imageUrl
+                    ? proxiedImageUrl(product.imageUrl)
+                    : null;
+                  const active = product.id === selectedId;
+                  return (
+                    <li key={product.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(product.id)}
+                        className={`flex w-full gap-3 px-3 py-2.5 text-left transition ${
+                          active
+                            ? "bg-stone-100"
+                            : "bg-white hover:bg-stone-50"
+                        }`}
+                      >
+                        <span className="relative h-12 w-12 shrink-0 overflow-hidden border border-stone-200 bg-stone-100">
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={thumb}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <span className="flex h-full items-center justify-center text-[10px] text-stone-400">
+                              —
+                            </span>
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="line-clamp-2 text-sm font-medium leading-snug text-ink">
+                            {product.title}
+                          </span>
+                          <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11px] text-stone-500">
+                            <span className="font-semibold text-ink">
+                              {formatEuro(product.currentPrice)}
+                            </span>
+                            {product.previousPrice != null &&
+                            product.previousPrice > product.currentPrice ? (
+                              <span className="line-through">
+                                {formatEuro(product.previousPrice)}
+                              </span>
+                            ) : null}
+                            <span className="font-mono">{product.asin}</span>
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })
               )}
-            </select>
-          </label>
+            </ul>
+          </div>
 
           <button
             type="button"
@@ -1849,12 +2118,13 @@ export function SocialAdminClient({
             >
               <div
                 ref={cardRef}
-                className="relative overflow-hidden"
+                className="relative"
                 style={{
                   width: format.width,
                   height: format.height,
                   transform: `scale(${scale})`,
                   transformOrigin: "top left",
+                  overflow: layoutId === "float" ? "visible" : "hidden",
                   fontFamily:
                     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                 }}

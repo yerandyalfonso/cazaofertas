@@ -39,7 +39,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         const active =
           item.href === "/admin"
             ? pathname === "/admin"
-            : pathname.startsWith(item.href);
+            : item.href === "/admin/social"
+              ? pathname.startsWith("/admin/social") ||
+                pathname.startsWith("/admin/videos")
+              : pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}

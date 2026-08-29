@@ -1,4 +1,5 @@
 import { roundMoney, toNumber } from "@/lib/money";
+import { formatDescriptionForStorage } from "@/lib/product-description";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -228,6 +229,7 @@ async function maybeNotifyKiabiDeal(
     brand: options.brand ?? "Kiabi",
     categoryId: null,
     categoryName: "Moda",
+    categorySlug: "moda",
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,
@@ -438,7 +440,8 @@ export async function runKiabiDealsCheck(options?: {
           affiliate_url: productUrl,
           brand: quote.brand ?? "Kiabi",
           image_url: quote.imageUrl ?? null,
-          description: null,
+          description:
+            formatDescriptionForStorage([], quote.description) ?? null,
           category_id: modaCategoryId,
           current_price: price,
           previous_price: reference > price ? reference : null,
@@ -514,6 +517,13 @@ export async function runKiabiDealsCheck(options?: {
           affiliate_url: existing.affiliate_url ?? productUrl,
           brand: quote.brand ?? existing.brand,
           image_url: quote.imageUrl ?? existing.image_url,
+          ...(quote.description
+            ? {
+                description:
+                  formatDescriptionForStorage([], quote.description) ??
+                  existing.description,
+              }
+            : {}),
           category_id: existing.category_id ?? modaCategoryId,
           current_price: price,
           previous_price:

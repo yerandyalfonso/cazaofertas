@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
 
     const { data: products } = await client
       .from("products")
-      .select("id, title, asin, slug")
+      .select("id, title, asin, slug, image_url, current_price, previous_price")
       .eq("is_active", true)
       .order("title")
       .limit(300);
@@ -146,7 +146,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       articles,
-      products: products ?? [],
+      products: (products ?? []).map((row) => ({
+        id: row.id,
+        title: row.title,
+        asin: row.asin,
+        slug: row.slug,
+        imageUrl: row.image_url ?? null,
+        currentPrice: Number(row.current_price) || 0,
+        previousPrice:
+          row.previous_price == null ? null : Number(row.previous_price),
+      })),
     });
   } catch (error) {
     return NextResponse.json(

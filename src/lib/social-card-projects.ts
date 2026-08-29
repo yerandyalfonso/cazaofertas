@@ -1,7 +1,8 @@
 const STORAGE_KEY = "cazaofertas.social-card.projects.v1";
 
 export type SocialCardFormatId = "square" | "story" | "landscape" | "classic";
-export type SocialCardLayoutId = "minimal" | "split" | "banner" | "seal";
+/** `split` se migra a `float` al cargar proyectos antiguos. */
+export type SocialCardLayoutId = "minimal" | "float" | "banner" | "seal";
 export type SocialCardStyleId = "cream" | "border" | "pastel" | "sunset";
 export type SocialCardImageFit =
   | "contain"
@@ -25,6 +26,60 @@ export interface SocialCardProject {
   imagePadX: number;
   imagePadY: number;
   cardRadius: number;
+  /** Fondo interior de la tarjeta (independiente del lienzo). */
+  cardSurfaceColor: string;
+  /** Layout flotante: rotación en grados (p. ej. -3). */
+  floatRotate: number;
+  /** Layout flotante: desplazamiento horizontal px. */
+  floatOffsetX: number;
+  /** Layout flotante: desplazamiento vertical px. */
+  floatOffsetY: number;
+  /** Layout flotante: zoom de la imagen (1 = 100%). */
+  floatZoom: number;
+  /** Padding horizontal de la zona de texto. */
+  textPadX: number;
+  /** Padding vertical de la zona de texto. */
+  textPadY: number;
+}
+
+const DEFAULT_CARD_SURFACE = "#ffffff";
+
+function normalizeLayoutId(raw: unknown): SocialCardLayoutId {
+  if (raw === "split") return "float";
+  if (raw === "minimal" || raw === "float" || raw === "banner" || raw === "seal") {
+    return raw;
+  }
+  return "minimal";
+}
+
+function normalizeProject(raw: Partial<SocialCardProject> & { id?: string; name?: string }): SocialCardProject | null {
+  if (!raw?.id || !raw?.name) return null;
+  return {
+    id: raw.id,
+    name: raw.name,
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+    productId: raw.productId ?? null,
+    productTitle: raw.productTitle ?? null,
+    formatId: (raw.formatId as SocialCardFormatId) ?? "story",
+    layoutId: normalizeLayoutId(raw.layoutId),
+    styleId: (raw.styleId as SocialCardStyleId) ?? "sunset",
+    colorTone: typeof raw.colorTone === "number" ? raw.colorTone : 58,
+    imageFit: (raw.imageFit as SocialCardImageFit) ?? "contain",
+    imagePadX: typeof raw.imagePadX === "number" ? raw.imagePadX : 40,
+    imagePadY: typeof raw.imagePadY === "number" ? raw.imagePadY : 40,
+    cardRadius: typeof raw.cardRadius === "number" ? raw.cardRadius : 40,
+    cardSurfaceColor:
+      typeof raw.cardSurfaceColor === "string" && raw.cardSurfaceColor.trim()
+        ? raw.cardSurfaceColor
+        : DEFAULT_CARD_SURFACE,
+    floatRotate: typeof raw.floatRotate === "number" ? raw.floatRotate : -3,
+    floatOffsetX: typeof raw.floatOffsetX === "number" ? raw.floatOffsetX : 0,
+    floatOffsetY: typeof raw.floatOffsetY === "number" ? raw.floatOffsetY : 0,
+    floatZoom: typeof raw.floatZoom === "number" ? raw.floatZoom : 1,
+    textPadX: typeof raw.textPadX === "number" ? raw.textPadX : 44,
+    textPadY: typeof raw.textPadY === "number" ? raw.textPadY : 40,
+  };
 }
 
 export function loadSocialCardProjects(): SocialCardProject[] {
@@ -32,10 +87,13 @@ export function loadSocialCardProjects(): SocialCardProject[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as SocialCardProject[];
+    const parsed = JSON.parse(raw) as unknown[];
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((item) => item?.id && item?.name)
+      .map((item) =>
+        normalizeProject(item as Partial<SocialCardProject> & { id?: string; name?: string }),
+      )
+      .filter((item): item is SocialCardProject => item != null)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   } catch {
     return [];
@@ -80,14 +138,21 @@ export function createEmptySocialCardProject(
     updatedAt: now,
     productId: null,
     productTitle: null,
-    formatId: "square",
+    formatId: "story",
     layoutId: "minimal",
-    styleId: "pastel",
-    colorTone: 50,
-    imageFit: "blur",
-    imagePadX: 0,
-    imagePadY: 0,
+    styleId: "sunset",
+    colorTone: 58,
+    imageFit: "contain",
+    imagePadX: 40,
+    imagePadY: 40,
     cardRadius: 40,
+    cardSurfaceColor: DEFAULT_CARD_SURFACE,
+    floatRotate: -3,
+    floatOffsetX: 0,
+    floatOffsetY: 0,
+    floatZoom: 1,
+    textPadX: 44,
+    textPadY: 40,
   };
 }
 
@@ -116,6 +181,13 @@ export interface SocialCardProjectSnapshot {
   imagePadX: number;
   imagePadY: number;
   cardRadius: number;
+  cardSurfaceColor: string;
+  floatRotate: number;
+  floatOffsetX: number;
+  floatOffsetY: number;
+  floatZoom: number;
+  textPadX: number;
+  textPadY: number;
 }
 
 export function projectFromSnapshot(
@@ -133,12 +205,19 @@ export function projectFromSnapshot(
     productId: snapshot.productId,
     productTitle: snapshot.productTitle,
     formatId: snapshot.formatId,
-    layoutId: snapshot.layoutId,
+    layoutId: normalizeLayoutId(snapshot.layoutId),
     styleId: snapshot.styleId,
     colorTone: snapshot.colorTone,
     imageFit: snapshot.imageFit,
     imagePadX: snapshot.imagePadX,
     imagePadY: snapshot.imagePadY,
     cardRadius: snapshot.cardRadius,
+    cardSurfaceColor: snapshot.cardSurfaceColor?.trim() || DEFAULT_CARD_SURFACE,
+    floatRotate: snapshot.floatRotate ?? -3,
+    floatOffsetX: snapshot.floatOffsetX ?? 0,
+    floatOffsetY: snapshot.floatOffsetY ?? 0,
+    floatZoom: snapshot.floatZoom ?? 1,
+    textPadX: snapshot.textPadX ?? 44,
+    textPadY: snapshot.textPadY ?? 40,
   };
 }

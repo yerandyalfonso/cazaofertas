@@ -36,6 +36,8 @@ function parseKiabiNextDataProduct(
                 };
               };
               label?: string;
+              description?: string;
+              longDescription?: string;
               images?: Array<{ url?: string }>;
             };
           };
@@ -56,6 +58,10 @@ function parseKiabiNextDataProduct(
 
     return {
       title: product?.label?.trim(),
+      description:
+        product?.description?.trim() ||
+        product?.longDescription?.trim() ||
+        undefined,
       imageUrl: product?.images?.[0]?.url,
       price: salePrice,
       listPrice,
@@ -110,6 +116,10 @@ function parseJsonLdProduct(html: string): Partial<KiabiProductQuote> | null {
 
         best = {
           title: typeof record.name === "string" ? record.name : undefined,
+          description:
+            typeof record.description === "string"
+              ? record.description.trim()
+              : undefined,
           brand:
             typeof record.brand === "string"
               ? record.brand
@@ -226,6 +236,13 @@ export async function scrapeKiabiProductPage(
     $("img[src*='static.kiabi']").first().attr("src")?.trim() ||
     undefined;
 
+  const description =
+    nextData.description?.trim() ||
+    jsonLd.description?.trim() ||
+    $("meta[property='og:description']").attr("content")?.trim() ||
+    $("meta[name='description']").attr("content")?.trim() ||
+    undefined;
+
   const discountPercentage =
     price != null ? computeDiscount(price, listPrice) : null;
 
@@ -234,6 +251,7 @@ export async function scrapeKiabiProductPage(
     productUrl,
     title,
     brand: jsonLd.brand?.trim() || "Kiabi",
+    description: description || undefined,
     imageUrl,
     price,
     listPrice,

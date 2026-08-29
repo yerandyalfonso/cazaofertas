@@ -94,6 +94,7 @@ type SortKey =
 
 type SortDir = "asc" | "desc";
 type StaleFilter = "all" | "fresh" | "stale" | "never";
+type DealFilter = "all" | "offer" | "normal";
 
 function productStatusBadges(product: AdminProduct) {
   const badges: Array<{ key: string; label: string; className: string }> = [];
@@ -214,6 +215,7 @@ export default function ProductsAdminClient() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [staleFilter, setStaleFilter] = useState<StaleFilter>("all");
+  const [dealFilter, setDealFilter] = useState<DealFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("lastCheckedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -302,6 +304,16 @@ export default function ProductsAdminClient() {
         }
       }
 
+      if (dealFilter !== "all") {
+        const isOffer =
+          product.isActive &&
+          product.availability !== "OUT_OF_STOCK" &&
+          ((product.dealLevel != null && product.dealLevel !== "NORMAL") ||
+            product.discountPercentage >= 5);
+        if (dealFilter === "offer" && !isOffer) return false;
+        if (dealFilter === "normal" && isOffer) return false;
+      }
+
       if (!needle) return true;
       const haystack = [
         product.title,
@@ -338,6 +350,7 @@ export default function ProductsAdminClient() {
     deferredQuery,
     categoryFilter,
     staleFilter,
+    dealFilter,
     sortKey,
     sortDir,
   ]);
@@ -410,12 +423,14 @@ export default function ProductsAdminClient() {
     setQuery("");
     setCategoryFilter("");
     setStaleFilter("all");
+    setDealFilter("all");
   }
 
   const hasActiveFilters =
     query.trim().length > 0 ||
     categoryFilter.length > 0 ||
-    staleFilter !== "all";
+    staleFilter !== "all" ||
+    dealFilter !== "all";
 
   function openCreate() {
     setViewingProduct(null);
@@ -985,6 +1000,19 @@ export default function ProductsAdminClient() {
           <option value="fresh">Revisados (&lt;48 h)</option>
           <option value="stale">Desactualizados (≥48 h)</option>
           <option value="never">Nunca revisados</option>
+        </select>
+
+        <select
+          value={dealFilter}
+          onChange={(event) =>
+            setDealFilter(event.target.value as DealFilter)
+          }
+          className={`${toolbarFieldClass} min-w-[160px]`}
+          aria-label="Filtrar por estado de oferta"
+        >
+          <option value="all">Ofertas y normales</option>
+          <option value="offer">Solo ofertas / chollos</option>
+          <option value="normal">Ya no son oferta</option>
         </select>
 
         {hasActiveFilters ? (
@@ -1696,6 +1724,19 @@ export default function ProductsAdminClient() {
                     <span className="mt-1 block text-xs text-stone-500">
                       {product.dealLabel}
                     </span>
+                    {product.isActive &&
+                    product.availability !== "OUT_OF_STOCK" &&
+                    ((product.dealLevel != null &&
+                      product.dealLevel !== "NORMAL") ||
+                      product.discountPercentage >= 5) ? (
+                      <span className="mt-1 inline-block rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+                        Oferta
+                      </span>
+                    ) : (
+                      <span className="mt-1 inline-block rounded-sm bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-600">
+                        Normal
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-stone-600">
                     {product.category?.name ?? "—"}
