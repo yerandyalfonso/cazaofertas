@@ -9,6 +9,7 @@ import {
 import { ProsCons } from "@/components/blog/ProsCons";
 import { TelegramCategoryCta } from "@/components/blog/TelegramCategoryCta";
 import type { BlogPost } from "@/lib/blog";
+import { BLOG_IMAGES } from "@/lib/blog-images";
 import type { CatalogProduct } from "@/lib/catalog";
 import {
   resolveBlogPresentation,
@@ -115,6 +116,7 @@ function ArticleHeader({
           <div className="relative aspect-[4/5] overflow-hidden bg-stone-200 md:aspect-[5/6]">
             <RemoteImage
               src={post.coverImage}
+              fallbackSrc={BLOG_IMAGES.laptopDeals}
               alt={post.coverAlt}
               fill
               priority
@@ -159,6 +161,7 @@ function ArticleHeader({
             <div className="relative aspect-[16/11] overflow-hidden bg-stone-200 lg:aspect-[5/4]">
               <RemoteImage
                 src={post.coverImage}
+                fallbackSrc={BLOG_IMAGES.laptopDeals}
                 alt={post.coverAlt}
                 fill
                 priority
@@ -197,16 +200,15 @@ function ArticleHeader({
       </div>
 
       <div className="relative mx-auto mt-10 aspect-[21/9] max-w-6xl overflow-hidden bg-stone-200 md:mt-14">
-        {post.coverImage?.trim() ? (
-          <RemoteImage
-            src={post.coverImage}
-            alt={post.coverAlt}
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-        ) : null}
+        <RemoteImage
+          src={post.coverImage}
+          fallbackSrc={BLOG_IMAGES.laptopDeals}
+          alt={post.coverAlt}
+          fill
+          priority
+          className="object-cover"
+          sizes="100vw"
+        />
       </div>
     </header>
   );

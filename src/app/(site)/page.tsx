@@ -3,11 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { DealCard } from "@/components/DealCard";
 import { ProductCard } from "@/components/ProductCard";
+import { RemoteImage } from "@/components/RemoteImage";
 import {
   getActiveProducts,
   getCategories,
   getTopDealProducts,
 } from "@/lib/catalog";
+import { BLOG_IMAGES } from "@/lib/blog-images";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, buildPageMetadata } from "@/lib/seo";
 import { telegramBotUrl } from "@/lib/telegram-links";
 import { getFeaturedArticles, getPublishedArticles } from "@/services/blog";
@@ -74,8 +76,9 @@ export default async function HomePage() {
                     className="group block animate-fade"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden bg-stone-200 md:aspect-[16/9]">
-                      <Image
+                      <RemoteImage
                         src={lead.coverImage}
+                        fallbackSrc={BLOG_IMAGES.laptopDeals}
                         alt={lead.coverAlt}
                         fill
                         priority
@@ -113,8 +116,9 @@ export default async function HomePage() {
                         }`}
                       >
                         <div className="relative mb-4 aspect-[3/2] overflow-hidden bg-stone-200">
-                          <Image
+                          <RemoteImage
                             src={post.coverImage}
+                            fallbackSrc={BLOG_IMAGES.laptopDeals}
                             alt={post.coverAlt}
                             fill
                             className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
@@ -211,8 +215,9 @@ export default async function HomePage() {
               className="group border-t border-stone-300 pt-5 transition hover:border-ink"
             >
               <div className="relative mb-4 aspect-[16/10] overflow-hidden bg-stone-200">
-                <Image
+                <RemoteImage
                   src={post.coverImage}
+                  fallbackSrc={BLOG_IMAGES.laptopDeals}
                   alt={post.coverAlt}
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"

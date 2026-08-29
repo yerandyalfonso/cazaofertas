@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
+import { RemoteImage } from "@/components/RemoteImage";
+import { BLOG_IMAGES } from "@/lib/blog-images";
 import { buildPageMetadata } from "@/lib/seo";
 import {
   getFeaturedArticles,
@@ -73,8 +74,9 @@ export default async function BlogPage() {
       >
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-end">
           <div className="relative aspect-[16/10] overflow-hidden bg-stone-200">
-            <Image
+            <RemoteImage
               src={lead.coverImage}
+              fallbackSrc={BLOG_IMAGES.laptopDeals}
               alt={lead.coverAlt}
               fill
               priority
@@ -108,8 +110,9 @@ export default async function BlogPage() {
               className="group flex flex-1 flex-col"
             >
               <div className="relative mb-5 aspect-[16/10] overflow-hidden bg-stone-200">
-                <Image
+                <RemoteImage
                   src={post.coverImage}
+                  fallbackSrc={BLOG_IMAGES.laptopDeals}
                   alt={post.coverAlt}
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
