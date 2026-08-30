@@ -17,6 +17,11 @@ interface CronStatus {
     lastDenialAt: string | null;
     lastSuccessAt: string | null;
   } | null;
+  settings?: {
+    telegramMinScore: number;
+    source: "database" | "env";
+    updatedAt: string | null;
+  } | null;
 }
 
 interface CronRunResult {
@@ -96,6 +101,11 @@ export function CronAdminClient() {
   const [flashLimit, setFlashLimit] = useState("12");
   const [error, setError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
+  const [telegramMinScore, setTelegramMinScore] = useState("75");
+  const [telegramMinScoreSource, setTelegramMinScoreSource] = useState<
+    "database" | "env" | null
+  >(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   async function readJsonSafe<T>(response: Response): Promise<T | null> {
     const text = await response.text();
@@ -132,7 +142,12 @@ export function CronAdminClient() {
         oldestCheckedAt: data.oldestCheckedAt,
         neverChecked: data.neverChecked,
         cronControl: data.cronControl,
+        settings: data.settings ?? null,
       });
+      if (data.settings?.telegramMinScore != null) {
+        setTelegramMinScore(String(data.settings.telegramMinScore));
+        setTelegramMinScoreSource(data.settings.source);
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Error de red al cargar estado.";
@@ -311,6 +326,47 @@ export function CronAdminClient() {
     }
   }
 
+  async function saveTelegramMinScore() {
+    setSavingSettings(true);
+    setError(null);
+    try {
+      const parsed = Number.parseFloat(telegramMinScore);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+        throw new Error("El umbral debe ser un número entre 0 y 100.");
+      }
+      const response = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramMinScore: parsed }),
+      });
+      const data = await readJsonSafe<{
+        ok?: boolean;
+        error?: string;
+        settings?: CronStatus["settings"];
+      }>(response);
+      if (!response.ok || !data?.ok || !data.settings) {
+        const message =
+          data?.error ?? "No se pudo guardar el umbral de Telegram.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      setTelegramMinScore(String(data.settings.telegramMinScore));
+      setTelegramMinScoreSource(data.settings.source);
+      toast.success(
+        `Umbral Telegram guardado: ${data.settings.telegramMinScore}`,
+      );
+      await loadStatus();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error al guardar ajustes.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   return (
     <div>
       <header>
@@ -377,6 +433,51 @@ export function CronAdminClient() {
           </button>
         </div>
       )}
+
+      <section className="mt-8 border border-stone-300 bg-white p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+          Telegram
+        </p>
+        <h2 className="mt-2 font-display text-2xl text-ink">
+          Umbral de score del canal
+        </h2>
+        <p className="mt-1 max-w-xl text-sm text-stone-600">
+          Solo se publican chollos con score ≥ este valor (flash, precios y
+          Kiabi). Baja el umbral (p. ej. 40–50) si quieres más alertas; súbelo
+          (70–85) para filtrar más.
+          {telegramMinScoreSource === "env"
+            ? " Ahora mismo usa el valor del entorno hasta que guardes aquí."
+            : ""}
+        </p>
+        <div className="mt-5 flex flex-wrap items-end gap-4">
+          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Score mínimo (0–100)
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={telegramMinScore}
+              onChange={(event) => setTelegramMinScore(event.target.value)}
+              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={savingSettings || loadingStatus}
+            onClick={() => void saveTelegramMinScore()}
+            className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-stone-800 disabled:opacity-60"
+          >
+            {savingSettings ? "Guardando…" : "Guardar umbral"}
+          </button>
+          {status?.settings?.updatedAt ? (
+            <p className="self-center text-xs text-stone-500">
+              Último cambio:{" "}
+              {new Date(status.settings.updatedAt).toLocaleString("es-ES")}
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="border border-stone-300 bg-white p-5">

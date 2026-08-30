@@ -50,7 +50,7 @@ export function BlogContent({
     <div className="min-w-0 space-y-8">
       {safeHtml ? (
         <div
-          className="blog-html space-y-6 text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 [&_blockquote]:border-l-2 [&_blockquote]:border-teal-800 [&_blockquote]:pl-5 [&_blockquote]:font-display [&_blockquote]:text-2xl [&_blockquote]:text-ink [&_h2]:mt-12 [&_h2]:font-display [&_h2]:text-3xl [&_h2]:tracking-tight [&_h2]:text-ink md:[&_h2]:mt-16 md:[&_h2]:text-4xl [&_h3]:mt-10 [&_h3]:font-display [&_h3]:text-2xl [&_h3]:text-ink [&_hr]:my-10 [&_hr]:border-stone-300 [&_p]:text-stone-700"
+          className="blog-html space-y-6 text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 [&_blockquote]:border-l-2 [&_blockquote]:border-teal-800 [&_blockquote]:pl-5 [&_blockquote]:font-display [&_blockquote]:text-2xl [&_blockquote]:text-ink [&_h2]:mt-12 [&_h2]:font-display [&_h2]:text-3xl [&_h2]:tracking-tight [&_h2]:text-ink md:[&_h2]:mt-16 md:[&_h2]:text-4xl [&_h3]:mt-10 [&_h3]:font-display [&_h3]:text-2xl [&_h3]:text-ink [&_h4]:mt-8 [&_h4]:font-display [&_h4]:text-xl [&_h4]:text-ink [&_hr]:my-10 [&_hr]:border-stone-300 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_p]:text-stone-700 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
           dangerouslySetInnerHTML={{ __html: safeHtml }}
         />
       ) : null}
@@ -83,6 +83,19 @@ export function BlogContent({
             );
           }
 
+          if (block.level === 4) {
+            return (
+              <h4
+                key={key}
+                className={`font-display text-xl tracking-tight text-ink ${
+                  index === 0 ? "" : "!mt-8"
+                }`}
+              >
+                {block.text}
+              </h4>
+            );
+          }
+
           return (
             <h3
               key={key}
@@ -92,6 +105,22 @@ export function BlogContent({
             >
               {block.text}
             </h3>
+          );
+        }
+
+        if (block.type === "list") {
+          const ListTag = block.style === "number" ? "ol" : "ul";
+          return (
+            <ListTag
+              key={key}
+              className={`space-y-2 pl-5 text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 ${
+                block.style === "number" ? "list-decimal" : "list-disc"
+              }`}
+            >
+              {block.items.map((item, itemIndex) => (
+                <li key={`${key}-${itemIndex}`}>{item}</li>
+              ))}
+            </ListTag>
           );
         }
 

@@ -4,7 +4,11 @@ import {
   looksLikeAmazonUrl,
 } from "@/lib/affiliate";
 import { buildTrackedAffiliateUrl } from "@/lib/affiliate-tracking";
-import { getTelegramChannelId, getTelegramEnv } from "@/lib/env";
+import {
+  getTelegramChannelId,
+  getTelegramEnv,
+  getTelegramPublicChannelId,
+} from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { absoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
@@ -231,7 +235,10 @@ function dealSummaryLine(deal: DealCandidate): string | null {
   return bits.join(" · ");
 }
 
-export function buildDealAlertText(deal: DealCandidate): string {
+export function buildDealAlertText(
+  deal: DealCandidate,
+  options?: { includeCopyLinks?: boolean },
+): string {
   const score =
     deal.score != null && Number.isFinite(deal.score)
       ? Math.round(deal.score)
@@ -259,15 +266,31 @@ export function buildDealAlertText(deal: DealCandidate): string {
     lines.push(`⭐ Puntuación <b>${score}/100</b>`);
   }
 
-  // Dos saltos finales para separar el texto del teclado inline.
+  if (options?.includeCopyLinks) {
+    const offerUrl = buildTrackedAffiliateUrl({
+      productId: deal.productId,
+      source: "telegram",
+    });
+    lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${offerUrl}`);
+    if (deal.productSlug?.trim()) {
+      lines.push(
+        `🌐 Ver en la web: ${absoluteUrl(`/producto/${deal.productSlug.trim()}`)}`,
+      );
+    }
+  }
+
+  // Dos saltos finales para separar el texto del teclado inline (si hay).
   lines.push("", "");
 
   return lines.join("\n");
 }
 
 /** Caption de foto: Telegram limita a 1024 caracteres. */
-export function buildDealAlertCaption(deal: DealCandidate): string {
-  const text = buildDealAlertText(deal);
+export function buildDealAlertCaption(
+  deal: DealCandidate,
+  options?: { includeCopyLinks?: boolean },
+): string {
+  const text = buildDealAlertText(deal, options);
   if (text.length <= 1024) return text;
   return `${text.slice(0, 1020).trimEnd()}…`;
 }
@@ -406,14 +429,21 @@ export async function sendDealAlertMessage(options: {
   chatId: number | string;
   deal: DealCandidate;
   messageThreadId?: number | null;
+  /** buttons = teclado inline (grupo/temas). links = URLs en el texto (canal público). */
+  linkMode?: "buttons" | "links";
 }): Promise<TelegramMessage> {
-  const replyMarkup = buildOfferActionMarkup({
-    affiliateUrl: buildTrackedAffiliateUrl({
-      productId: options.deal.productId,
-      source: "telegram",
-    }),
-    productSlug: options.deal.productSlug,
-  });
+  const linkMode = options.linkMode ?? "buttons";
+  const includeCopyLinks = linkMode === "links";
+  const replyMarkup =
+    linkMode === "buttons"
+      ? buildOfferActionMarkup({
+          affiliateUrl: buildTrackedAffiliateUrl({
+            productId: options.deal.productId,
+            source: "telegram",
+          }),
+          productSlug: options.deal.productSlug,
+        })
+      : undefined;
   const messageThreadId = options.messageThreadId;
 
   const photoUrl = options.deal.imageUrl?.trim();
@@ -422,7 +452,7 @@ export async function sendDealAlertMessage(options: {
       return await sendTelegramPhoto({
         chatId: options.chatId,
         photoUrl,
-        caption: buildDealAlertCaption(options.deal),
+        caption: buildDealAlertCaption(options.deal, { includeCopyLinks }),
         replyMarkup,
         messageThreadId,
       });
@@ -436,7 +466,7 @@ export async function sendDealAlertMessage(options: {
 
   return sendTelegramMessage({
     chatId: options.chatId,
-    text: buildDealAlertText(options.deal),
+    text: buildDealAlertText(options.deal, { includeCopyLinks }),
     disableWebPagePreview: true,
     replyMarkup,
     messageThreadId,
@@ -444,8 +474,9 @@ export async function sendDealAlertMessage(options: {
 }
 
 /**
- * Publica un chollo en el grupo/canal (TELEGRAM_CHANNEL_ID).
- * Si el grupo tiene temas, enruta por slug de categoría (`message_thread_id`).
+ * Publica un chollo:
+ * 1) Grupo/foro (TELEGRAM_CHANNEL_ID) con temas + botones
+ * 2) Canal público (TELEGRAM_PUBLIC_CHANNEL_ID) con links en el texto
  */
 export async function sendChannelDealAlert(
   deal: DealCandidate,
@@ -455,7 +486,30 @@ export async function sendChannelDealAlert(
     throw new Error("Falta TELEGRAM_CHANNEL_ID en el entorno.");
   }
   const messageThreadId = resolveTelegramTopicId(deal.categorySlug);
-  return sendDealAlertMessage({ chatId: channelId, deal, messageThreadId });
+  const groupMessage = await sendDealAlertMessage({
+    chatId: channelId,
+    deal,
+    messageThreadId,
+    linkMode: "buttons",
+  });
+
+  const publicChannelId = getTelegramPublicChannelId();
+  if (publicChannelId && String(publicChannelId) !== String(channelId)) {
+    try {
+      await sendDealAlertMessage({
+        chatId: publicChannelId,
+        deal,
+        linkMode: "links",
+      });
+    } catch (error) {
+      console.warn(
+        "[telegram] Falló envío al canal público; el grupo sí recibió la alerta.",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  return groupMessage;
 }
 
 async function handleCreateAlert(chatId: number, telegramId?: number): Promise<void> {

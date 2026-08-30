@@ -2,9 +2,16 @@ import { EXTRA_HTML_BLOG_POSTS } from "@/lib/blog-extra-posts";
 import { BLOG_IMAGES } from "@/lib/blog-images";
 import type { BlogTemplate } from "@/lib/blog-templates";
 
+export type BlogHeadingLevel = 2 | 3 | 4;
+
 export type BlogBlock =
   | { type: "paragraph"; text: string }
-  | { type: "heading"; level: 2 | 3; text: string }
+  | { type: "heading"; level: BlogHeadingLevel; text: string }
+  | {
+      type: "list";
+      style: "bullet" | "number";
+      items: string[];
+    }
   | { type: "image"; src: string; alt: string; caption?: string }
   | { type: "product"; slug: string }
   | { type: "productGrid"; slugs: string[] }

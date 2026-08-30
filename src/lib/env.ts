@@ -30,6 +30,7 @@ const serverEnvSchema = publicEnvSchema.extend({
   CRON_SECRET: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHANNEL_ID: z.string().optional(),
+  TELEGRAM_PUBLIC_CHANNEL_ID: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TELEGRAM_MIN_SCORE: z.string().optional(),
 });
@@ -83,6 +84,7 @@ export function getServerEnv(): ServerEnv {
     CRON_SECRET: process.env.CRON_SECRET,
     TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHANNEL_ID: process.env.TELEGRAM_CHANNEL_ID,
+    TELEGRAM_PUBLIC_CHANNEL_ID: process.env.TELEGRAM_PUBLIC_CHANNEL_ID,
     TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
     TELEGRAM_MIN_SCORE: process.env.TELEGRAM_MIN_SCORE,
   });
@@ -96,9 +98,22 @@ export function getTelegramEnv(): TelegramEnv {
   });
 }
 
-/** Chat/canal destino para alertas broadcast (-100… o @canal). */
+/** Chat/canal destino para alertas broadcast (-100… o @canal). Grupo con temas. */
 export function getTelegramChannelId(): string | number | null {
   const raw = process.env.TELEGRAM_CHANNEL_ID?.trim();
+  if (!raw) return null;
+  if (/^-?\d+$/.test(raw)) return Number(raw);
+  return raw.startsWith("@") ? raw : `@${raw}`;
+}
+
+/**
+ * Canal público de difusión (p. ej. @cazador_de_ofertas).
+ * Mismas ofertas que el grupo, pero con links en el texto (sin botones).
+ */
+export function getTelegramPublicChannelId(): string | number | null {
+  const raw =
+    process.env.TELEGRAM_PUBLIC_CHANNEL_ID?.trim() ||
+    process.env.TELEGRAM_BROADCAST_CHANNEL_ID?.trim();
   if (!raw) return null;
   if (/^-?\d+$/.test(raw)) return Number(raw);
   return raw.startsWith("@") ? raw : `@${raw}`;
@@ -116,6 +131,10 @@ export function getEnvStatus() {
     supabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     telegramBotToken: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     telegramChannelId: Boolean(process.env.TELEGRAM_CHANNEL_ID),
+    telegramPublicChannelId: Boolean(
+      process.env.TELEGRAM_PUBLIC_CHANNEL_ID ||
+        process.env.TELEGRAM_BROADCAST_CHANNEL_ID,
+    ),
     telegramWebhookSecret: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
   };
 }

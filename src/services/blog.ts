@@ -60,8 +60,15 @@ export function isBlogBlock(value: unknown): value is BlogBlock {
     case "heading": {
       const level = (value as { level?: unknown }).level;
       return (
-        (level === 2 || level === 3) &&
+        (level === 2 || level === 3 || level === 4) &&
         typeof (value as { text?: unknown }).text === "string"
+      );
+    }
+    case "list": {
+      const style = (value as { style?: unknown }).style;
+      return (
+        (style === "bullet" || style === "number") &&
+        Array.isArray((value as { items?: unknown }).items)
       );
     }
     case "image":

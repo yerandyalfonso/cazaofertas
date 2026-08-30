@@ -40,12 +40,22 @@ export async function GET(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
     const client = createSupabaseServiceClient();
+    const { searchParams } = new URL(request.url);
 
-    const { data, error } = await client
+    const rawLimit = Number.parseInt(searchParams.get("limit") ?? "100", 10);
+    const rawOffset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(rawLimit, 200)
+        : 100;
+    const offset =
+      Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
+
+    const { data, error, count } = await client
       .from("products")
-      .select("*, categories(id, name, slug)")
+      .select("*, categories(id, name, slug)", { count: "exact" })
       .order("updated_at", { ascending: false })
-      .limit(200);
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new Error(error.message);
@@ -109,16 +119,28 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const { data: categories } = await client
-      .from("categories")
-      .select("id, name, slug")
-      .eq("is_active", true)
-      .order("name");
+    const total = count ?? products.length;
+    const hasMore = offset + products.length < total;
+
+    // Categorías solo en la primera página (evita repetir en cada lote).
+    let categories: Array<{ id: string; name: string; slug: string }> | undefined;
+    if (offset === 0) {
+      const { data: categoryRows } = await client
+        .from("categories")
+        .select("id, name, slug")
+        .eq("is_active", true)
+        .order("name");
+      categories = categoryRows ?? [];
+    }
 
     return NextResponse.json({
       ok: true,
       products,
-      categories: categories ?? [],
+      total,
+      offset,
+      limit,
+      hasMore,
+      ...(categories ? { categories } : {}),
     });
   } catch (error) {
     const message = formatEnvError(error);

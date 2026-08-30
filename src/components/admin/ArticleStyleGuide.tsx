@@ -76,7 +76,8 @@ export function ArticleStyleGuide({
               </li>
               <li>
                 <span className="font-semibold text-ink">Bloques:</span> títulos
-                H2/H3, párrafos, destacados, pros/contras e imágenes. Enlaza
+                H2/H3/H4, párrafos, listas, citas y bloques especiales en el
+                editor visual. Al guardar se convierten a bloques tipados. Enlaza
                 productos con el selector del formulario.
               </li>
               <li>

@@ -1,4 +1,4 @@
-import type { BlogBlock } from "@/lib/blog";
+import type { BlogBlock, BlogHeadingLevel } from "@/lib/blog";
 import type { BlogTemplate } from "@/lib/blog-templates";
 
 /** Documento editorial guardado en articles.content (jsonb). */
@@ -148,8 +148,31 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
         text: "Criterios que importan",
       },
       {
+        type: "list",
+        style: "number",
+        items: [
+          "Factor decisivo 1 (ej. capacidad)",
+          "Factor decisivo 2 (ej. compatibilidad)",
+          "Factor decisivo 3 (ej. autonomía)",
+        ],
+      },
+      {
+        type: "heading",
+        level: 3,
+        text: "Detalle por criterio",
+      },
+      {
         type: "paragraph",
-        text: "Lista los 3–5 factores decisivos (capacidad, compatibilidad, autonomía…).",
+        text: "Amplía cada punto si hace falta; usa H4 para subapartados cortos.",
+      },
+      {
+        type: "heading",
+        level: 4,
+        text: "Ejemplo de subapartado",
+      },
+      {
+        type: "paragraph",
+        text: "Una frase concreta sobre ese criterio.",
       },
       {
         type: "heading",
@@ -157,8 +180,13 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
         text: "Errores frecuentes",
       },
       {
-        type: "paragraph",
-        text: "Qué evitar al comprar por impulso en Amazon.",
+        type: "list",
+        style: "bullet",
+        items: [
+          "Comprar solo por el % del cartel",
+          "Ignorar vendedor / envío",
+          "No contrastar con el mínimo histórico",
+        ],
       },
       {
         type: "heading",
@@ -230,6 +258,8 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
 export type EditorBlockKind =
   | "heading"
   | "paragraph"
+  | "listBullet"
+  | "listNumber"
   | "blockquote"
   | "divider"
   | "image"
@@ -242,8 +272,17 @@ export interface EditorBlockBase {
 }
 
 export type EditorBlock =
-  | (EditorBlockBase & { type: "heading"; level: 2 | 3; text: string })
+  | (EditorBlockBase & {
+      type: "heading";
+      level: BlogHeadingLevel;
+      text: string;
+    })
   | (EditorBlockBase & { type: "paragraph"; text: string })
+  | (EditorBlockBase & {
+      type: "list";
+      style: "bullet" | "number";
+      items: string[];
+    })
   | (EditorBlockBase & { type: "blockquote"; text: string; cite?: string })
   | (EditorBlockBase & { type: "divider" })
   | (EditorBlockBase & {
@@ -275,6 +314,13 @@ export function blogBlocksToEditor(blocks: BlogBlock[]): EditorBlock[] {
         return { id, type: "heading", level: block.level, text: block.text };
       case "paragraph":
         return { id, type: "paragraph", text: block.text };
+      case "list":
+        return {
+          id,
+          type: "list",
+          style: block.style,
+          items: [...block.items],
+        };
       case "blockquote":
         return {
           id,
@@ -328,6 +374,13 @@ export function editorBlocksToBlog(blocks: EditorBlock[]): BlogBlock[] {
           result.push({ type: "paragraph", text: block.text.trim() });
         }
         break;
+      case "list": {
+        const items = block.items.map((item) => item.trim()).filter(Boolean);
+        if (items.length > 0) {
+          result.push({ type: "list", style: block.style, items });
+        }
+        break;
+      }
       case "blockquote":
         if (block.text.trim()) {
           result.push({
@@ -394,6 +447,10 @@ export function emptyEditorBlock(kind: EditorBlockKind): EditorBlock {
       return { id, type: "heading", level: 2, text: "" };
     case "paragraph":
       return { id, type: "paragraph", text: "" };
+    case "listBullet":
+      return { id, type: "list", style: "bullet", items: [""] };
+    case "listNumber":
+      return { id, type: "list", style: "number", items: [""] };
     case "blockquote":
       return { id, type: "blockquote", text: "" };
     case "divider":
@@ -433,6 +490,11 @@ export function getTemplateStyleOutline(template: BlogTemplate): {
         };
       case "paragraph":
         return { kind: "Párrafo", text: block.text };
+      case "list":
+        return {
+          kind: block.style === "number" ? "Lista numerada" : "Lista",
+          text: block.items.join(" · "),
+        };
       case "blockquote":
         return { kind: "Destacado", text: block.text };
       case "prosCons":
@@ -488,6 +550,7 @@ export function estimateBlocksReadingTime(blocks: BlogBlock[]): number {
     .map((block) => {
       if (block.type === "paragraph" || block.type === "heading") return block.text;
       if (block.type === "blockquote") return block.text;
+      if (block.type === "list") return block.items.join(" ");
       if (block.type === "prosCons") {
         return [...block.pros, ...block.cons].join(" ");
       }

@@ -315,6 +315,8 @@ function blockText(block: BlogBlock): string {
     case "heading":
     case "blockquote":
       return block.text.trim();
+    case "list":
+      return block.items.join(". ").trim();
     case "prosCons":
       return [...block.pros, ...block.cons].join(". ").trim();
     default:

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowDown, ArrowUp, Plus, Upload, X } from "lucide-react";
-import { ArticleBlockEditor } from "@/components/admin/ArticleBlockEditor";
+import { BlogWysiwygEditor } from "@/components/admin/blog-wysiwyg/BlogWysiwygEditor";
 import { ArticleQuickImport } from "@/components/admin/ArticleQuickImport";
 import { ArticleStyleGuide } from "@/components/admin/ArticleStyleGuide";
 import { useAdminToast } from "@/components/admin/AdminToast";
@@ -64,6 +64,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
   const [blocks, setBlocks] = useState<EditorBlock[]>(() =>
     createBlankEditorBlocks(),
   );
+  const [editorResetKey, setEditorResetKey] = useState(0);
   const [pullQuote, setPullQuote] = useState("");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -161,6 +162,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
       } else {
         setBlocks(createBlankEditorBlocks());
       }
+      setEditorResetKey((key) => key + 1);
     } catch {
       setError("Error de red al cargar el artículo.");
     } finally {
@@ -192,6 +194,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     if (result.pullQuote) setPullQuote(result.pullQuote);
     if (result.category) setCategory(result.category);
     setBlocks(result.blocks);
+    setEditorResetKey((key) => key + 1);
     if (result.featuredImage) {
       setFeaturedImage(result.featuredImage);
     }
@@ -563,16 +566,17 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
               Contenido
             </p>
             <p className="mt-1 text-sm text-stone-600">
-              Añade títulos, párrafos, destacados o pros/contras y escribe
-              directamente. Consulta la guía de estilo si necesitas el esquema
-              recomendado.
+              Editor visual: títulos H2–H4, listas, citas y bloques especiales
+              (imagen, producto, pros/contras). Al guardar se mantienen los
+              mismos bloques tipados en la base de datos.
             </p>
           </div>
-          <ArticleBlockEditor
+          <BlogWysiwygEditor
             blocks={blocks}
             onChange={setBlocks}
             onUploadImage={uploadImage}
             products={products.map((p) => ({ slug: p.slug, title: p.title }))}
+            resetKey={editorResetKey}
           />
         </section>
 

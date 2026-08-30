@@ -194,6 +194,8 @@ export default function ProductsAdminClient() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -233,36 +235,67 @@ export default function ProductsAdminClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadingMore(false);
     setError(null);
     try {
-      const response = await fetch("/api/admin/products");
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        products?: AdminProduct[];
-        categories?: CategoryOption[];
-      };
-      if (!response.ok || !data.ok) {
-        const message = data.error ?? "No se pudieron cargar productos.";
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      setProducts(data.products ?? []);
-      setCategories(data.categories ?? []);
-      setSelectedIds((prev) => {
-        const valid = new Set((data.products ?? []).map((p) => p.id));
-        const next = new Set<string>();
-        for (const id of prev) {
-          if (valid.has(id)) next.add(id);
+      const pageSize = 100;
+      let offset = 0;
+      let accumulated: AdminProduct[] = [];
+      let total: number | null = null;
+      let categoriesLoaded = false;
+
+      while (true) {
+        if (offset > 0) setLoadingMore(true);
+        const response = await fetch(
+          `/api/admin/products?offset=${offset}&limit=${pageSize}`,
+        );
+        const data = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+          products?: AdminProduct[];
+          categories?: CategoryOption[];
+          total?: number;
+          hasMore?: boolean;
+        };
+        if (!response.ok || !data.ok) {
+          const message = data.error ?? "No se pudieron cargar productos.";
+          setError(message);
+          toast.error(message);
+          return;
         }
-        return next;
-      });
+
+        if (!categoriesLoaded && data.categories) {
+          setCategories(data.categories);
+          categoriesLoaded = true;
+        }
+        if (typeof data.total === "number") {
+          total = data.total;
+          setCatalogTotal(data.total);
+        }
+
+        accumulated = [...accumulated, ...(data.products ?? [])];
+        setProducts(accumulated);
+        setSelectedIds((prev) => {
+          const valid = new Set(accumulated.map((p) => p.id));
+          const next = new Set<string>();
+          for (const id of prev) {
+            if (valid.has(id)) next.add(id);
+          }
+          return next;
+        });
+
+        const hasMore =
+          data.hasMore === true ||
+          (total != null && accumulated.length < total);
+        if (!hasMore || (data.products?.length ?? 0) === 0) break;
+        offset += pageSize;
+      }
     } catch {
       setError("Error de red al cargar productos.");
       toast.error("Error de red al cargar productos.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [toast]);
 
@@ -901,9 +934,15 @@ export default function ProductsAdminClient() {
             Productos
           </h1>
           <p className="mt-2 text-sm text-stone-600">
-            {loading
+            {loading && products.length === 0
               ? "Cargando catálogo…"
-              : `${visibleProducts.length} de ${products.length} productos`}
+              : loadingMore
+                ? `Cargando… ${products.length}${catalogTotal != null ? ` / ${catalogTotal}` : ""} productos`
+                : `${visibleProducts.length} de ${products.length} productos${
+                    catalogTotal != null && catalogTotal !== products.length
+                      ? ` (total ${catalogTotal})`
+                      : ""
+                  }`}
             {!loading && staleCount > 0 ? (
               <span className="text-rose-700">
                 {" "}

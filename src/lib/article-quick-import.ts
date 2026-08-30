@@ -78,6 +78,12 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
       "[IMAGEN]: https://…/foto.jpg | Texto alternativo",
       "[INTRODUCCIÓN]: …",
       "[H2]: Criterios (opcional)",
+      "[H3]: Subsección (opcional)",
+      "[H4]: Apartado (opcional)",
+      "[LISTA]:",
+      "- Ítem con viñeta",
+      "[LISTA NUMERADA]:",
+      "1. Ítem numerado",
       "[PÁRRAFO]: …",
       "[PUNTOS CLAVE]",
       "1. Punto uno",
@@ -93,7 +99,16 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
 [IMAGEN]: https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=1200 | Freidora de aire en encimera
 [INTRODUCCIÓN]: Esta guía resume los criterios que usamos en CazaOferta para no comprar por impulso en Amazon.
 [H2]: Criterios que importan
-[PÁRRAFO]: Prioriza litros útiles, facilidad de limpieza y programas que uses cada semana.
+[LISTA NUMERADA]:
+1. Capacidad útil en litros
+2. Facilidad de limpieza
+3. Programas que uses cada semana
+[H3]: Errores habituales
+[LISTA]:
+- Comprar solo por el % del cartel
+- Ignorar el tamaño de encimera
+[H4]: Nota rápida
+[PÁRRAFO]: Fija un precio objetivo ligado al mínimo histórico antes de decidir.
 [PUNTOS CLAVE]
 1. Mide el espacio real de encimera
 2. Elige capacidad según comensales habituales
@@ -195,7 +210,26 @@ function classifyTag(normalized: string): string {
   if (normalized === "h2" || normalized === "titulo h2" || normalized === "subtitulo") {
     return "h2";
   }
-  if (normalized === "h3") return "h3";
+  if (normalized === "h3" || normalized === "titulo h3") return "h3";
+  if (normalized === "h4" || normalized === "titulo h4") return "h4";
+  if (
+    normalized === "lista" ||
+    normalized === "lista vinetas" ||
+    normalized === "viñetas" ||
+    normalized === "vinetas" ||
+    normalized === "ul" ||
+    normalized === "bullets"
+  ) {
+    return "listBullet";
+  }
+  if (
+    normalized === "lista numerada" ||
+    normalized === "lista numeros" ||
+    normalized === "ol" ||
+    normalized === "numeros"
+  ) {
+    return "listNumber";
+  }
   if (
     normalized === "parrafo" ||
     normalized === "texto" ||
@@ -325,8 +359,20 @@ function paragraphBlock(text: string): EditorBlock {
   return { id: newBlockId(), type: "paragraph", text };
 }
 
-function headingBlock(level: 2 | 3, text: string): EditorBlock {
+function headingBlock(level: 2 | 3 | 4, text: string): EditorBlock {
   return { id: newBlockId(), type: "heading", level, text };
+}
+
+function listBlock(
+  style: "bullet" | "number",
+  items: string[],
+): EditorBlock {
+  return {
+    id: newBlockId(),
+    type: "list",
+    style,
+    items: items.length > 0 ? items : [""],
+  };
 }
 
 function blockquoteBlock(text: string): EditorBlock {
@@ -434,6 +480,26 @@ export function parseQuickImport(
           if (rest) blocks.push(paragraphBlock(rest));
         }
         break;
+      case "h4":
+        flushProsCons();
+        blocks.push(headingBlock(4, content.split(/\n/)[0]?.trim() || content));
+        {
+          const rest = content.split(/\n/).slice(1).join("\n").trim();
+          if (rest) blocks.push(paragraphBlock(rest));
+        }
+        break;
+      case "listBullet":
+      case "listNumber": {
+        flushProsCons();
+        const items = parseListItems(content);
+        blocks.push(
+          listBlock(
+            section.tag === "listNumber" ? "number" : "bullet",
+            items.length > 0 ? items : [content],
+          ),
+        );
+        break;
+      }
       case "intro":
       case "paragraph":
         flushProsCons();
@@ -457,9 +523,7 @@ export function parseQuickImport(
         if (items.length === 0) {
           blocks.push(paragraphBlock(content));
         } else {
-          for (let i = 0; i < items.length; i += 1) {
-            blocks.push(paragraphBlock(`${i + 1}. ${items[i]}`));
-          }
+          blocks.push(listBlock("number", items));
         }
         break;
       }

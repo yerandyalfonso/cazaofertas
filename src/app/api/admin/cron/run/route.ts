@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
+import { getAppSettings } from "@/services/appSettings";
 import {
   getCronControlState,
   pauseCronJobs,
@@ -18,12 +19,13 @@ export async function GET(request: NextRequest) {
     if (denied) return denied;
     const client = createSupabaseServiceClient();
 
-    const [{ data, error }, cronControl] = await Promise.all([
+    const [{ data, error }, cronControl, appSettings] = await Promise.all([
       client
         .from("products")
         .select("last_checked_at, is_active, amazon_url")
         .eq("is_active", true),
       getCronControlState().catch(() => null),
+      getAppSettings().catch(() => null),
     ]);
 
     if (error) {
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
       oldestCheckedAt: oldest ?? null,
       neverChecked,
       cronControl,
+      settings: appSettings,
     });
   } catch (error) {
     const message = formatEnvError(error);

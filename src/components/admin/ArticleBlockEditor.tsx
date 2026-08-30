@@ -7,6 +7,8 @@ import {
   GripVertical,
   Heading2,
   ImagePlus,
+  List,
+  ListOrdered,
   Loader2,
   Minus,
   Package,
@@ -23,11 +25,14 @@ import {
   type EditorBlockKind,
   newBlockId,
 } from "@/lib/admin-article-editor";
+import type { BlogHeadingLevel } from "@/lib/blog";
 
 const ADD_OPTIONS: Array<{ kind: EditorBlockKind; label: string; icon: typeof Type }> =
   [
-    { kind: "heading", label: "Título de sección", icon: Heading2 },
+    { kind: "heading", label: "Título (H2–H4)", icon: Heading2 },
     { kind: "paragraph", label: "Párrafo", icon: Type },
+    { kind: "listBullet", label: "Lista · viñetas", icon: List },
+    { kind: "listNumber", label: "Lista · números", icon: ListOrdered },
     { kind: "blockquote", label: "Destacado", icon: Quote },
     { kind: "prosCons", label: "Pros / Contras", icon: Scale },
     { kind: "product", label: "Producto", icon: Package },
@@ -140,20 +145,24 @@ export function ArticleBlockEditor({
                 <GripVertical className="h-3.5 w-3.5 shrink-0" />
               </span>
               {block.type === "heading"
-                ? "Título de sección"
+                ? `Título · H${block.level}`
                 : block.type === "paragraph"
                   ? "Párrafo"
-                  : block.type === "blockquote"
-                    ? "Destacado"
-                    : block.type === "prosCons"
-                      ? "Pros / Contras"
-                      : block.type === "product"
-                        ? "Producto embebido"
-                        : block.type === "productGrid"
-                          ? "Grid de productos"
-                          : block.type === "image"
-                            ? "Imagen"
-                            : "Separador"}
+                  : block.type === "list"
+                    ? block.style === "number"
+                      ? "Lista numerada"
+                      : "Lista con viñetas"
+                    : block.type === "blockquote"
+                      ? "Destacado"
+                      : block.type === "prosCons"
+                        ? "Pros / Contras"
+                        : block.type === "product"
+                          ? "Producto embebido"
+                          : block.type === "productGrid"
+                            ? "Grid de productos"
+                            : block.type === "image"
+                              ? "Imagen"
+                              : "Separador"}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -191,13 +200,14 @@ export function ArticleBlockEditor({
                 value={block.level}
                 onChange={(event) =>
                   updateBlock(block.id, {
-                    level: Number(event.target.value) as 2 | 3,
+                    level: Number(event.target.value) as BlogHeadingLevel,
                   })
                 }
                 className="h-9 border border-stone-300 bg-white px-2 text-sm"
               >
                 <option value={2}>H2 · Sección principal</option>
                 <option value={3}>H3 · Subsección</option>
+                <option value={4}>H4 · Apartado</option>
               </select>
               <input
                 value={block.text}
@@ -220,6 +230,62 @@ export function ArticleBlockEditor({
               placeholder="Escribe el párrafo…"
               className="w-full border border-stone-300 bg-white px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-ink"
             />
+          ) : null}
+
+          {block.type === "list" ? (
+            <div className="space-y-2">
+              <select
+                value={block.style}
+                onChange={(event) =>
+                  updateBlock(block.id, {
+                    style: event.target.value as "bullet" | "number",
+                  })
+                }
+                className="h-9 border border-stone-300 bg-white px-2 text-sm"
+              >
+                <option value="bullet">Viñetas (•)</option>
+                <option value="number">Números (1, 2, 3…)</option>
+              </select>
+              {block.items.map((item, idx) => (
+                <div key={`${block.id}-item-${idx}`} className="flex gap-2">
+                  <span className="flex h-9 w-7 shrink-0 items-center justify-center text-xs text-stone-400">
+                    {block.style === "number" ? `${idx + 1}.` : "•"}
+                  </span>
+                  <input
+                    value={item}
+                    onChange={(event) => {
+                      const items = [...block.items];
+                      items[idx] = event.target.value;
+                      updateBlock(block.id, { items });
+                    }}
+                    placeholder={`Ítem ${idx + 1}`}
+                    className="h-9 min-w-0 flex-1 border border-stone-300 bg-white px-3 text-sm outline-none focus:border-ink"
+                  />
+                  <button
+                    type="button"
+                    title="Quitar ítem"
+                    onClick={() => {
+                      const items = block.items.filter((_, i) => i !== idx);
+                      updateBlock(block.id, {
+                        items: items.length > 0 ? items : [""],
+                      });
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center text-stone-500 hover:text-rose-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  updateBlock(block.id, { items: [...block.items, ""] })
+                }
+                className="text-xs font-semibold text-teal-800 hover:underline"
+              >
+                + Añadir ítem
+              </button>
+            </div>
           ) : null}
 
           {block.type === "blockquote" ? (

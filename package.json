@@ -24,6 +24,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
+    "@tiptap/extension-blockquote": "^3.30.5",
+    "@tiptap/extension-placeholder": "^3.30.5",
+    "@tiptap/pm": "^3.30.5",
+    "@tiptap/react": "^3.30.5",
+    "@tiptap/starter-kit": "^3.30.5",
     "cheerio": "^1.1.2",
     "dotenv": "^17.4.2",
     "html-to-image": "^1.11.13",

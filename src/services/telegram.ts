@@ -1,7 +1,7 @@
-import { getTelegramMinScore } from "@/lib/env";
 import { roundMoney, toNumber } from "@/lib/money";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
+import { resolveTelegramMinScore } from "@/services/appSettings";
 import {
   isTelegramChannelConfigured,
   sendChannelDealAlert,
@@ -35,7 +35,8 @@ export async function notifyChannelDealIfEligible(
     cooldownHours?: number;
   },
 ): Promise<ChannelNotifyResult> {
-  const minScore = options?.minScore ?? getTelegramMinScore();
+  const minScore =
+    options?.minScore ?? (await resolveTelegramMinScore());
   const score = deal.score ?? 0;
 
   if (!isTelegramChannelConfigured()) {

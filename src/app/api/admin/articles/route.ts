@@ -35,6 +35,9 @@ function normalizeContentPayload(raw: unknown): {
         ) {
           return block.text;
         }
+        if (block.type === "list") {
+          return block.items.join(" ");
+        }
         if (block.type === "prosCons") {
           return [...block.pros, ...block.cons].join(" ");
         }

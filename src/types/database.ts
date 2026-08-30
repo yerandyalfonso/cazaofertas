@@ -547,6 +547,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      app_settings: {
+        Row: {
+          id: string;
+          telegram_min_score: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          telegram_min_score?: number;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          telegram_min_score?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
