@@ -99,27 +99,30 @@ echo "Logs: $LOG_DIR"
 echo
 
 write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20 *:30 *:40 *:50"
+# Flash dedicado: cada 180 s, hasta 3 ofertas nuevas (feeds por departamento rotados).
+write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "180" ""
 write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 
 echo
 echo "Cargando LaunchAgents..."
 load_agent "com.cazaofertas.cron.check-prices"
-# Flash deals van dentro de check-prices (1 por ciclo); retirar el agente suelto si existía.
-unload_if_loaded "com.cazaofertas.cron.flash-deals"
-rm -f "$AGENTS_DIR/com.cazaofertas.cron.flash-deals.plist"
+load_agent "com.cazaofertas.cron.flash-deals"
 load_agent "com.cazaofertas.cron.user-alerts"
 load_agent "com.cazaofertas.cron.kiabi-deals"
 
 echo
 echo "Listo. Horarios (hora local del Mac):"
-echo "  • check-prices: 2 precios Amazon + 1 flash deal — :00, :10, :20, :30, :40, :50"
+echo "  • check-prices: 2 precios Amazon + lote Telegram si toca — :00, :10, :20, :30, :40, :50"
+echo "  • flash-deals:  cada 3 min · hasta 3 ofertas nuevas · departamentos rotados"
 echo "  • user-alerts:  08:15 y 20:15 (1 min entre alertas)"
 echo "  • kiabi-deals:  09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1; solo estas 2 pasadas)"
-echo "  • flash-deals:  integrado en check-prices (ya no hay cron aparte)"
+echo "  • telegram:     el lote al grupo se envía según el intervalo del admin (default 4 h)"
 echo
 echo "Prueba manual:"
+echo "  cd \"$REPO_ROOT\" && npm run cron:local:flash"
 echo "  cd \"$REPO_ROOT\" && npm run cron:local:prices"
 echo
 echo "Ver logs:"
+echo "  tail -f \"$LOG_DIR/flash-deals.log\""
 echo "  tail -f \"$LOG_DIR/check-prices.log\""

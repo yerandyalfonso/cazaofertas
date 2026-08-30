@@ -9,6 +9,7 @@ import {
   getTelegramEnv,
   getTelegramPublicChannelId,
 } from "@/lib/env";
+import { postDealToFacebookPage } from "@/services/facebook";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { absoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
@@ -235,6 +236,15 @@ function dealSummaryLine(deal: DealCandidate): string | null {
   return bits.join(" · ");
 }
 
+function formatDealStamp(iso: string): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function buildDealAlertText(
   deal: DealCandidate,
   options?: { includeCopyLinks?: boolean },
@@ -264,6 +274,13 @@ export function buildDealAlertText(
 
   if (score != null) {
     lines.push(`⭐ Puntuación <b>${score}/100</b>`);
+  }
+
+  if (deal.detectedAt) {
+    lines.push(`📅 Publicada: ${formatDealStamp(deal.detectedAt)}`);
+  }
+  if (deal.expiresAt && new Date(deal.expiresAt).getTime() > Date.now()) {
+    lines.push(`⏳ Vence: ${formatDealStamp(deal.expiresAt)}`);
   }
 
   if (options?.includeCopyLinks) {
@@ -477,6 +494,7 @@ export async function sendDealAlertMessage(options: {
  * Publica un chollo:
  * 1) Grupo/foro (TELEGRAM_CHANNEL_ID) con temas + botones
  * 2) Canal público (TELEGRAM_PUBLIC_CHANNEL_ID) con links en el texto
+ * 3) Página de Facebook (si hay token; nunca interrumpe Telegram)
  */
 export async function sendChannelDealAlert(
   deal: DealCandidate,
@@ -507,6 +525,11 @@ export async function sendChannelDealAlert(
         error instanceof Error ? error.message : error,
       );
     }
+  }
+
+  const facebook = await postDealToFacebookPage(deal);
+  if (!facebook.ok && !facebook.skipped) {
+    console.warn("[facebook]", facebook.error ?? "No se pudo publicar en Facebook.");
   }
 
   return groupMessage;

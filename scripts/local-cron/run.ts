@@ -12,13 +12,15 @@ type LocalCronJob =
   | "check-prices"
   | "flash-deals"
   | "user-alerts"
-  | "kiabi-deals";
+  | "kiabi-deals"
+  | "telegram-flush";
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
   "flash-deals",
   "user-alerts",
   "kiabi-deals",
+  "telegram-flush",
 ];
 
 function parseJob(raw: string | undefined): LocalCronJob {
@@ -31,8 +33,6 @@ function parseJob(raw: string | undefined): LocalCronJob {
 
 async function runCheckPrices(): Promise<void> {
   const { runAmazonPriceCheck } = await import("@/services/amazonPriceCheck");
-  const { runFlashDealsCheck } = await import("@/services/flashDeals");
-  const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
   const { reviewCheckPricesResult } = await import("./notify");
 
   const amazon = await runAmazonPriceCheck({
@@ -44,46 +44,28 @@ async function runCheckPrices(): Promise<void> {
   });
   console.log(JSON.stringify({ amazon }, null, 2));
 
-  // 1 flash deal en el mismo ciclo que check-prices (antes cada 3 h aparte).
-  const flashRaw = await runFlashDealsCheck({
-    limit: 1,
-    notify: true,
-    allowSimulatedFallback: true,
-    includeCatalog: false,
-    delayMs: 0,
-  });
-  const flashProcessed =
-    (flashRaw.inserted ?? 0) +
-    (flashRaw.updated ?? 0) +
-    (flashRaw.unchanged ?? 0) +
-    (flashRaw.errors?.length ?? 0);
-  const flashPause = await maybePauseAfterAmazonErrors(
-    flashRaw.errors ?? [],
-    flashProcessed,
+  const { flushPendingChannelNotifications } = await import(
+    "@/services/telegramFlush"
   );
-  const flash = {
-    ...flashRaw,
-    pause: {
-      activated: flashPause.paused,
-      denials: flashPause.denials,
-      state: flashPause.state,
-    },
-  };
-  console.log(JSON.stringify({ flash }, null, 2));
+  const telegramFlush = await flushPendingChannelNotifications({
+    force: false,
+  });
+  console.log(JSON.stringify({ telegramFlush }, null, 2));
 
-  await reviewCheckPricesResult(amazon, { flash });
+  await reviewCheckPricesResult(amazon);
 }
 
 async function runFlashDeals(): Promise<void> {
   const { runFlashDealsCheck } = await import("@/services/flashDeals");
   const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
 
+  // Cada ~3 min (LaunchAgent): hasta 3 ASINs nuevos; feeds por departamento rotados.
   const result = await runFlashDealsCheck({
     limit: 3,
     notify: true,
     allowSimulatedFallback: true,
     includeCatalog: false,
-    delayMs: 300_000,
+    delayMs: 2_500,
   });
 
   const processed =
@@ -134,6 +116,15 @@ async function runKiabiDeals(): Promise<void> {
   await reviewKiabiDealsResult(result);
 }
 
+async function runTelegramFlush(): Promise<void> {
+  const { flushPendingChannelNotifications } = await import(
+    "@/services/telegramFlush"
+  );
+  const force = process.argv.includes("--force");
+  const result = await flushPendingChannelNotifications({ force });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function main(): Promise<void> {
   const job = parseJob(process.argv[2]);
   const started = new Date().toISOString();
@@ -157,6 +148,9 @@ async function main(): Promise<void> {
       break;
     case "kiabi-deals":
       await runKiabiDeals();
+      break;
+    case "telegram-flush":
+      await runTelegramFlush();
       break;
   }
 

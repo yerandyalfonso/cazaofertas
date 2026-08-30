@@ -33,6 +33,9 @@ const serverEnvSchema = publicEnvSchema.extend({
   TELEGRAM_PUBLIC_CHANNEL_ID: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   TELEGRAM_MIN_SCORE: z.string().optional(),
+  FACEBOOK_PAGE_ID: z.string().optional(),
+  FACEBOOK_PAGE_ACCESS_TOKEN: z.string().optional(),
+  FACEBOOK_GRAPH_API_VERSION: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -87,6 +90,9 @@ export function getServerEnv(): ServerEnv {
     TELEGRAM_PUBLIC_CHANNEL_ID: process.env.TELEGRAM_PUBLIC_CHANNEL_ID,
     TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
     TELEGRAM_MIN_SCORE: process.env.TELEGRAM_MIN_SCORE,
+    FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID,
+    FACEBOOK_PAGE_ACCESS_TOKEN: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
+    FACEBOOK_GRAPH_API_VERSION: process.env.FACEBOOK_GRAPH_API_VERSION,
   });
 }
 
@@ -124,6 +130,27 @@ export function getTelegramMinScore(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 75;
 }
 
+export function getFacebookPageId(): string | null {
+  const raw = process.env.FACEBOOK_PAGE_ID?.trim();
+  return raw || null;
+}
+
+export function getFacebookPageAccessToken(): string | null {
+  const raw = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim();
+  return raw || null;
+}
+
+/** Graph API version (v18 está obsoleto). Override: FACEBOOK_GRAPH_API_VERSION. */
+export function getFacebookGraphApiVersion(): string {
+  const raw = process.env.FACEBOOK_GRAPH_API_VERSION?.trim();
+  if (!raw) return "v23.0";
+  return raw.startsWith("v") ? raw : `v${raw}`;
+}
+
+export function isFacebookPageConfigured(): boolean {
+  return Boolean(getFacebookPageId() && getFacebookPageAccessToken());
+}
+
 export function getEnvStatus() {
   return {
     supabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
@@ -136,5 +163,7 @@ export function getEnvStatus() {
         process.env.TELEGRAM_BROADCAST_CHANNEL_ID,
     ),
     telegramWebhookSecret: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
+    facebookPageId: Boolean(process.env.FACEBOOK_PAGE_ID),
+    facebookPageAccessToken: Boolean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
   };
 }

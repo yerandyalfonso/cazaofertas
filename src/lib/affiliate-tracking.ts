@@ -9,6 +9,7 @@ export type AffiliateClickSource =
   | "blog"
   | "blog_inline"
   | "telegram"
+  | "facebook"
   | "admin"
   | "other";
 

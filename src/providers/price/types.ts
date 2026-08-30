@@ -13,6 +13,8 @@ export interface ProductPriceData {
   categorySlug?: string;
   previousPrice?: number;
   discountPercentage?: number;
+  /** Caducidad de Lightning/flash si Amazon la publica. */
+  dealExpiresAt?: string | null;
 }
 
 export interface PriceProvider {

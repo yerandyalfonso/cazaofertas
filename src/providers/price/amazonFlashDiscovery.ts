@@ -9,11 +9,98 @@ import {
 } from "@/providers/price";
 import { DEFAULT_MOCK_CATALOG } from "@/providers/price/MockPriceProvider";
 
+/** Listados generales (siempre se incluyen si no hay override por env). */
 export const DEFAULT_FLASH_FEED_URLS = [
   "https://www.amazon.es/gp/goldbox",
   "https://www.amazon.es/deals",
-  "https://www.amazon.es/gp/goldbox?ref_=nav_cs_gb",
 ] as const;
+
+/**
+ * Departamentos de /events/deals (filtro discounts-widget).
+ * Se rotan por pasada para variar categorías sin scrapear los 15 cada vez.
+ */
+export const FLASH_DEPARTMENT_IDS = [
+  "1703496031",
+  "6198055031",
+  "1951052031",
+  "2665403031",
+  "599371031",
+  "4772051031",
+  "599392031",
+  "667050031",
+  "1571260031",
+  "599386031",
+  "5512277031",
+  "667041031",
+  "12472656031",
+  "3677431031",
+  "599383031",
+] as const;
+
+/** Misma codificación que copia Amazon desde el navegador (doble encode). */
+export function buildAmazonDealsDepartmentUrl(departmentId: string): string {
+  const payload = {
+    state: {
+      refinementFilters: {
+        departments: [String(departmentId)],
+      },
+    },
+    version: 1,
+  };
+  const widget = encodeURIComponent(
+    encodeURIComponent(JSON.stringify(JSON.stringify(payload))),
+  );
+  return `https://www.amazon.es/events/deals/?discounts-widget=${widget}`;
+}
+
+function parseFeedUrlsFromEnv(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return [
+    ...new Set(
+      raw
+        .split(/[\n,]+/)
+        .map((url) => url.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/**
+ * Feeds a scrapear en esta pasada.
+ * - `AMAZON_FLASH_FEED_URLS`: lista fija (coma o salto de línea).
+ * - Si no: goldbox/deals + N departamentos rotados (default 3, cada slot de 3 min).
+ */
+export function resolveFlashFeedUrls(options?: {
+  now?: number;
+  departmentFeedsPerRun?: number;
+  slotMs?: number;
+}): string[] {
+  const fromEnv = parseFeedUrlsFromEnv(process.env.AMAZON_FLASH_FEED_URLS);
+  if (fromEnv.length > 0) return fromEnv;
+
+  const perRunRaw = Number(
+    options?.departmentFeedsPerRun ??
+      process.env.AMAZON_FLASH_DEPARTMENT_FEEDS_PER_RUN ??
+      3,
+  );
+  const perRun =
+    Number.isFinite(perRunRaw) && perRunRaw > 0
+      ? Math.min(Math.floor(perRunRaw), FLASH_DEPARTMENT_IDS.length)
+      : 3;
+  const slotMs = options?.slotMs ?? 3 * 60 * 1000;
+  const now = options?.now ?? Date.now();
+  const slot = Math.floor(now / slotMs);
+  const start = (slot * perRun) % FLASH_DEPARTMENT_IDS.length;
+
+  const departmentUrls: string[] = [];
+  for (let i = 0; i < perRun; i += 1) {
+    const id =
+      FLASH_DEPARTMENT_IDS[(start + i) % FLASH_DEPARTMENT_IDS.length]!;
+    departmentUrls.push(buildAmazonDealsDepartmentUrl(id));
+  }
+
+  return [...DEFAULT_FLASH_FEED_URLS, ...departmentUrls];
+}
 
 export interface DiscoveredListingItem {
   asin: string;
@@ -174,7 +261,7 @@ export async function discoverFlashDealListings(options?: {
     ...new Set(
       (options?.feedUrls?.length
         ? options.feedUrls
-        : [...DEFAULT_FLASH_FEED_URLS]
+        : resolveFlashFeedUrls()
       )
         .map((url) => url.trim())
         .filter(Boolean),

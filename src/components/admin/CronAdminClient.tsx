@@ -19,9 +19,13 @@ interface CronStatus {
   } | null;
   settings?: {
     telegramMinScore: number;
+    telegramBatchHours: number;
+    lastTelegramFlushAt: string | null;
     source: "database" | "env";
     updatedAt: string | null;
   } | null;
+  pendingTelegram?: number;
+  facebookConfigured?: boolean;
 }
 
 interface CronRunResult {
@@ -72,6 +76,7 @@ interface FlashRunResult {
   newLows?: number;
   channelNotificationsSent?: number;
   channelNotificationsSkipped?: number;
+  channelNotificationsQueued?: number;
   products?: Array<{
     asin: string;
     title: string;
@@ -102,10 +107,12 @@ export function CronAdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [telegramMinScore, setTelegramMinScore] = useState("75");
+  const [telegramBatchHours, setTelegramBatchHours] = useState("4");
   const [telegramMinScoreSource, setTelegramMinScoreSource] = useState<
     "database" | "env" | null
   >(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [flushingTelegram, setFlushingTelegram] = useState(false);
 
   async function readJsonSafe<T>(response: Response): Promise<T | null> {
     const text = await response.text();
@@ -143,10 +150,15 @@ export function CronAdminClient() {
         neverChecked: data.neverChecked,
         cronControl: data.cronControl,
         settings: data.settings ?? null,
+        pendingTelegram: data.pendingTelegram ?? 0,
+        facebookConfigured: data.facebookConfigured ?? false,
       });
       if (data.settings?.telegramMinScore != null) {
         setTelegramMinScore(String(data.settings.telegramMinScore));
         setTelegramMinScoreSource(data.settings.source);
+      }
+      if (data.settings?.telegramBatchHours != null) {
+        setTelegramBatchHours(String(data.settings.telegramBatchHours));
       }
     } catch (err) {
       const message =
@@ -265,7 +277,8 @@ export function CronAdminClient() {
           toast.success(
             `Flash OK · +${inserted} nuevos` +
               (errCount > 0 ? ` · ${errCount} errores` : "") +
-              ` · Telegram ${data.channelNotificationsSent ?? 0}`,
+              ` · Telegram cola ${data.channelNotificationsQueued ?? 0}` +
+              ` / enviadas ${data.channelNotificationsSent ?? 0}`,
           );
         }
       }
@@ -326,18 +339,25 @@ export function CronAdminClient() {
     }
   }
 
-  async function saveTelegramMinScore() {
+  async function saveTelegramSettings() {
     setSavingSettings(true);
     setError(null);
     try {
-      const parsed = Number.parseFloat(telegramMinScore);
-      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+      const parsedScore = Number.parseFloat(telegramMinScore);
+      const parsedHours = Number.parseFloat(telegramBatchHours);
+      if (!Number.isFinite(parsedScore) || parsedScore < 0 || parsedScore > 100) {
         throw new Error("El umbral debe ser un número entre 0 y 100.");
+      }
+      if (!Number.isFinite(parsedHours) || parsedHours < 1 || parsedHours > 24) {
+        throw new Error("El intervalo debe estar entre 1 y 24 horas.");
       }
       const response = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegramMinScore: parsed }),
+        body: JSON.stringify({
+          telegramMinScore: parsedScore,
+          telegramBatchHours: parsedHours,
+        }),
       });
       const data = await readJsonSafe<{
         ok?: boolean;
@@ -346,15 +366,16 @@ export function CronAdminClient() {
       }>(response);
       if (!response.ok || !data?.ok || !data.settings) {
         const message =
-          data?.error ?? "No se pudo guardar el umbral de Telegram.";
+          data?.error ?? "No se pudieron guardar los ajustes de Telegram.";
         setError(message);
         toast.error(message);
         return;
       }
       setTelegramMinScore(String(data.settings.telegramMinScore));
+      setTelegramBatchHours(String(data.settings.telegramBatchHours));
       setTelegramMinScoreSource(data.settings.source);
       toast.success(
-        `Umbral Telegram guardado: ${data.settings.telegramMinScore}`,
+        `Ajustes Telegram: umbral ${data.settings.telegramMinScore} · lote cada ${data.settings.telegramBatchHours} h`,
       );
       await loadStatus();
     } catch (err) {
@@ -364,6 +385,46 @@ export function CronAdminClient() {
       toast.error(message);
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function flushTelegramNow() {
+    setFlushingTelegram(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/cron/telegram-flush", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await readJsonSafe<{
+        ok?: boolean;
+        error?: string;
+        sent?: number;
+        skippedExpired?: number;
+        skippedLowScore?: number;
+        failed?: number;
+        pendingBefore?: number;
+      }>(response);
+      if (!response.ok || !data?.ok) {
+        const message = data?.error ?? "No se pudo enviar el lote de Telegram.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      toast.success(
+        `Lote Telegram · ${data.sent ?? 0} enviadas` +
+          (data.skippedExpired ? ` · ${data.skippedExpired} caducadas` : "") +
+          (data.failed ? ` · ${data.failed} fallos` : ""),
+      );
+      await loadStatus();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error al enviar el lote.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setFlushingTelegram(false);
     }
   }
 
@@ -439,14 +500,14 @@ export function CronAdminClient() {
           Telegram
         </p>
         <h2 className="mt-2 font-display text-2xl text-ink">
-          Umbral de score del canal
+          Canal / grupo Telegram
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
-          Solo se publican chollos con score ≥ este valor (flash, precios y
-          Kiabi). Baja el umbral (p. ej. 40–50) si quieres más alertas; súbelo
-          (70–85) para filtrar más.
+          El cron sigue recopilando ofertas. Al grupo, a @cazador_de_ofertas y
+          a Facebook (si hay token) se envía un lote con lo pendiente cada N
+          horas (no al momento). Las alertas personales del bot no cambian.
           {telegramMinScoreSource === "env"
-            ? " Ahora mismo usa el valor del entorno hasta que guardes aquí."
+            ? " Ahora mismo usa valores de entorno hasta que guardes aquí."
             : ""}
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
@@ -462,21 +523,60 @@ export function CronAdminClient() {
               className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
             />
           </label>
+          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Enviar cada (horas)
+            <input
+              type="number"
+              min="1"
+              max="24"
+              step="1"
+              value={telegramBatchHours}
+              onChange={(event) => setTelegramBatchHours(event.target.value)}
+              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+            />
+          </label>
           <button
             type="button"
             disabled={savingSettings || loadingStatus}
-            onClick={() => void saveTelegramMinScore()}
+            onClick={() => void saveTelegramSettings()}
             className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-stone-800 disabled:opacity-60"
           >
-            {savingSettings ? "Guardando…" : "Guardar umbral"}
+            {savingSettings ? "Guardando…" : "Guardar ajustes"}
           </button>
-          {status?.settings?.updatedAt ? (
-            <p className="self-center text-xs text-stone-500">
-              Último cambio:{" "}
-              {new Date(status.settings.updatedAt).toLocaleString("es-ES")}
-            </p>
-          ) : null}
         </div>
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
+          <p className="text-sm text-stone-600">
+            Pendientes en cola:{" "}
+            <span className="font-medium text-ink">
+              {loadingStatus ? "…" : (status?.pendingTelegram ?? 0)}
+            </span>
+            {status?.settings?.lastTelegramFlushAt ? (
+              <>
+                {" "}
+                · último lote{" "}
+                {new Date(status.settings.lastTelegramFlushAt).toLocaleString(
+                  "es-ES",
+                )}
+              </>
+            ) : null}
+          </p>
+          <button
+            type="button"
+            disabled={flushingTelegram || loadingStatus}
+            onClick={() => void flushTelegramNow()}
+            className="inline-flex h-9 items-center border border-stone-300 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink hover:text-ink disabled:opacity-60"
+          >
+            {flushingTelegram ? "Enviando…" : "Enviar lote ahora"}
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-stone-600">
+          Facebook:{" "}
+          {loadingStatus
+            ? "…"
+            : status?.facebookConfigured
+              ? "configurado (se publica con el mismo lote)"
+              : "sin configurar (FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN)"}
+        </p>
       </section>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -603,8 +703,9 @@ export function CronAdminClient() {
             {flashResult.discovery?.usedSimulation
               ? " · listado simulado"
               : ""}
-            {" · "}Telegram canal {flashResult.channelNotificationsSent ?? 0}{" "}
-            enviadas / {flashResult.channelNotificationsSkipped ?? 0} omitidas
+            {" · "}Telegram cola {flashResult.channelNotificationsQueued ?? 0}{" "}
+            / enviadas {flashResult.channelNotificationsSent ?? 0} / omitidas{" "}
+            {flashResult.channelNotificationsSkipped ?? 0}
           </p>
 
           {flashResult.discovery?.feedErrors &&

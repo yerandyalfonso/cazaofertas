@@ -8,6 +8,7 @@ import { computeMovingAverages } from "@/lib/price-history";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
+import { resolveTelegramMinScore } from "@/services/appSettings";
 import {
   notifyMatchingUsers,
   type NotificationDispatchResult,
@@ -95,6 +96,7 @@ export interface PriceDetectionStats {
   notificationsSkipped: number;
   channelNotificationsSent: number;
   channelNotificationsSkipped: number;
+  channelNotificationsQueued: number;
   errors: Array<{ asin: string; message: string }>;
   deals: DetectedDeal[];
 }
@@ -251,6 +253,7 @@ export async function runPriceDetection(
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
   const source = options.source ?? "mock";
   const shouldNotify = options.notify ?? true;
+  const telegramMinScore = await resolveTelegramMinScore();
 
   const { data: products, error: productsError } = await client
     .from("products")
@@ -302,6 +305,7 @@ export async function runPriceDetection(
     notificationsSkipped: 0,
     channelNotificationsSent: 0,
     channelNotificationsSkipped: 0,
+    channelNotificationsQueued: 0,
     errors: [],
     deals: [],
   };
@@ -449,6 +453,9 @@ export async function runPriceDetection(
             updated_at: now,
             ...inStockAvailabilityPatch(availability),
             ...mediaBackfillPatch(product, quote),
+            ...(quote.dealExpiresAt
+              ? { deal_expires_at: quote.dealExpiresAt }
+              : {}),
           })
           .eq("id", product.id);
 
@@ -471,7 +478,7 @@ export async function runPriceDetection(
         stats.updated += 1;
 
         const isDeal = scoring.level !== DealLevel.NORMAL;
-        const qualifiesChannel = scoring.score >= 75;
+        const qualifiesChannel = scoring.score >= telegramMinScore;
 
         if (!isDeal && !qualifiesChannel) {
           continue;
@@ -513,6 +520,7 @@ export async function runPriceDetection(
               scoring.reasons.some((reason) =>
                 reason.toLowerCase().includes("mínimo histórico"),
               ),
+            expiresAt: quote.dealExpiresAt ?? product.deal_expires_at,
           };
 
           if (isDeal) {
@@ -524,7 +532,9 @@ export async function runPriceDetection(
           }
 
           channel = await notifyChannelDealIfEligible(client, deal);
-          if (channel.sent) {
+          if (channel.queued) {
+            stats.channelNotificationsQueued += 1;
+          } else if (channel.sent) {
             stats.channelNotificationsSent += 1;
           } else if (channel.skipped) {
             stats.channelNotificationsSkipped += 1;

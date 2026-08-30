@@ -70,6 +70,7 @@ export type Database = {
           last_telegram_notified_at: string | null;
           last_telegram_notified_price: number | null;
           last_telegram_notified_score: number | null;
+          deal_expires_at: string | null;
           created_at: string;
           updated_at: string;
           is_active: boolean;
@@ -103,6 +104,7 @@ export type Database = {
           last_telegram_notified_at?: string | null;
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;
+          deal_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
           is_active?: boolean;
@@ -136,6 +138,7 @@ export type Database = {
           last_telegram_notified_at?: string | null;
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;
+          deal_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
           is_active?: boolean;
@@ -551,16 +554,22 @@ export type Database = {
         Row: {
           id: string;
           telegram_min_score: number;
+          telegram_batch_hours: number;
+          last_telegram_flush_at: string | null;
           updated_at: string;
         };
         Insert: {
           id?: string;
           telegram_min_score?: number;
+          telegram_batch_hours?: number;
+          last_telegram_flush_at?: string | null;
           updated_at?: string;
         };
         Update: {
           id?: string;
           telegram_min_score?: number;
+          telegram_batch_hours?: number;
+          last_telegram_flush_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];

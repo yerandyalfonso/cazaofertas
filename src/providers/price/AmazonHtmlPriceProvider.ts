@@ -687,6 +687,58 @@ function extractBreadcrumbsFromAmazonHtml(
 }
 
 /**
+ * Caducidad de Lightning / Gold Box si Amazon la incluye en la ficha.
+ * Si no hay señal fiable, null (no se inventa).
+ */
+export function extractDealExpiresAt(html: string): string | null {
+  const now = Date.now();
+  const minFuture = now + 60_000;
+  const maxFuture = now + 14 * 24 * 60 * 60 * 1000;
+  const timestamps: number[] = [];
+
+  const pushEpoch = (raw: number) => {
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    const ms = raw < 1e12 ? raw * 1000 : raw;
+    if (ms >= minFuture && ms <= maxFuture) timestamps.push(ms);
+  };
+
+  const pushRemaining = (raw: number) => {
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    const ms = raw < 1e11 ? now + raw : now + raw;
+    if (raw < 60_000) return;
+    if (ms >= minFuture && ms <= maxFuture) timestamps.push(ms);
+  };
+
+  for (const match of html.matchAll(
+    /(?:dealEndTime|dealExpiryTime|lightningDealEndTime|dealEndTimestamp|gbDealEndTime|dealEndsAtMs)["'\s:=]*(\d{10,13})/gi,
+  )) {
+    pushEpoch(Number(match[1]));
+  }
+
+  for (const match of html.matchAll(
+    /data-(?:deal-)?end-?time=["'](\d{10,13})["']/gi,
+  )) {
+    pushEpoch(Number(match[1]));
+  }
+
+  for (const match of html.matchAll(
+    /(?:msToEnd|millisecondsToEnd|timeRemainingMs|msRemaining)["'\s:]*(\d{5,10})/gi,
+  )) {
+    pushRemaining(Number(match[1]));
+  }
+
+  for (const match of html.matchAll(
+    /(?:dealEndDate|dealEndsAt|dealEndTimeISO)["'\s:]*["']([^"']{10,40})["']/gi,
+  )) {
+    const parsed = Date.parse(match[1] ?? "");
+    if (Number.isFinite(parsed)) pushEpoch(parsed);
+  }
+
+  if (timestamps.length === 0) return null;
+  return new Date(Math.min(...timestamps)).toISOString();
+}
+
+/**
  * Precio actual (a pagar) vs referencia (precio recomendado / lista).
  * Evita tomar el «mínimo 30 días» como lista y precios de widgets secundarios.
  */
@@ -702,6 +754,7 @@ export function extractPriceFromAmazonHtml(html: string): {
   availability: ProductAvailability;
   breadcrumbs?: string[];
   categorySlug?: string;
+  dealExpiresAt?: string | null;
 } {
   const $ = cheerio.load(html);
 
@@ -914,6 +967,7 @@ export function extractPriceFromAmazonHtml(html: string): {
     title,
     brand: cleanBrand,
   });
+  const dealExpiresAt = extractDealExpiresAt(html);
 
   return {
     price,
@@ -927,6 +981,7 @@ export function extractPriceFromAmazonHtml(html: string): {
     availability,
     breadcrumbs,
     categorySlug: categorySlug ?? undefined,
+    dealExpiresAt,
   };
 }
 
@@ -1097,6 +1152,7 @@ export async function previewAmazonProductPage(
   description?: string;
   breadcrumbs?: string[];
   categorySlug?: string;
+  dealExpiresAt?: string | null;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -1129,6 +1185,7 @@ export async function previewAmazonProductPage(
     description: extracted.description,
     breadcrumbs: extracted.breadcrumbs,
     categorySlug: extracted.categorySlug,
+    dealExpiresAt: extracted.dealExpiresAt ?? null,
   };
 }
 
@@ -1158,6 +1215,7 @@ export async function scrapeAmazonProductPage(
         previousPrice: extracted.listPrice ?? undefined,
         discountPercentage: extracted.discountPercentage ?? undefined,
         categorySlug: extracted.categorySlug,
+        dealExpiresAt: extracted.dealExpiresAt ?? null,
       };
     }
     throw new Error("No se pudo extraer el precio del HTML de Amazon.");
@@ -1175,6 +1233,7 @@ export async function scrapeAmazonProductPage(
     previousPrice: extracted.listPrice ?? undefined,
     discountPercentage: extracted.discountPercentage ?? undefined,
     categorySlug: extracted.categorySlug,
+    dealExpiresAt: extracted.dealExpiresAt ?? null,
   };
 }
 

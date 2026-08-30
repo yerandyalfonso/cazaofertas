@@ -199,6 +199,7 @@ export interface KiabiDealsRunResult {
   skippedExisting: number;
   channelNotificationsSent: number;
   channelNotificationsSkipped: number;
+  channelNotificationsQueued: number;
   errors: Array<{ externalId: string; message: string }>;
 }
 
@@ -221,7 +222,7 @@ async function maybeNotifyKiabiDeal(
     imageUrl?: string | null;
     telegramMinScore?: number;
   },
-): Promise<"sent" | "skipped" | "failed"> {
+): Promise<"sent" | "skipped" | "failed" | "queued"> {
   const deal: DealCandidate = {
     productId: options.productId,
     asin: options.syntheticAsin,
@@ -246,6 +247,7 @@ async function maybeNotifyKiabiDeal(
   const result = await notifyChannelDealIfEligible(client, deal, {
     minScore: options.telegramMinScore,
   });
+  if (result.queued) return "queued";
   if (result.sent) return "sent";
   if (result.skipped) return "skipped";
   return "failed";
@@ -279,6 +281,7 @@ export async function runKiabiDealsCheck(options?: {
       skippedExisting: 0,
       channelNotificationsSent: 0,
       channelNotificationsSkipped: 0,
+      channelNotificationsQueued: 0,
       errors: [],
     };
   }
@@ -389,6 +392,7 @@ export async function runKiabiDealsCheck(options?: {
   let skippedNoDiscount = 0;
   let channelNotificationsSent = 0;
   let channelNotificationsSkipped = 0;
+  let channelNotificationsQueued = 0;
   const errors: Array<{ externalId: string; message: string }> = [];
 
   for (let index = 0; index < queue.length; index += 1) {
@@ -500,7 +504,8 @@ export async function runKiabiDealsCheck(options?: {
             imageUrl: quote.imageUrl,
             telegramMinScore: channelMinScore,
           });
-          if (notifyResult === "sent") channelNotificationsSent += 1;
+          if (notifyResult === "queued") channelNotificationsQueued += 1;
+          else if (notifyResult === "sent") channelNotificationsSent += 1;
           else if (notifyResult === "skipped") channelNotificationsSkipped += 1;
           }
         }
@@ -584,6 +589,7 @@ export async function runKiabiDealsCheck(options?: {
               imageUrl: quote.imageUrl ?? existing.image_url,
               telegramMinScore: channelMinScore,
             });
+            if (notifyResult === "queued") channelNotificationsQueued += 1;
             if (notifyResult === "sent") channelNotificationsSent += 1;
             else if (notifyResult === "skipped") channelNotificationsSkipped += 1;
             }
@@ -622,6 +628,7 @@ export async function runKiabiDealsCheck(options?: {
     skippedExisting,
     channelNotificationsSent,
     channelNotificationsSkipped,
+    channelNotificationsQueued,
     errors,
   };
 }

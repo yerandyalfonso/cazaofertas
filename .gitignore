@@ -45,3 +45,6 @@ next-env.d.ts
 scripts/local-cron/.carrefour-browser-items.json
 scripts/local-cron/.carrefour-browser-state.json
 scripts/local-cron/.carrefour-browser-profile/
+# local cron — ASINs flash sin buy box (cooldown)
+scripts/local-cron/.flash-asin-cooldown.json
+

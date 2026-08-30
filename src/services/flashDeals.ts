@@ -17,6 +17,10 @@ import { previewAmazonProductPage } from "@/providers/price";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import type { DealCandidate } from "@/services/alertMatching";
+import {
+  addFlashAsinCooldown,
+  getActiveFlashAsinCooldowns,
+} from "@/services/flashAsinCooldown";
 import { DealLevel, ProductAvailability } from "@/types";
 
 function slugify(value: string): string {
@@ -31,6 +35,15 @@ function slugify(value: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shuffleInPlace<T>(items: T[]): void {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = items[i]!;
+    items[i] = items[j]!;
+    items[j] = tmp;
+  }
 }
 
 function computeDiscount(
@@ -62,8 +75,9 @@ async function maybeNotifyFlashChannel(
     categorySlug?: string | null;
     imageUrl?: string | null;
     summary?: string | null;
+    expiresAt?: string | null;
   },
-): Promise<"sent" | "skipped" | "failed"> {
+): Promise<"sent" | "skipped" | "failed" | "queued"> {
   const deal: DealCandidate = {
     productId: options.productId,
     asin: options.asin,
@@ -87,9 +101,11 @@ async function maybeNotifyFlashChannel(
       asin: options.asin,
     }),
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
+    expiresAt: options.expiresAt ?? null,
   };
 
   const result = await notifyChannelDealIfEligible(client, deal);
+  if (result.queued) return "queued";
   if (result.sent) return "sent";
   if (result.skipped) return "skipped";
   return "failed";
@@ -132,6 +148,11 @@ export interface FlashDealsRunResult {
   newLows: number;
   channelNotificationsSent: number;
   channelNotificationsSkipped: number;
+  channelNotificationsQueued: number;
+  /** ASINs en cooldown (sin buy box / OOS previos). */
+  skippedCooldown: number;
+  /** Sin precio usable tras scrapear la ficha. */
+  skippedNoPrice: number;
   products: FlashDealProductReport[];
   errors: Array<{ asin: string; message: string }>;
 }
@@ -155,9 +176,9 @@ interface CatalogRow {
 
 /**
  * Descubridor flash:
- * 1) Lee listados Gold Box / Deals
+ * 1) Lee Gold Box / Deals + departamentos de /events/deals (rotados)
  * 2) Compara ASINs con Supabase
- * 3) Solo INSERT de novedades (+ notificación canal si score alto)
+ * 3) Solo INSERT de novedades (+ cola Telegram si score alto)
  *
  * Los productos que ya están en catálogo NO se re-chequean aquí:
  * eso lo hace el cron de precios (`check-prices`).
@@ -216,8 +237,20 @@ export async function runFlashDealsCheck(options?: {
     }
   }
 
-  // Solo ASINs nuevos. Los ya en BD los vigila check-prices (bajadas → notify).
-  const queue = newCandidates.slice(0, limit);
+  const cooldowns = await getActiveFlashAsinCooldowns();
+  const eligible: DiscoveredListingItem[] = [];
+  let skippedCooldown = 0;
+  for (const item of newCandidates) {
+    if (cooldowns.has(item.asin)) {
+      skippedCooldown += 1;
+      continue;
+    }
+    eligible.push(item);
+  }
+  shuffleInPlace(eligible);
+
+  // Solo ASINs nuevos (fuera de cooldown). Los ya en BD los vigila check-prices.
+  const queue = eligible.slice(0, limit);
 
   const products: FlashDealProductReport[] = [];
   const errors: Array<{ asin: string; message: string }> = [];
@@ -228,6 +261,8 @@ export async function runFlashDealsCheck(options?: {
   let catalogScanned = 0;
   let channelNotificationsSent = 0;
   let channelNotificationsSkipped = 0;
+  let channelNotificationsQueued = 0;
+  let skippedNoPrice = 0;
 
   for (let index = 0; index < queue.length; index += 1) {
     const item = queue[index]!;
@@ -253,6 +288,7 @@ export async function runFlashDealsCheck(options?: {
       let description: string | null = null;
       let categorySlugHint: string | undefined;
       let categoryBreadcrumbs: string[] | undefined;
+      let dealExpiresAt: string | null = null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
@@ -273,6 +309,22 @@ export async function runFlashDealsCheck(options?: {
           if (preview.breadcrumbs?.length) {
             categoryBreadcrumbs = preview.breadcrumbs;
           }
+          if (preview.dealExpiresAt) dealExpiresAt = preview.dealExpiresAt;
+
+          if (
+            price == null &&
+            preview.availability === ProductAvailability.OUT_OF_STOCK
+          ) {
+            await addFlashAsinCooldown(item.asin, {
+              hours: 24,
+              reason: "out-of-stock",
+            });
+            skippedNoPrice += 1;
+            console.warn(
+              `[flash] ${item.asin}: agotado / sin buy box → cooldown 24 h`,
+            );
+            continue;
+          }
         } catch (enrichError) {
           // Live/injected: sin ficha no insertamos. Simulación: hints ok.
           if (item.origin !== "simulated" || price == null) {
@@ -281,12 +333,32 @@ export async function runFlashDealsCheck(options?: {
         }
       }
 
+      if (price == null && item.origin !== "simulated") {
+        // Último recurso: precio del listado (Amazon ES suele llevar IVA).
+        if (item.priceHint != null && item.priceHint > 0) {
+          price = item.priceHint;
+          if (
+            listPrice == null &&
+            item.listPriceHint != null &&
+            item.listPriceHint > item.priceHint
+          ) {
+            listPrice = item.listPriceHint;
+          }
+          console.warn(
+            `[flash] ${item.asin}: buy box vacío; usando hint del listado (${price} €)`,
+          );
+        }
+      }
+
       if (price == null) {
-        errors.push({
-          asin: item.asin,
-          message:
-            "Sin precio del buy box Amazon ES (no se usan hints del listado).",
+        await addFlashAsinCooldown(item.asin, {
+          hours: 12,
+          reason: "no-buybox",
         });
+        skippedNoPrice += 1;
+        console.warn(
+          `[flash] ${item.asin}: sin precio buy box → cooldown 12 h (sin alerta Telegram)`,
+        );
         continue;
       }
 
@@ -369,6 +441,7 @@ export async function runFlashDealsCheck(options?: {
           is_active: true,
           last_checked_at: now,
           updated_at: now,
+          deal_expires_at: dealExpiresAt,
         })
         .select("id, asin, title, slug")
         .single();
@@ -430,7 +503,9 @@ export async function runFlashDealsCheck(options?: {
           categorySlug: scoringCategorySlug,
           imageUrl,
           summary: description || brand,
+          expiresAt: dealExpiresAt,
         });
+        if (channelStatus === "queued") channelNotificationsQueued += 1;
         if (channelStatus === "sent") channelNotificationsSent += 1;
         if (channelStatus === "skipped") channelNotificationsSkipped += 1;
       }
@@ -451,9 +526,15 @@ export async function runFlashDealsCheck(options?: {
         wasNewToCatalog: true,
       });
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
       errors.push({
         asin: item.asin,
-        message: error instanceof Error ? error.message : "Error desconocido",
+        message,
+      });
+      await addFlashAsinCooldown(item.asin, {
+        hours: 6,
+        reason: "enrich-error",
       });
     }
 
@@ -482,6 +563,9 @@ export async function runFlashDealsCheck(options?: {
     newLows,
     channelNotificationsSent,
     channelNotificationsSkipped,
+    channelNotificationsQueued,
+    skippedCooldown,
+    skippedNoPrice,
     products: products.filter(
       (p) => p.action === "inserted" || p.action === "updated" || p.isFlashDeal,
     ),

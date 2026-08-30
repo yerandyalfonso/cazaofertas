@@ -30,6 +30,10 @@ export interface DealCandidate {
   imageUrl?: string | null;
   /** Resumen corto bajo el título. */
   summary?: string | null;
+  /** Cuando se detectó / encoló (mensaje Telegram). */
+  detectedAt?: string | null;
+  /** Caducidad Amazon si existe. */
+  expiresAt?: string | null;
 }
 
 export interface AlertMatch {

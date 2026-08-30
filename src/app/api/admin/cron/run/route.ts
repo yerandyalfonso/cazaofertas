@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
-import { formatEnvError } from "@/lib/env";
+import { formatEnvError, isFacebookPageConfigured } from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
 import { getAppSettings } from "@/services/appSettings";
 import {
@@ -9,6 +9,7 @@ import {
   resumeCronJobs,
 } from "@/services/cronControl";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { countPendingChannelNotifications } from "@/services/telegramFlush";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,13 +20,15 @@ export async function GET(request: NextRequest) {
     if (denied) return denied;
     const client = createSupabaseServiceClient();
 
-    const [{ data, error }, cronControl, appSettings] = await Promise.all([
+    const [{ data, error }, cronControl, appSettings, pendingTelegram] =
+      await Promise.all([
       client
         .from("products")
         .select("last_checked_at, is_active, amazon_url")
         .eq("is_active", true),
       getCronControlState().catch(() => null),
       getAppSettings().catch(() => null),
+      countPendingChannelNotifications(),
     ]);
 
     if (error) {
@@ -53,6 +56,8 @@ export async function GET(request: NextRequest) {
       neverChecked,
       cronControl,
       settings: appSettings,
+      pendingTelegram,
+      facebookConfigured: isFacebookPageConfigured(),
     });
   } catch (error) {
     const message = formatEnvError(error);
