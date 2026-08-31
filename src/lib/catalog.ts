@@ -137,16 +137,31 @@ function getClient() {
   }
 }
 
-export async function getActiveProducts(limit = 24): Promise<CatalogProduct[]> {
+export async function getActiveProducts(
+  limit = 24,
+  options?: { orderBy?: "discount" | "created" | "updated" },
+): Promise<CatalogProduct[]> {
   const client = getClient();
   if (!client) return [];
 
-  const { data, error } = await client
+  const orderBy = options?.orderBy ?? "discount";
+  let query = client
     .from("products")
     .select("*, categories(id, name, slug)")
-    .eq("is_active", true)
-    .order("discount_percentage", { ascending: false, nullsFirst: false })
-    .limit(limit);
+    .eq("is_active", true);
+
+  if (orderBy === "created") {
+    query = query.order("created_at", { ascending: false });
+  } else if (orderBy === "updated") {
+    query = query.order("updated_at", { ascending: false });
+  } else {
+    query = query.order("discount_percentage", {
+      ascending: false,
+      nullsFirst: false,
+    });
+  }
+
+  const { data, error } = await query.limit(limit);
 
   if (error || !data) {
     console.error("[catalog] getActiveProducts", error?.message);
@@ -154,6 +169,57 @@ export async function getActiveProducts(limit = 24): Promise<CatalogProduct[]> {
   }
 
   return data.map((row) => mapProduct(row));
+}
+
+/**
+ * Listado de ofertas: mezcla recientes (flash nuevos) + mayor descuento,
+ * luego ordena por deal score. Evita que solo salgan los top por %.
+ */
+export async function getOfferListingProducts(
+  limit = 150,
+): Promise<CatalogProduct[]> {
+  const client = getClient();
+  if (!client) return [];
+
+  const half = Math.max(Math.ceil(limit / 2), 48);
+  const select = "*, categories(id, name, slug)";
+
+  const [recentRes, discountRes] = await Promise.all([
+    client
+      .from("products")
+      .select(select)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(half),
+    client
+      .from("products")
+      .select(select)
+      .eq("is_active", true)
+      .order("discount_percentage", { ascending: false, nullsFirst: false })
+      .limit(half),
+  ]);
+
+  if (recentRes.error) {
+    console.error("[catalog] getOfferListingProducts recent", recentRes.error.message);
+  }
+  if (discountRes.error) {
+    console.error(
+      "[catalog] getOfferListingProducts discount",
+      discountRes.error.message,
+    );
+  }
+
+  const byId = new Map<string, CatalogProduct>();
+  for (const row of [...(recentRes.data ?? []), ...(discountRes.data ?? [])]) {
+    byId.set(row.id, mapProduct(row));
+  }
+
+  return [...byId.values()]
+    .sort((a, b) => {
+      if (b.dealScore !== a.dealScore) return b.dealScore - a.dealScore;
+      return b.discountPercentage - a.discountPercentage;
+    })
+    .slice(0, limit);
 }
 
 export async function getFeaturedProducts(limit = 4): Promise<CatalogProduct[]> {
@@ -177,7 +243,7 @@ export async function getFeaturedProducts(limit = 4): Promise<CatalogProduct[]> 
 }
 
 export async function getTopDealProducts(limit = 8): Promise<CatalogProduct[]> {
-  const products = await getActiveProducts(40);
+  const products = await getOfferListingProducts(Math.max(limit * 6, 96));
   return products
     .filter((product) => product.dealLevel !== DealLevel.NORMAL)
     .sort((a, b) => b.dealScore - a.dealScore)

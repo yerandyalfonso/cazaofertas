@@ -266,7 +266,7 @@ export function buildDealAlertText(
 ): string {
   const score =
     deal.score != null && Number.isFinite(deal.score)
-      ? Math.round(deal.score)
+      ? Math.min(100, Math.round(deal.score))
       : null;
 
   const lines = [

@@ -3,9 +3,8 @@ import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { JsonLd } from "@/components/JsonLd";
 import { OffersCatalog } from "@/components/OffersCatalog";
 import {
-  getActiveProducts,
   getCategories,
-  getTopDealProducts,
+  getOfferListingProducts,
   TELEGRAM_BOT_URL,
 } from "@/lib/catalog";
 import { buildPageMetadata, itemListJsonLd } from "@/lib/seo";
@@ -19,20 +18,15 @@ export const metadata: Metadata = {
   }),
 };
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export default async function OffersPage() {
-  const [topDeals, products, categories] = await Promise.all([
-    getTopDealProducts(24),
-    getActiveProducts(48),
+  const [products, categories] = await Promise.all([
+    getOfferListingProducts(200),
     getCategories(),
   ]);
 
-  const byId = new Map<string, (typeof products)[number]>();
-  for (const product of [...topDeals, ...products]) {
-    byId.set(product.id, product);
-  }
-  const list = [...byId.values()].sort((a, b) => b.dealScore - a.dealScore);
+  const list = products;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">

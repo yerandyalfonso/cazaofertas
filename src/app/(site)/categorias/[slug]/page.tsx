@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/JsonLd";
 import { ProductCard } from "@/components/ProductCard";
-import { getActiveProducts, getCategories } from "@/lib/catalog";
+import { getCategories, getOfferListingProducts } from "@/lib/catalog";
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
@@ -16,7 +16,7 @@ interface CategoryPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 export async function generateStaticParams() {
   const categories = await getCategories();
@@ -52,14 +52,14 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
   const { slug } = await params;
   const [categories, products] = await Promise.all([
     getCategories(),
-    getActiveProducts(48),
+    getOfferListingProducts(250),
   ]);
   const category = categories.find((item) => item.slug === slug);
   if (!category) notFound();
 
-  const filtered = products.filter(
-    (product) => product.category?.slug === slug,
-  );
+  const filtered = products
+    .filter((product) => product.category?.slug === slug)
+    .sort((a, b) => b.dealScore - a.dealScore);
   const copy = categorySeoCopy(category.slug, category.name);
   const intro = category.description?.trim() || copy.intro;
 

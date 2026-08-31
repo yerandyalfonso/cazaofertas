@@ -185,7 +185,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
           <p className="text-sm text-stone-600">
             Puntuación{" "}
-            <strong className="text-ink">{Math.round(product.dealScore)}/100</strong>
+            <strong className="text-ink">{Math.min(100, Math.round(product.dealScore))}/100</strong>
           </p>
 
           {descriptionParts.length > 0 ? (

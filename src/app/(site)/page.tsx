@@ -31,7 +31,7 @@ export default async function HomePage() {
   const [topDeals, latest, categories, featuredPosts, allPosts] =
     await Promise.all([
       getTopDealProducts(4),
-      getActiveProducts(4),
+      getActiveProducts(8, { orderBy: "created" }),
       getCategories(),
       getFeaturedArticles(),
       getPublishedArticles(),

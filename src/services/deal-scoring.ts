@@ -210,7 +210,8 @@ export class DealScoringService {
     const categoryBonus = this.config.categoryBonuses[input.categorySlug] ?? 0;
     score += categoryBonus * this.config.weights.category;
 
-    const roundedScore = roundMoney(score);
+    // El modelo puede superar 100 (dto + histórico + categoría); la UI es /100.
+    const roundedScore = roundMoney(clamp(score, 0, 100));
     const qualifiesAsDeal =
       discountPercentage >= this.config.minDiscountPercentForDeal || isHistoricalLow;
 

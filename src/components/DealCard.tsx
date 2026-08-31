@@ -174,7 +174,7 @@ export function DealCard({
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-              {Math.round(product.dealScore)}/100
+              {Math.min(100, Math.round(product.dealScore))}/100
             </p>
             <a
               href={buildTrackedAffiliatePath({
