@@ -5,7 +5,12 @@ import {
   type AffiliateProductInput,
 } from "@/lib/affiliate";
 
-export const PRODUCT_RETAILERS = ["amazon", "kiabi", "carrefour"] as const;
+export const PRODUCT_RETAILERS = [
+  "amazon",
+  "kiabi",
+  "carrefour",
+  "miravia",
+] as const;
 export type ProductRetailer = (typeof PRODUCT_RETAILERS)[number];
 
 export interface RetailerDefinition {
@@ -46,6 +51,15 @@ export const RETAILER_DEFINITIONS: RetailerDefinition[] = [
     urlPlaceholder: "https://www.carrefour.es/...",
     scrapeSupported: false,
     externalIdHint: "skuId o VC4A-… en la URL",
+  },
+  {
+    id: "miravia",
+    label: "Miravia",
+    hostPatterns: [/miravia\.es/i],
+    urlPlaceholder: "https://www.miravia.es/p/i…-s….html",
+    scrapeSupported: true,
+    externalIdHint: "itemId (números en /p/i…)",
+    defaultBrand: "Miravia",
   },
 ];
 
@@ -95,7 +109,17 @@ export function syntheticAsinForRetailer(
   if (retailer === "amazon") return clean;
   if (retailer === "kiabi") return `KB-${clean}`;
   if (retailer === "carrefour") return `CF-${clean}`;
+  if (retailer === "miravia") return `MV-${clean}`;
   return `RT-${clean}`;
+}
+
+export function extractMiraviaProductId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  const fromUrl = trimmed.match(/\/p\/i(\d+)(?:-s\d+)?(?:\.html)?/i);
+  if (fromUrl?.[1]) return fromUrl[1];
+
+  if (/^\d{8,}$/.test(trimmed)) return trimmed;
+  return null;
 }
 
 export function extractKiabiProductId(urlOrId: string): string | null {
@@ -134,6 +158,8 @@ export function extractExternalId(
       return extractKiabiProductId(trimmed);
     case "carrefour":
       return extractCarrefourProductId(trimmed);
+    case "miravia":
+      return extractMiraviaProductId(trimmed);
     default:
       return trimmed.length >= 3 ? trimmed : null;
   }

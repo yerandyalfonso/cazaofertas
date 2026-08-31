@@ -13,8 +13,10 @@ import {
   syntheticAsinForRetailer,
   type ProductRetailer,
 } from "@/lib/retailers";
+import { roundMoney } from "@/lib/money";
 import { previewAmazonProductPage } from "@/providers/price";
 import { scrapeKiabiProductPage } from "@/providers/retail/kiabi";
+import { scrapeMiraviaProductPage } from "@/providers/retail/miravia";
 
 export interface ProductPagePreview {
   retailer: ProductRetailer;
@@ -152,6 +154,41 @@ export async function previewProductPage(
       }
       throw error;
     }
+  }
+
+  if (retailer === "miravia") {
+    const quote = await scrapeMiraviaProductPage(trimmed, {
+      timeoutMs: options.timeoutMs ?? 18_000,
+    });
+    const discount =
+      quote.price != null &&
+      quote.listPrice != null &&
+      quote.listPrice > quote.price
+        ? roundMoney(
+            ((quote.listPrice - quote.price) / quote.listPrice) * 100,
+          )
+        : quote.discountPercentage;
+
+    return {
+      retailer: "miravia",
+      externalId: quote.externalId,
+      asin: syntheticAsinForRetailer("miravia", quote.externalId),
+      title: quote.title,
+      brand: quote.brand ?? "Miravia",
+      price: quote.price,
+      listPrice: quote.listPrice,
+      referencePrice: quote.listPrice ?? quote.price,
+      discountPercentage: discount,
+      productUrl: quote.productUrl,
+      imageUrl: quote.imageUrl ?? null,
+      categorySlug: null,
+      breadcrumbs: [],
+      partial: quote.price == null,
+      warning:
+        quote.price == null
+          ? "Miravia: no se pudo leer el precio de la ficha; completa manualmente."
+          : null,
+    };
   }
 
   throw new Error(`Extracción no implementada para ${definition.label}.`);

@@ -54,13 +54,14 @@ export function isValidAmazonUrl(value: string | null | undefined): boolean {
 }
 
 export function isSyntheticRetailAsin(asin: string | null | undefined): boolean {
-  return /^(KB-|CF-|RT-)/i.test(asin?.trim() ?? "");
+  return /^(KB-|CF-|MV-|RT-)/i.test(asin?.trim() ?? "");
 }
 
 export function inferRetailerFromAsin(asin: string): ProductRetailer {
   const normalized = asin.trim().toUpperCase();
   if (normalized.startsWith("KB-")) return "kiabi";
   if (normalized.startsWith("CF-")) return "carrefour";
+  if (normalized.startsWith("MV-")) return "miravia";
   return "amazon";
 }
 

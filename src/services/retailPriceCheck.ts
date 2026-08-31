@@ -38,6 +38,8 @@ function sleep(ms: number): Promise<void> {
 
 function priceSourceForRetailer(retailer: ProductRetailer): PriceSource {
   if (retailer === "kiabi") return "kiabi";
+  if (retailer === "carrefour") return "carrefour";
+  if (retailer === "miravia") return "miravia";
   return "mock";
 }
 

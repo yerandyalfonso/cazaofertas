@@ -7,15 +7,16 @@ import {
 } from "@/services/cronControl";
 import { notifyCronFailure } from "@/services/cronNotify";
 import { runFlashDealsCheck } from "@/services/flashDeals";
+import { runMiraviaDealsCheck } from "@/services/miraviaDeals";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * Cron discovery-first de Ofertas Flash.
+ * Cron discovery-first de Ofertas Flash (Amazon + Miravia misma pasada).
  * Respeta pausa preventiva ante denegaciones Amazon.
  *
- * Query: ?limit=&feeds=url1,url2&asins=B0...,B0...&simulate=0&force=1
+ * Query: ?limit=&feeds=url1,url2&asins=B0...,B0...&simulate=0&force=1&miravia=0
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       : undefined;
     const allowSimulatedFallback =
       request.nextUrl.searchParams.get("simulate") !== "0";
+    const runMiravia = request.nextUrl.searchParams.get("miravia") !== "0";
 
     const result = await runFlashDealsCheck({
       limit: Number.isFinite(limit) && limit > 0 ? limit : 12,
@@ -45,6 +47,12 @@ export async function GET(request: NextRequest) {
       notify: request.nextUrl.searchParams.get("notify") !== "0",
       delayMs: 1_300,
     });
+
+    const miravia = runMiravia
+      ? await runMiraviaDealsCheck({
+          notify: request.nextUrl.searchParams.get("notify") !== "0",
+        })
+      : null;
 
     const processed =
       (result.inserted ?? 0) +
@@ -59,6 +67,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
+      miravia,
       pause: {
         activated: pause.paused,
         denials: pause.denials,
@@ -94,6 +103,7 @@ export async function POST(request: NextRequest) {
       allowSimulatedFallback?: boolean;
       notify?: boolean;
       force?: boolean;
+      miravia?: boolean;
     };
 
     await assertCronAllowed({ force: body.force });
@@ -108,6 +118,13 @@ export async function POST(request: NextRequest) {
       delayMs: 1_300,
     });
 
+    const miravia =
+      body.miravia === false
+        ? null
+        : await runMiraviaDealsCheck({
+            notify: body.notify ?? true,
+          });
+
     const processed =
       (result.inserted ?? 0) +
       (result.updated ?? 0) +
@@ -121,6 +138,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...result,
+      miravia,
       pause: {
         activated: pause.paused,
         denials: pause.denials,

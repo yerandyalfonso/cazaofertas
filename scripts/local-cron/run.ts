@@ -57,15 +57,21 @@ async function runCheckPrices(): Promise<void> {
 
 async function runFlashDeals(): Promise<void> {
   const { runFlashDealsCheck } = await import("@/services/flashDeals");
+  const { runMiraviaDealsCheck } = await import("@/services/miraviaDeals");
   const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
 
-  // Cada ~3 min (LaunchAgent): hasta 3 ASINs nuevos; feeds por departamento rotados.
+  // Cada ~3 min (LaunchAgent): hasta 3 ASINs Amazon + Miravia flash (misma cadencia).
   const result = await runFlashDealsCheck({
     limit: 3,
     notify: true,
     allowSimulatedFallback: true,
     includeCatalog: false,
     delayMs: 2_500,
+  });
+
+  const miravia = await runMiraviaDealsCheck({
+    limit: Number(process.env.MIRAVIA_FLASH_LIMIT ?? "2") || 2,
+    notify: true,
   });
 
   const processed =
@@ -81,6 +87,7 @@ async function runFlashDeals(): Promise<void> {
 
   const payload = {
     ...result,
+    miravia,
     pause: {
       activated: pause.paused,
       denials: pause.denials,

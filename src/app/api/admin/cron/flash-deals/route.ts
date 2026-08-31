@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { runFlashDealsCheck } from "@/services/flashDeals";
+import { runMiraviaDealsCheck } from "@/services/miraviaDeals";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-/** Proxy admin → descubridor flash (solo INSERT de ASINs nuevos). */
+/** Proxy admin → descubridor flash (Amazon + Miravia). */
 export async function POST(request: NextRequest) {
   try {
     const denied = requireAdminApi(request);
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
       injectedAsins?: string[];
       allowSimulatedFallback?: boolean;
       notify?: boolean;
+      miravia?: boolean;
     };
 
     const result = await runFlashDealsCheck({
@@ -28,7 +30,14 @@ export async function POST(request: NextRequest) {
       notify: body.notify ?? true,
     });
 
-    return NextResponse.json(result);
+    const miravia =
+      body.miravia === false
+        ? null
+        : await runMiraviaDealsCheck({
+            notify: body.notify ?? true,
+          });
+
+    return NextResponse.json({ ...result, miravia });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: formatEnvError(error) },

@@ -6,6 +6,7 @@ import {
 import type { FlashDealsRunResult } from "@/services/flashDeals";
 import type { RetailPriceCheckResult } from "@/services/retailPriceCheck";
 import type { KiabiDealsRunResult } from "@/services/kiabiDeals";
+import type { MiraviaDealsRunResult } from "@/services/miraviaDeals";
 import type { UserUrlAlertsResult } from "@/services/userUrlAlerts";
 
 const JOB_PREFIX = "local";
@@ -155,10 +156,12 @@ export async function reviewRetailPricesResult(
 export async function reviewFlashDealsResult(
   result: FlashDealsRunResult & {
     pause?: { activated: boolean; denials: number };
+    miravia?: MiraviaDealsRunResult | null;
   },
 ): Promise<void> {
   const job = jobId("flash-deals");
   const errors = result.errors ?? [];
+  const miravia = result.miravia;
 
   if (result.pause?.activated) {
     await notifyCronAlert({
@@ -170,7 +173,17 @@ export async function reviewFlashDealsResult(
   }
 
   const feedErrors = result.discovery?.feedErrors ?? [];
-  if (errors.length === 0 && feedErrors.length === 0) return;
+  const miraviaErrors = miravia?.errors ?? [];
+  const miraviaFeedErrors = miravia?.discovery?.feedErrors ?? [];
+
+  if (
+    errors.length === 0 &&
+    feedErrors.length === 0 &&
+    miraviaErrors.length === 0 &&
+    miraviaFeedErrors.length === 0
+  ) {
+    return;
+  }
 
   const errorLines = errors
     .slice(0, 3)
@@ -178,6 +191,14 @@ export async function reviewFlashDealsResult(
   const feedLines = feedErrors
     .slice(0, 2)
     .map((e) => `• Feed: ${e.message}`);
+  const miraviaLines = [
+    ...miraviaErrors
+      .slice(0, 2)
+      .map((e) => `• Miravia ${e.externalId}: ${e.message}`),
+    ...miraviaFeedErrors
+      .slice(0, 2)
+      .map((e) => `• Miravia feed: ${e.message}`),
+  ];
 
   await notifyCronAlert({
     job,
@@ -187,6 +208,10 @@ export async function reviewFlashDealsResult(
       ...errorLines,
       feedErrors.length > 0 ? `Feeds fallidos: ${feedErrors.length}` : "",
       ...feedLines,
+      miravia
+        ? `Miravia: +${miravia.inserted} · err ${miraviaErrors.length}`
+        : "",
+      ...miraviaLines,
     ],
   });
 }
