@@ -12,47 +12,92 @@ import { DEFAULT_MOCK_CATALOG } from "@/providers/price/MockPriceProvider";
 
 /**
  * Goldbox/deals sesgan mucho a Electrónica/Hogar: solo cada N slots.
- * El grueso va por departamento rotado con pesos (Belleza/Moda más a menudo).
+ * El grueso va por feeds rotados con pesos (Belleza/Moda/Mascotas más a menudo).
  */
 export const DEFAULT_FLASH_FEED_URLS = [
   "https://www.amazon.es/gp/goldbox",
   "https://www.amazon.es/deals",
 ] as const;
 
-export interface FlashDepartmentFeed {
-  id: string;
-  slug: SiteCategorySlug;
-  /** Veces que aparece en el ciclo de rotación (Belleza/Moda > resto). */
-  weight: number;
-}
+export type FlashFeedSource =
+  | {
+      kind: "department";
+      id: string;
+      slug: SiteCategorySlug;
+      weight: number;
+    }
+  | {
+      kind: "url";
+      url: string;
+      slug: SiteCategorySlug;
+      weight: number;
+    };
 
 /**
- * Browse nodes Amazon.es → categoría CazaOferta.
- * Incluye Ropa/Zapatos (antes faltaban) y sube peso de Belleza/Moda.
+ * Fuentes de descubrimiento flash.
+ * Nota: el filtro `departments` de /events/deals NO funciona bien para Mascotas
+ * (Amazon devuelve chollos genéricos). Usamos búsquedas `i=pets` / keywords.
  */
-export const FLASH_DEPARTMENT_FEEDS: readonly FlashDepartmentFeed[] = [
-  { id: "6198055031", slug: "belleza", weight: 3 },
-  { id: "3677431031", slug: "belleza", weight: 2 }, // Salud y cuidado personal
-  { id: "2846221031", slug: "moda", weight: 3 }, // Ropa y accesorios
-  { id: "1571263031", slug: "moda", weight: 2 }, // Zapatos y complementos
-  { id: "1703496031", slug: "bebe", weight: 1 },
-  { id: "1951052031", slug: "automovil", weight: 1 },
-  { id: "2665403031", slug: "deportes", weight: 1 },
-  { id: "599392031", slug: "hogar", weight: 1 },
-  { id: "667050031", slug: "tecnologia", weight: 1 }, // Electrónica
-  { id: "1571260031", slug: "jardin", weight: 1 },
-  { id: "599386031", slug: "juguetes", weight: 1 },
-  { id: "599383031", slug: "videojuegos", weight: 1 },
-  { id: "12472656031", slug: "mascotas", weight: 1 },
+export const FLASH_FEED_SOURCES: readonly FlashFeedSource[] = [
+  { kind: "department", id: "6198055031", slug: "belleza", weight: 3 },
+  { kind: "department", id: "3677431031", slug: "belleza", weight: 2 },
+  { kind: "department", id: "2846221031", slug: "moda", weight: 3 },
+  { kind: "department", id: "1571263031", slug: "moda", weight: 2 },
+  { kind: "department", id: "1703496031", slug: "bebe", weight: 1 },
+  { kind: "department", id: "1951052031", slug: "automovil", weight: 1 },
+  { kind: "department", id: "2665403031", slug: "deportes", weight: 1 },
+  { kind: "department", id: "599392031", slug: "hogar", weight: 1 },
+  { kind: "department", id: "667050031", slug: "tecnologia", weight: 1 },
+  { kind: "department", id: "1571260031", slug: "jardin", weight: 1 },
+  { kind: "department", id: "599386031", slug: "juguetes", weight: 1 },
+  { kind: "department", id: "599383031", slug: "videojuegos", weight: 1 },
+  // Mascotas: búsquedas de ofertas reales (el node en /events/deals no filtra).
+  {
+    kind: "url",
+    url: "https://www.amazon.es/s?i=pets&bbn=12472654031&rh=p_n_deal_type%3A23566065031",
+    slug: "mascotas",
+    weight: 2,
+  },
+  {
+    kind: "url",
+    url: "https://www.amazon.es/s?k=pienso+perro&rh=p_n_deal_type%3A23566065031",
+    slug: "mascotas",
+    weight: 1,
+  },
+  {
+    kind: "url",
+    url: "https://www.amazon.es/s?k=arena+gatos&rh=p_n_deal_type%3A23566065031",
+    slug: "mascotas",
+    weight: 1,
+  },
+  {
+    kind: "url",
+    url: "https://www.amazon.es/s?k=collar+perro&rh=p_n_deal_type%3A23566065031",
+    slug: "mascotas",
+    weight: 1,
+  },
 ] as const;
 
-/** @deprecated Usa FLASH_DEPARTMENT_FEEDS. */
+/** @deprecated alias — usa FLASH_FEED_SOURCES. */
+export const FLASH_DEPARTMENT_FEEDS = FLASH_FEED_SOURCES.filter(
+  (feed): feed is Extract<FlashFeedSource, { kind: "department" }> =>
+    feed.kind === "department",
+);
+
+/** @deprecated Usa FLASH_FEED_SOURCES. */
 export const FLASH_DEPARTMENT_IDS = FLASH_DEPARTMENT_FEEDS.map(
   (feed) => feed.id,
 );
 
 const FLASH_DEPARTMENT_BY_ID = new Map(
   FLASH_DEPARTMENT_FEEDS.map((feed) => [feed.id, feed] as const),
+);
+
+const FLASH_URL_BY_EXACT = new Map(
+  FLASH_FEED_SOURCES.filter(
+    (feed): feed is Extract<FlashFeedSource, { kind: "url" }> =>
+      feed.kind === "url",
+  ).map((feed) => [feed.url, feed] as const),
 );
 
 /** Misma codificación que copia Amazon desde el navegador (doble encode). */
@@ -69,6 +114,16 @@ export function buildAmazonDealsDepartmentUrl(departmentId: string): string {
     encodeURIComponent(JSON.stringify(JSON.stringify(payload))),
   );
   return `https://www.amazon.es/events/deals/?discounts-widget=${widget}`;
+}
+
+export function flashFeedUrl(feed: FlashFeedSource): string {
+  return feed.kind === "url"
+    ? feed.url
+    : buildAmazonDealsDepartmentUrl(feed.id);
+}
+
+export function flashFeedKey(feed: FlashFeedSource): string {
+  return feed.kind === "url" ? `url:${feed.url}` : `dept:${feed.id}`;
 }
 
 export function flashCategorySlugForDepartmentId(
@@ -107,6 +162,58 @@ export function flashDepartmentIdFromFeedUrl(url: string): string | null {
   }
 }
 
+export function flashCategorySlugForFeedUrl(
+  url: string,
+): SiteCategorySlug | null {
+  const exact = FLASH_URL_BY_EXACT.get(url);
+  if (exact) return exact.slug;
+
+  const fromDept = flashCategorySlugForDepartmentId(
+    flashDepartmentIdFromFeedUrl(url),
+  );
+  if (fromDept) return fromDept;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("i") === "pets") return "mascotas";
+    if (parsed.searchParams.get("bbn") === "12472654031") return "mascotas";
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Descarta basura cuando el feed de categoría trae chollos de otra sección. */
+export function titleConflictsWithFeedCategory(
+  title: string | null | undefined,
+  expectedSlug: SiteCategorySlug | null | undefined,
+): boolean {
+  if (!expectedSlug || !title?.trim()) return false;
+  const t = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  const isTech =
+    /\b(smartphone|iphone|galaxy|portatil|laptop|chromebook|televisor|\btv\b|auriculares|airpods|xbox|playstation|nintendo)\b/.test(
+      t,
+    );
+  const isPet =
+    /\b(perro|gato|mascota|pienso|collar|correa|arena|rascador|comedero|juguete para|cachorro)\b/.test(
+      t,
+    );
+
+  if (expectedSlug === "mascotas") {
+    if (isTech && !isPet) return true;
+    if (
+      /\b(smartphone|portatil|televisor|chromebook|dji mic|ideaPad)\b/.test(t)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseFeedUrlsFromEnv(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
   return [
@@ -119,9 +226,9 @@ function parseFeedUrlsFromEnv(raw: string | undefined): string[] {
   ];
 }
 
-function buildWeightedDepartmentPool(): FlashDepartmentFeed[] {
-  const pool: FlashDepartmentFeed[] = [];
-  for (const feed of FLASH_DEPARTMENT_FEEDS) {
+function buildWeightedFeedPool(): FlashFeedSource[] {
+  const pool: FlashFeedSource[] = [];
+  for (const feed of FLASH_FEED_SOURCES) {
     const times = Math.max(1, Math.floor(feed.weight));
     for (let i = 0; i < times; i += 1) pool.push(feed);
   }
@@ -131,8 +238,8 @@ function buildWeightedDepartmentPool(): FlashDepartmentFeed[] {
 /**
  * Feeds a scrapear en esta pasada.
  * - `AMAZON_FLASH_FEED_URLS`: lista fija (coma o salto de línea).
- * - Si no: N departamentos con peso (Belleza/Moda más frecuentes).
- * - Goldbox/deals solo cada 5 slots (evita sesgo Tecnología/Hogar).
+ * - Si no: N fuentes con peso (Belleza/Moda/Mascotas más frecuentes).
+ * - Goldbox genérico solo de vez en cuando.
  */
 export function resolveFlashFeedUrls(options?: {
   now?: number;
@@ -149,33 +256,31 @@ export function resolveFlashFeedUrls(options?: {
   );
   const perRun =
     Number.isFinite(perRunRaw) && perRunRaw > 0
-      ? Math.min(Math.floor(perRunRaw), FLASH_DEPARTMENT_FEEDS.length)
+      ? Math.min(Math.floor(perRunRaw), FLASH_FEED_SOURCES.length)
       : 3;
   const slotMs = options?.slotMs ?? 3 * 60 * 1000;
   const now = options?.now ?? Date.now();
   const slot = Math.floor(now / slotMs);
-  const pool = buildWeightedDepartmentPool();
+  const pool = buildWeightedFeedPool();
 
-  const picked: FlashDepartmentFeed[] = [];
-  const seenIds = new Set<string>();
+  const picked: FlashFeedSource[] = [];
+  const seenKeys = new Set<string>();
   let cursor = 0;
   while (picked.length < perRun && cursor < pool.length * 3) {
     const feed = pool[(slot * perRun + cursor) % pool.length]!;
     cursor += 1;
-    if (seenIds.has(feed.id)) continue;
-    seenIds.add(feed.id);
+    const key = flashFeedKey(feed);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     picked.push(feed);
   }
 
-  const departmentUrls = picked.map((feed) =>
-    buildAmazonDealsDepartmentUrl(feed.id),
-  );
+  const urls = picked.map((feed) => flashFeedUrl(feed));
 
-  // Goldbox genérico sesga a tech/hogar: solo de vez en cuando (1 URL).
   if (slot % 10 === 0) {
-    return ["https://www.amazon.es/gp/goldbox", ...departmentUrls];
+    return ["https://www.amazon.es/gp/goldbox", ...urls];
   }
-  return departmentUrls;
+  return urls;
 }
 
 export interface DiscoveredListingItem {
@@ -354,9 +459,7 @@ export async function discoverFlashDealListings(options?: {
 
   for (let index = 0; index < feedUrls.length; index += 1) {
     const url = feedUrls[index]!;
-    const expectedCategorySlug = flashCategorySlugForDepartmentId(
-      flashDepartmentIdFromFeedUrl(url),
-    );
+    const expectedCategorySlug = flashCategorySlugForFeedUrl(url);
     try {
       const html = await fetchAmazonPageHtml(url, { timeoutMs });
       feedsFetched += 1;
@@ -365,6 +468,14 @@ export async function discoverFlashDealListings(options?: {
         url,
         expectedCategorySlug,
       )) {
+        if (
+          titleConflictsWithFeedCategory(
+            item.titleHint,
+            expectedCategorySlug,
+          )
+        ) {
+          continue;
+        }
         if (!merged.has(item.asin)) {
           merged.set(item.asin, item);
         }
