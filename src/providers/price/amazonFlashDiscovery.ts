@@ -3,39 +3,57 @@ import {
   extractAsin,
   generateAmazonUrl,
 } from "@/lib/affiliate";
+import type { SiteCategorySlug } from "@/lib/site-categories";
 import {
   fetchAmazonPageHtml,
   parseAmazonPriceText,
 } from "@/providers/price";
 import { DEFAULT_MOCK_CATALOG } from "@/providers/price/MockPriceProvider";
 
-/** Listados generales (siempre se incluyen si no hay override por env). */
+/**
+ * Goldbox/deals sesgan mucho a Electrónica/Hogar: solo cada N slots.
+ * El grueso va por departamento rotado con pesos (Belleza/Moda más a menudo).
+ */
 export const DEFAULT_FLASH_FEED_URLS = [
   "https://www.amazon.es/gp/goldbox",
   "https://www.amazon.es/deals",
 ] as const;
 
+export interface FlashDepartmentFeed {
+  id: string;
+  slug: SiteCategorySlug;
+  /** Veces que aparece en el ciclo de rotación (Belleza/Moda > resto). */
+  weight: number;
+}
+
 /**
- * Departamentos de /events/deals (filtro discounts-widget).
- * Se rotan por pasada para variar categorías sin scrapear los 15 cada vez.
+ * Browse nodes Amazon.es → categoría CazaOferta.
+ * Incluye Ropa/Zapatos (antes faltaban) y sube peso de Belleza/Moda.
  */
-export const FLASH_DEPARTMENT_IDS = [
-  "1703496031",
-  "6198055031",
-  "1951052031",
-  "2665403031",
-  "599371031",
-  "4772051031",
-  "599392031",
-  "667050031",
-  "1571260031",
-  "599386031",
-  "5512277031",
-  "667041031",
-  "12472656031",
-  "3677431031",
-  "599383031",
+export const FLASH_DEPARTMENT_FEEDS: readonly FlashDepartmentFeed[] = [
+  { id: "6198055031", slug: "belleza", weight: 3 },
+  { id: "3677431031", slug: "belleza", weight: 2 }, // Salud y cuidado personal
+  { id: "2846221031", slug: "moda", weight: 3 }, // Ropa y accesorios
+  { id: "1571263031", slug: "moda", weight: 2 }, // Zapatos y complementos
+  { id: "1703496031", slug: "bebe", weight: 1 },
+  { id: "1951052031", slug: "automovil", weight: 1 },
+  { id: "2665403031", slug: "deportes", weight: 1 },
+  { id: "599392031", slug: "hogar", weight: 1 },
+  { id: "667050031", slug: "tecnologia", weight: 1 }, // Electrónica
+  { id: "1571260031", slug: "jardin", weight: 1 },
+  { id: "599386031", slug: "juguetes", weight: 1 },
+  { id: "599383031", slug: "videojuegos", weight: 1 },
+  { id: "12472656031", slug: "mascotas", weight: 1 },
 ] as const;
+
+/** @deprecated Usa FLASH_DEPARTMENT_FEEDS. */
+export const FLASH_DEPARTMENT_IDS = FLASH_DEPARTMENT_FEEDS.map(
+  (feed) => feed.id,
+);
+
+const FLASH_DEPARTMENT_BY_ID = new Map(
+  FLASH_DEPARTMENT_FEEDS.map((feed) => [feed.id, feed] as const),
+);
 
 /** Misma codificación que copia Amazon desde el navegador (doble encode). */
 export function buildAmazonDealsDepartmentUrl(departmentId: string): string {
@@ -53,6 +71,42 @@ export function buildAmazonDealsDepartmentUrl(departmentId: string): string {
   return `https://www.amazon.es/events/deals/?discounts-widget=${widget}`;
 }
 
+export function flashCategorySlugForDepartmentId(
+  departmentId: string | null | undefined,
+): SiteCategorySlug | null {
+  if (!departmentId) return null;
+  return FLASH_DEPARTMENT_BY_ID.get(String(departmentId))?.slug ?? null;
+}
+
+export function flashDepartmentIdFromFeedUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    let widget = parsed.searchParams.get("discounts-widget");
+    if (!widget) return null;
+    for (let i = 0; i < 3; i += 1) {
+      try {
+        const next = decodeURIComponent(widget);
+        if (next === widget) break;
+        widget = next;
+      } catch {
+        break;
+      }
+    }
+    const jsonText =
+      widget.startsWith('"') && widget.endsWith('"')
+        ? (JSON.parse(widget) as string)
+        : widget;
+    const payload = JSON.parse(jsonText) as {
+      state?: { refinementFilters?: { departments?: string[] } };
+    };
+    const id = payload.state?.refinementFilters?.departments?.[0];
+    return id ? String(id) : null;
+  } catch {
+    const match = url.match(/departments.*?(\d{8,12})/i);
+    return match?.[1] ?? null;
+  }
+}
+
 function parseFeedUrlsFromEnv(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
   return [
@@ -65,10 +119,20 @@ function parseFeedUrlsFromEnv(raw: string | undefined): string[] {
   ];
 }
 
+function buildWeightedDepartmentPool(): FlashDepartmentFeed[] {
+  const pool: FlashDepartmentFeed[] = [];
+  for (const feed of FLASH_DEPARTMENT_FEEDS) {
+    const times = Math.max(1, Math.floor(feed.weight));
+    for (let i = 0; i < times; i += 1) pool.push(feed);
+  }
+  return pool;
+}
+
 /**
  * Feeds a scrapear en esta pasada.
  * - `AMAZON_FLASH_FEED_URLS`: lista fija (coma o salto de línea).
- * - Si no: goldbox/deals + N departamentos rotados (default 3, cada slot de 3 min).
+ * - Si no: N departamentos con peso (Belleza/Moda más frecuentes).
+ * - Goldbox/deals solo cada 5 slots (evita sesgo Tecnología/Hogar).
  */
 export function resolveFlashFeedUrls(options?: {
   now?: number;
@@ -85,21 +149,33 @@ export function resolveFlashFeedUrls(options?: {
   );
   const perRun =
     Number.isFinite(perRunRaw) && perRunRaw > 0
-      ? Math.min(Math.floor(perRunRaw), FLASH_DEPARTMENT_IDS.length)
+      ? Math.min(Math.floor(perRunRaw), FLASH_DEPARTMENT_FEEDS.length)
       : 3;
   const slotMs = options?.slotMs ?? 3 * 60 * 1000;
   const now = options?.now ?? Date.now();
   const slot = Math.floor(now / slotMs);
-  const start = (slot * perRun) % FLASH_DEPARTMENT_IDS.length;
+  const pool = buildWeightedDepartmentPool();
 
-  const departmentUrls: string[] = [];
-  for (let i = 0; i < perRun; i += 1) {
-    const id =
-      FLASH_DEPARTMENT_IDS[(start + i) % FLASH_DEPARTMENT_IDS.length]!;
-    departmentUrls.push(buildAmazonDealsDepartmentUrl(id));
+  const picked: FlashDepartmentFeed[] = [];
+  const seenIds = new Set<string>();
+  let cursor = 0;
+  while (picked.length < perRun && cursor < pool.length * 3) {
+    const feed = pool[(slot * perRun + cursor) % pool.length]!;
+    cursor += 1;
+    if (seenIds.has(feed.id)) continue;
+    seenIds.add(feed.id);
+    picked.push(feed);
   }
 
-  return [...DEFAULT_FLASH_FEED_URLS, ...departmentUrls];
+  const departmentUrls = picked.map((feed) =>
+    buildAmazonDealsDepartmentUrl(feed.id),
+  );
+
+  // Goldbox genérico sesga a tech/hogar: solo de vez en cuando (1 URL).
+  if (slot % 10 === 0) {
+    return ["https://www.amazon.es/gp/goldbox", ...departmentUrls];
+  }
+  return departmentUrls;
 }
 
 export interface DiscoveredListingItem {
@@ -111,6 +187,8 @@ export interface DiscoveredListingItem {
   sourceUrl: string;
   /** Origen: listado live de Amazon o simulación / feed inyectado. */
   origin: "live" | "simulated" | "injected";
+  /** Categoría esperada según el departamento del feed. */
+  expectedCategorySlug?: SiteCategorySlug | null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -120,6 +198,7 @@ function sleep(ms: number): Promise<void> {
 function collectAsinsFromHtml(
   html: string,
   sourceUrl: string,
+  expectedCategorySlug?: SiteCategorySlug | null,
 ): DiscoveredListingItem[] {
   const $ = cheerio.load(html);
   const byAsin = new Map<string, DiscoveredListingItem>();
@@ -136,6 +215,11 @@ function collectAsinsFromHtml(
       titleHint: extras?.titleHint ?? existing?.titleHint,
       priceHint: extras?.priceHint ?? existing?.priceHint,
       listPriceHint: extras?.listPriceHint ?? existing?.listPriceHint,
+      expectedCategorySlug:
+        extras?.expectedCategorySlug ??
+        existing?.expectedCategorySlug ??
+        expectedCategorySlug ??
+        null,
     });
   };
 
@@ -270,10 +354,17 @@ export async function discoverFlashDealListings(options?: {
 
   for (let index = 0; index < feedUrls.length; index += 1) {
     const url = feedUrls[index]!;
+    const expectedCategorySlug = flashCategorySlugForDepartmentId(
+      flashDepartmentIdFromFeedUrl(url),
+    );
     try {
       const html = await fetchAmazonPageHtml(url, { timeoutMs });
       feedsFetched += 1;
-      for (const item of collectAsinsFromHtml(html, url)) {
+      for (const item of collectAsinsFromHtml(
+        html,
+        url,
+        expectedCategorySlug,
+      )) {
         if (!merged.has(item.asin)) {
           merged.set(item.asin, item);
         }

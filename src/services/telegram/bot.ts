@@ -245,6 +245,21 @@ function formatDealStamp(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** Hashtag Telegram (#belleza) a partir del slug de categoría. */
+export function formatCategoryHashtag(
+  name?: string | null,
+  slug?: string | null,
+): string | null {
+  const raw = slug?.trim() || name?.trim();
+  if (!raw) return null;
+  const tag = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return tag ? `#${tag}` : null;
+}
+
 export function buildDealAlertText(
   deal: DealCandidate,
   options?: { includeCopyLinks?: boolean },
@@ -293,6 +308,21 @@ export function buildDealAlertText(
       lines.push(
         `🌐 Ver en la web: ${absoluteUrl(`/producto/${deal.productSlug.trim()}`)}`,
       );
+    }
+  }
+
+  const categoryLabel = deal.categoryName?.trim();
+  const categoryTag = formatCategoryHashtag(
+    deal.categoryName,
+    deal.categorySlug,
+  );
+  if (categoryLabel || categoryTag) {
+    lines.push("");
+    if (categoryLabel) {
+      lines.push(`📂 ${escapeHtml(categoryLabel)}`);
+    }
+    if (categoryTag) {
+      lines.push(categoryTag);
     }
   }
 

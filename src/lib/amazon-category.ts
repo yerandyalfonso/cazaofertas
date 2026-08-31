@@ -6,6 +6,8 @@ export interface AmazonCategoryInferenceInput {
   breadcrumbs?: string[];
   title?: string | null;
   brand?: string | null;
+  /** Departamento del feed Amazon; solo respaldo si breadcrumbs/título no deciden. */
+  feedCategorySlug?: SiteCategorySlug | null;
 }
 
 interface CategoryRule {
@@ -264,6 +266,9 @@ const CATEGORY_RULES: CategoryRule[] = [
       /\borganizacion\b/,
       /\blimpieza\b/,
       /\belectrodomesticos?\b/,
+      /\bclimatizacion\b/,
+      /\bcalefaccion\b/,
+      /\btermostatos?\b/,
     ],
     titleKeywords: [
       "sabana",
@@ -283,6 +288,13 @@ const CATEGORY_RULES: CategoryRule[] = [
       "alfombra",
       "organizador",
       "cesta",
+      "termostato",
+      "thermostat",
+      "calefactor",
+      "radiador",
+      "climatizador",
+      "humidificador",
+      "deshumidificador",
     ],
   },
   {
@@ -295,6 +307,8 @@ const CATEGORY_RULES: CategoryRule[] = [
       /\bmaquillaje\b/,
       /\bpeluqueria\b/,
       /\bsalud\s+y\s+cuidado\b/,
+      /\bcuidado\s+de\s+la\s+piel\b/,
+      /\bcuidado\s+del\s+cabello\b/,
     ],
     titleKeywords: [
       "crema facial",
@@ -310,6 +324,8 @@ const CATEGORY_RULES: CategoryRule[] = [
       "afeitadora",
       "depiladora",
       "hidratante",
+      "protector solar",
+      "crema corporal",
     ],
   },
   {
@@ -350,7 +366,7 @@ const CATEGORY_RULES: CategoryRule[] = [
     breadcrumbPatterns: [
       /\bjuguetes?\b/,
       /\bjuegos?\s+y\s+juguetes\b/,
-      /\bconstruccion\b/,
+      /\bjuguetes?\s+de\s+construccion\b/,
     ],
     titleKeywords: [
       "juguete",
@@ -358,10 +374,11 @@ const CATEGORY_RULES: CategoryRule[] = [
       "puzzle",
       "peluche",
       "muneca",
-      "figura",
       "playmobil",
       "juego de mesa",
       "coche teledirigido",
+      "figura de accion",
+      "bloques de construccion",
     ],
   },
 ];
@@ -376,7 +393,8 @@ function scoreBreadcrumbs(
     if (!normalized) return;
     for (const pattern of patterns) {
       if (pattern.test(normalized)) {
-        score += 12 + index;
+        // Los crumbs finales (más específicos) pesan más.
+        score += 14 + index * 3;
         break;
       }
     }
@@ -397,9 +415,11 @@ function scoreTitle(title: string, keywords: string[]): number {
   return score;
 }
 
+const MIN_CONFIDENT_SCORE = 8;
+
 /**
  * Infiere la categoría del catálogo a partir de breadcrumbs Amazon y/o título.
- * Prioriza breadcrumbs; el título actúa como respaldo.
+ * Prioriza breadcrumbs/título; el departamento del feed solo actúa de respaldo.
  */
 export function inferAmazonCategorySlug(
   input: AmazonCategoryInferenceInput,
@@ -408,8 +428,9 @@ export function inferAmazonCategorySlug(
     .map((crumb) => crumb.trim())
     .filter(Boolean);
   const title = input.title?.trim() ?? "";
+  const feedSlug = input.feedCategorySlug ?? null;
 
-  if (breadcrumbs.length === 0 && !title) return null;
+  if (breadcrumbs.length === 0 && !title && !feedSlug) return null;
 
   let bestSlug: SiteCategorySlug | null = null;
   let bestScore = 0;
@@ -423,6 +444,14 @@ export function inferAmazonCategorySlug(
       bestScore = score;
       bestSlug = rule.slug;
     }
+  }
+
+  if (bestSlug && bestScore >= MIN_CONFIDENT_SCORE) {
+    return bestSlug;
+  }
+
+  if (feedSlug) {
+    return feedSlug;
   }
 
   return bestScore > 0 ? bestSlug : null;

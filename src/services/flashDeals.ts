@@ -385,12 +385,13 @@ export async function runFlashDealsCheck(options?: {
         item.origin === "live";
 
       const resolvedCategorySlug =
-        categorySlugHint ??
         inferAmazonCategorySlug({
           breadcrumbs: categoryBreadcrumbs,
           title,
           brand,
+          feedCategorySlug: item.expectedCategorySlug ?? null,
         }) ??
+        categorySlugHint ??
         null;
       const categoryMeta = resolvedCategorySlug
         ? await resolveCategoryIdBySlug(client, resolvedCategorySlug)
