@@ -381,6 +381,51 @@ const CATEGORY_RULES: CategoryRule[] = [
       "bloques de construccion",
     ],
   },
+  {
+    slug: "oficina",
+    breadcrumbPatterns: [
+      /\boficina\b/,
+      /\bpapeleria\b/,
+      /\bmaterial\s+escolar\b/,
+      /\bestuches?\b/,
+      /\borganizacion\s+de\s+oficina\b/,
+    ],
+    titleKeywords: [
+      "boligrafo",
+      "cuaderno",
+      "impresora",
+      "toner",
+      "papel a4",
+      "archivador",
+      "grapadora",
+      "mochila escolar",
+    ],
+  },
+  {
+    slug: "otros",
+    breadcrumbPatterns: [
+      /\blibros?\b/,
+      /\bmusica\b/,
+      /\bcine\b/,
+      /\bviajes?\b/,
+      /\bsupermercado\b/,
+      /\balimentacion\b/,
+      /\bcupones?\b/,
+      /\bactualidad\b/,
+    ],
+    titleKeywords: [
+      "libro",
+      "kindle",
+      "ebook",
+      "vinilo",
+      "cd musica",
+      "pelicula",
+      "blu-ray",
+      "maleta viaje",
+      "cupon",
+      "codigo descuento",
+    ],
+  },
 ];
 
 function scoreBreadcrumbs(

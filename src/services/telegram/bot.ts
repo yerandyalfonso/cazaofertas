@@ -16,7 +16,9 @@ import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
 import { resolveTelegramTopicId } from "@/lib/telegram-topics";
+import { formatRetailerHashtag } from "@/lib/retailers";
 import type { DealCandidate } from "@/services/alertMatching";
+import { inferRetailerFromAsin } from "@/services/products";
 import { dealScoringService } from "@/services/deal-scoring";
 import { ensureProductFromAmazonUrl } from "@/services/products";
 import {
@@ -311,18 +313,30 @@ export function buildDealAlertText(
     }
   }
 
-  const categoryLabel = deal.categoryName?.trim();
-  const categoryTag = formatCategoryHashtag(
-    deal.categoryName,
-    deal.categorySlug,
+  const parentLabel = deal.parentCategoryName?.trim();
+  const subLabel = deal.categoryName?.trim();
+  const categoryLine =
+    parentLabel && subLabel && parentLabel !== subLabel
+      ? `${parentLabel} · ${subLabel}`
+      : subLabel || parentLabel || null;
+
+  const parentTag = formatCategoryHashtag(
+    deal.parentCategoryName,
+    deal.parentCategorySlug,
   );
-  if (categoryLabel || categoryTag) {
+  const subTag = formatCategoryHashtag(deal.categoryName, deal.categorySlug);
+  const retailerTag = formatRetailerHashtag(
+    deal.retailer ?? inferRetailerFromAsin(deal.asin),
+  );
+
+  if (categoryLine || parentTag || subTag || retailerTag) {
     lines.push("");
-    if (categoryLabel) {
-      lines.push(`📂 ${escapeHtml(categoryLabel)}`);
+    if (categoryLine) {
+      lines.push(`📂 ${escapeHtml(categoryLine)}`);
     }
-    if (categoryTag) {
-      lines.push(categoryTag);
+    const tags = [parentTag, subTag, retailerTag].filter(Boolean).join(" ");
+    if (tags) {
+      lines.push(tags);
     }
   }
 
@@ -1218,7 +1232,7 @@ async function fetchTopDealsText(): Promise<string> {
         previousPrice,
         lowestPrice,
         discountPercentage,
-        categorySlug: category?.slug ?? "general",
+        categorySlug: category?.slug ?? "otros",
         priceChangeCount30d: 1,
         previousPriceAgeHours: 72,
       });

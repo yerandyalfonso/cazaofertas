@@ -12,9 +12,16 @@ export interface DealCandidate {
   title: string;
   brand: string | null;
   categoryId: string | null;
-  categoryName: string | null;
-  /** Slug de `categories` (estable; no usar el nombre para temas Telegram). */
+  /** Slug de subcategoría interna (ruteo Telegram). */
   categorySlug?: string | null;
+  /** Nombre visible de la subcategoría. */
+  categoryName?: string | null;
+  /** Slug de categoría padre (blog). */
+  parentCategorySlug?: string | null;
+  /** Nombre de categoría padre (blog). */
+  parentCategoryName?: string | null;
+  /** Tienda de compra (`amazon`, `kiabi`, `miravia`, …) para hashtag #tienda. */
+  retailer?: string | null;
   currentPrice: number;
   previousPrice: number;
   discountPercentage: number;

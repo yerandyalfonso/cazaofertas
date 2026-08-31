@@ -6,6 +6,7 @@ import {
 } from "@/lib/out-of-stock-policy";
 import { computeMovingAverages } from "@/lib/price-history";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
+import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { resolveTelegramMinScore } from "@/services/appSettings";
@@ -118,18 +119,20 @@ interface CategoryEmbed {
   id: string;
   slug: string;
   name: string;
+  parent?: CategoryEmbed | CategoryEmbed[] | null;
 }
 
 interface ProductWithCategory extends ProductRow {
   categories: CategoryEmbed | CategoryEmbed[] | null;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const batches: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    batches.push(items.slice(index, index + size));
-  }
-  return batches;
+function parentCategoryOf(
+  category: CategoryEmbed | null,
+): CategoryEmbed | null {
+  if (!category?.parent) return null;
+  return Array.isArray(category.parent)
+    ? (category.parent[0] ?? null)
+    : category.parent;
 }
 
 function categoryOf(product: ProductWithCategory): CategoryEmbed | null {
@@ -138,6 +141,14 @@ function categoryOf(product: ProductWithCategory): CategoryEmbed | null {
     return category[0] ?? null;
   }
   return category;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+  return batches;
 }
 
 function availabilityFrom(value: string | undefined): ProductAvailability {
@@ -257,7 +268,7 @@ export async function runPriceDetection(
 
   const { data: products, error: productsError } = await client
     .from("products")
-    .select("*, categories(id, slug, name)")
+    .select("*, categories(id, slug, name, parent:parent_id(id, slug, name))")
     .eq("is_active", true);
 
   if (productsError) {
@@ -422,6 +433,10 @@ export async function runPriceDetection(
               );
 
         const category = categoryOf(product);
+        const parentCategory = parentCategoryOf(category);
+        const parentSlug =
+          parentCategory?.slug ??
+          (category?.slug ? resolveParentSlug(category.slug) : null);
         const scoringContext = await loadScoringContext(
           client,
           product.id,
@@ -432,7 +447,7 @@ export async function runPriceDetection(
           previousPrice: referencePrice > nextPrice ? referencePrice : storedPrice,
           lowestPrice: previousLowest,
           discountPercentage,
-          categorySlug: category?.slug ?? "general",
+          categorySlug: parentSlug ?? "otros",
           priceChangeCount30d: scoringContext.priceChangeCount30d,
           previousPriceAgeHours: scoringContext.previousPriceAgeHours,
         });
@@ -496,6 +511,9 @@ export async function runPriceDetection(
             categoryId: category?.id ?? product.category_id,
             categoryName: category?.name ?? null,
             categorySlug: category?.slug ?? null,
+            parentCategorySlug: parentSlug ?? null,
+            parentCategoryName: parentCategory?.name ?? null,
+            retailer: product.retailer,
             currentPrice: nextPrice,
             previousPrice:
               referencePrice > nextPrice ? referencePrice : storedPrice,

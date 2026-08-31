@@ -58,7 +58,10 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
   if (!category) notFound();
 
   const filtered = products
-    .filter((product) => product.category?.slug === slug)
+    .filter(
+      (product) =>
+        product.category?.parentSlug === slug || product.category?.slug === slug,
+    )
     .sort((a, b) => b.dealScore - a.dealScore);
   const copy = categorySeoCopy(category.slug, category.name);
   const intro = category.description?.trim() || copy.intro;

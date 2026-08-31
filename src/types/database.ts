@@ -20,6 +20,7 @@ export type Database = {
           image_url: string | null;
           is_active: boolean;
           created_at: string;
+          parent_id: string | null;
         };
         Insert: {
           id?: string;
@@ -29,6 +30,7 @@ export type Database = {
           image_url?: string | null;
           is_active?: boolean;
           created_at?: string;
+          parent_id?: string | null;
         };
         Update: {
           id?: string;
@@ -38,8 +40,16 @@ export type Database = {
           image_url?: string | null;
           is_active?: boolean;
           created_at?: string;
+          parent_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey";
+            columns: ["parent_id"];
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       products: {
         Row: {

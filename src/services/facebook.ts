@@ -26,6 +26,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
   juguetes: "🧸",
   mascotas: "🐾",
   videojuegos: "🎮",
+  oficina: "📎",
+  otros: "📦",
 };
 
 interface GraphErrorBody {
@@ -146,7 +148,7 @@ async function graphPost(
 }
 
 export function buildFacebookDealMessage(deal: DealCandidate): string {
-  const emoji = categoryEmoji(deal.categorySlug);
+  const emoji = categoryEmoji(deal.parentCategorySlug ?? deal.categorySlug);
   const score =
     deal.score != null && Number.isFinite(deal.score)
       ? Math.min(100, Math.round(deal.score))
@@ -162,7 +164,12 @@ export function buildFacebookDealMessage(deal: DealCandidate): string {
     truncatePlain(deal.title, 140),
   ];
 
-  const category = deal.categoryName?.trim();
+  const category =
+    deal.parentCategoryName &&
+    deal.categoryName &&
+    deal.parentCategoryName !== deal.categoryName
+      ? `${deal.parentCategoryName} · ${deal.categoryName}`
+      : deal.categoryName?.trim() || deal.parentCategoryName?.trim();
   if (category) {
     lines.push(category);
   }

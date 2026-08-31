@@ -1,6 +1,7 @@
 import { generateAffiliateUrl } from "@/lib/affiliate";
 import { calculateDiscountPercentage, toNumber } from "@/lib/money";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import {
   getAppSettings,
@@ -117,7 +118,7 @@ export async function flushPendingChannelNotifications(options?: {
       const { data: product, error: productError } = await client
         .from("products")
         .select(
-          "id, asin, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, category_id, categories(id, name, slug)",
+          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, category_id, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
         )
         .eq("id", row.product_id)
         .maybeSingle();
@@ -164,14 +165,22 @@ export async function flushPendingChannelNotifications(options?: {
         0;
 
       const categoryRaw = product.categories;
-      const category = Array.isArray(categoryRaw)
+      const categoryNode = Array.isArray(categoryRaw)
         ? categoryRaw[0]
         : categoryRaw;
+      const parentRaw = categoryNode?.parent;
+      const parentNode = Array.isArray(parentRaw)
+        ? parentRaw[0]
+        : parentRaw;
+      const parentSlug =
+        parentNode?.slug ??
+        (categoryNode?.slug ? resolveParentSlug(categoryNode.slug) : null);
+
       const scoring = dealScoringService.scoreProduct({
         currentPrice,
         previousPrice: previousPrice > currentPrice ? previousPrice : null,
         lowestPrice: toNumber(product.lowest_price),
-        categorySlug: category?.slug ?? "general",
+        categorySlug: parentSlug ?? "otros",
       });
 
       if (scoring.score < minScore) {
@@ -188,9 +197,12 @@ export async function flushPendingChannelNotifications(options?: {
         asin: product.asin,
         title: product.title,
         brand: product.brand,
-        categoryId: category?.id ?? product.category_id,
-        categoryName: category?.name ?? null,
-        categorySlug: category?.slug ?? null,
+        categoryId: categoryNode?.id ?? product.category_id,
+        categoryName: categoryNode?.name ?? null,
+        categorySlug: categoryNode?.slug ?? null,
+        parentCategorySlug: parentSlug ?? null,
+        parentCategoryName: parentNode?.name ?? null,
+        retailer: product.retailer,
         currentPrice,
         previousPrice: previousPrice > currentPrice ? previousPrice : currentPrice,
         discountPercentage: discount,

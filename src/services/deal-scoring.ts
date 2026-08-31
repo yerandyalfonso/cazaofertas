@@ -33,6 +33,8 @@ export const DEFAULT_DEAL_SCORING_CONFIG: DealScoringConfig = {
     mascotas: 2,
     jardin: 2,
     automovil: 2,
+    oficina: 1,
+    otros: 0,
   },
 };
 
@@ -101,7 +103,7 @@ export class DealScoringService {
       previousPrice: input.previousPrice,
       lowestPrice: input.lowestPrice,
       discountPercentage,
-      categorySlug: input.categorySlug ?? "general",
+      categorySlug: input.categorySlug ?? "otros",
       priceChangeCount30d: input.priceChangeCount30d ?? 1,
       previousPriceAgeHours: input.previousPriceAgeHours ?? 72,
     });

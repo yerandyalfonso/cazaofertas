@@ -1,3 +1,4 @@
+import { resolveParentSlug } from "@/lib/category-taxonomy";
 import {
   normalizeRetailer,
   resolveProductBuyUrl,
@@ -17,6 +18,9 @@ import { DealLevel, ProductAvailability } from "@/types";
 import type { Database } from "@/types/database";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+
+const CATEGORY_SELECT =
+  "*, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))";
 
 export type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 export type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
@@ -48,6 +52,8 @@ export interface CatalogProduct {
     id: string;
     name: string;
     slug: string;
+    parentSlug: string | null;
+    parentName: string | null;
   } | null;
   dealLevel: DealLevel;
   dealScore: number;
@@ -60,11 +66,16 @@ export interface PriceHistoryResult {
   averagePrice90d: number | null;
 }
 
-type ProductWithCategory = ProductRow & {
-  categories?:
+type CategoryWithParent = Pick<CategoryRow, "id" | "name" | "slug"> & {
+  parent_id?: string | null;
+  parent?:
     | Pick<CategoryRow, "id" | "name" | "slug">
     | Pick<CategoryRow, "id" | "name" | "slug">[]
     | null;
+};
+
+type ProductWithCategory = ProductRow & {
+  categories?: CategoryWithParent | CategoryWithParent[] | null;
 };
 
 export function toCatalogProduct(product: ProductWithCategory): CatalogProduct {
@@ -73,9 +84,17 @@ export function toCatalogProduct(product: ProductWithCategory): CatalogProduct {
 
 function mapProduct(product: ProductWithCategory): CatalogProduct {
   const categoryRaw = product.categories;
-  const category = Array.isArray(categoryRaw)
+  const categoryNode = Array.isArray(categoryRaw)
     ? (categoryRaw[0] ?? null)
     : (categoryRaw ?? null);
+  const parentRaw = categoryNode?.parent;
+  const parentNode = Array.isArray(parentRaw)
+    ? (parentRaw[0] ?? null)
+    : (parentRaw ?? null);
+
+  const subSlug = categoryNode?.slug ?? null;
+  const parentSlug =
+    parentNode?.slug ?? (subSlug ? resolveParentSlug(subSlug) : null);
 
   const currentPrice = toNumber(product.current_price) ?? 0;
   const previousPrice = toNumber(product.previous_price);
@@ -84,7 +103,7 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     currentPrice,
     previousPrice,
     lowestPrice,
-    categorySlug: category?.slug,
+    categorySlug: parentSlug ?? subSlug ?? "otros",
   });
 
   const retailer = normalizeRetailer(product.retailer);
@@ -120,8 +139,14 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
         return product.affiliate_url?.trim() || productUrl || product.amazon_url;
       }
     })(),
-    category: category
-      ? { id: category.id, name: category.name, slug: category.slug }
+    category: categoryNode
+      ? {
+          id: categoryNode.id,
+          name: categoryNode.name,
+          slug: categoryNode.slug,
+          parentSlug: parentSlug ?? null,
+          parentName: parentNode?.name ?? null,
+        }
       : null,
     dealLevel: scoring.level,
     dealScore: scoring.score,
@@ -147,7 +172,7 @@ export async function getActiveProducts(
   const orderBy = options?.orderBy ?? "discount";
   let query = client
     .from("products")
-    .select("*, categories(id, name, slug)")
+    .select(CATEGORY_SELECT)
     .eq("is_active", true);
 
   if (orderBy === "created") {
@@ -182,7 +207,7 @@ export async function getOfferListingProducts(
   if (!client) return [];
 
   const half = Math.max(Math.ceil(limit / 2), 48);
-  const select = "*, categories(id, name, slug)";
+  const select = CATEGORY_SELECT;
 
   const [recentRes, discountRes] = await Promise.all([
     client
@@ -228,7 +253,7 @@ export async function getFeaturedProducts(limit = 4): Promise<CatalogProduct[]> 
 
   const { data, error } = await client
     .from("products")
-    .select("*, categories(id, name, slug)")
+    .select(CATEGORY_SELECT)
     .eq("is_active", true)
     .eq("is_featured", true)
     .order("discount_percentage", { ascending: false, nullsFirst: false })
@@ -260,7 +285,7 @@ async function loadProductBySlug(
     const data = await withRetry(async () => {
       const { data: row, error } = await client
         .from("products")
-        .select("*, categories(id, name, slug)")
+        .select(CATEGORY_SELECT)
         .eq("slug", slug)
         .eq("is_active", true)
         .maybeSingle();
@@ -302,7 +327,7 @@ async function loadProductsBySlugs(
     const data = await withRetry(async () => {
       const { data: rows, error } = await client
         .from("products")
-        .select("*, categories(id, name, slug)")
+        .select(CATEGORY_SELECT)
         .in("slug", unique)
         .eq("is_active", true);
 
@@ -403,6 +428,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
     .from("categories")
     .select("*")
     .eq("is_active", true)
+    .is("parent_id", null)
     .order("name", { ascending: true });
 
   if (error || !data) {

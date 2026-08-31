@@ -216,6 +216,7 @@ export default function ProductsAdminClient() {
   const [scrapedDiscount, setScrapedDiscount] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [retailerFilter, setRetailerFilter] = useState("");
   const [staleFilter, setStaleFilter] = useState<StaleFilter>("all");
   const [dealFilter, setDealFilter] = useState<DealFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("lastCheckedAt");
@@ -326,6 +327,10 @@ export default function ProductsAdminClient() {
         return false;
       }
 
+      if (retailerFilter && product.retailer !== retailerFilter) {
+        return false;
+      }
+
       if (staleFilter !== "all") {
         const hours = freshnessMeta(product.lastCheckedAt).hours;
         if (staleFilter === "never" && hours !== null) return false;
@@ -382,6 +387,7 @@ export default function ProductsAdminClient() {
     products,
     deferredQuery,
     categoryFilter,
+    retailerFilter,
     staleFilter,
     dealFilter,
     sortKey,
@@ -462,6 +468,7 @@ export default function ProductsAdminClient() {
   const hasActiveFilters =
     query.trim().length > 0 ||
     categoryFilter.length > 0 ||
+    retailerFilter.length > 0 ||
     staleFilter !== "all" ||
     dealFilter !== "all";
 
@@ -1023,6 +1030,20 @@ export default function ProductsAdminClient() {
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={retailerFilter}
+          onChange={(event) => setRetailerFilter(event.target.value)}
+          className={`${toolbarFieldClass} min-w-[140px]`}
+          aria-label="Filtrar por tienda"
+        >
+          <option value="">Todas las tiendas</option>
+          {PRODUCT_RETAILERS.map((retailer) => (
+            <option key={retailer} value={retailer}>
+              {retailerLabel(retailer)}
             </option>
           ))}
         </select>

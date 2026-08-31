@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Categorías de ofertas Amazon",
     description:
-      "Explora chollos de Amazon España por categoría: tecnología, hogar, moda y más.",
+      "Explora chollos por categoría: tecnología, hogar, moda, oficina, otros y más.",
     path: "/categorias",
   }),
 };

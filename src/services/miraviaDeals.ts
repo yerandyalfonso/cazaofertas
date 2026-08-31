@@ -1,5 +1,5 @@
-import { inferAmazonCategorySlug } from "@/lib/amazon-category";
-import { resolveCategoryIdBySlug } from "@/lib/categories";
+import { resolveCategoryMetaForDeal } from "@/lib/categories";
+import { inferProductSubcategorySlug } from "@/lib/product-category-inference";
 import { roundMoney, toNumber } from "@/lib/money";
 import {
   resolveProductBuyUrl,
@@ -111,6 +111,8 @@ async function maybeNotifyMiraviaDeal(
     categoryId?: string | null;
     categoryName?: string | null;
     categorySlug?: string | null;
+    parentCategorySlug?: string | null;
+    parentCategoryName?: string | null;
     telegramMinScore?: number;
   },
 ): Promise<"sent" | "skipped" | "failed" | "queued"> {
@@ -122,6 +124,9 @@ async function maybeNotifyMiraviaDeal(
     categoryId: options.categoryId ?? null,
     categoryName: options.categoryName ?? null,
     categorySlug: options.categorySlug ?? null,
+    parentCategorySlug: options.parentCategorySlug ?? null,
+    parentCategoryName: options.parentCategoryName ?? null,
+    retailer: "miravia",
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,
@@ -271,14 +276,17 @@ export async function runMiraviaDealsCheck(options?: {
         item.titleHint?.trim() || `Producto Miravia ${item.externalId}`;
       const productUrl = item.productUrl;
       const syntheticAsin = syntheticAsinForRetailer("miravia", item.externalId);
-      const categorySlug = inferAmazonCategorySlug({ title });
-      const categoryMeta = await resolveCategoryIdBySlug(client, categorySlug);
+      const subcategorySlug = inferProductSubcategorySlug({ title });
+      const categoryMeta = await resolveCategoryMetaForDeal(
+        client,
+        subcategorySlug,
+      );
 
       const scoring = dealScoringService.scoreProduct({
         currentPrice: price,
         previousPrice: listPrice,
         lowestPrice: price,
-        categorySlug: categorySlug ?? undefined,
+        categorySlug: categoryMeta.parentSlug,
       });
 
       const now = new Date().toISOString();
@@ -295,7 +303,7 @@ export async function runMiraviaDealsCheck(options?: {
         brand: "Miravia",
         image_url: item.imageUrlHint ?? null,
         description: null,
-        category_id: categoryMeta?.id ?? null,
+        category_id: categoryMeta.categoryId,
         current_price: price,
         previous_price: listPrice,
         lowest_price: price,
@@ -352,9 +360,11 @@ export async function runMiraviaDealsCheck(options?: {
             affiliateUrl,
             brand: "Miravia",
             imageUrl: item.imageUrlHint,
-            categoryId: categoryMeta?.id ?? null,
-            categoryName: categoryMeta?.name ?? null,
-            categorySlug: categoryMeta?.slug ?? categorySlug,
+            categoryId: categoryMeta.categoryId,
+            categoryName: categoryMeta.subcategoryName,
+            categorySlug: categoryMeta.subcategorySlug,
+            parentCategorySlug: categoryMeta.parentSlug,
+            parentCategoryName: categoryMeta.parentName,
             telegramMinScore: channelMinScore,
           });
           if (notifyResult === "queued") channelNotificationsQueued += 1;

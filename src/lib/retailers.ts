@@ -249,3 +249,12 @@ export function retailerBuyCtaLabel(retailer: string | null | undefined): string
 export function retailerViewCtaLabel(retailer: string | null | undefined): string {
   return `Ver en ${retailerLabel(retailer)}`;
 }
+
+/** Hashtag Telegram de tienda (#amazon, #miravia, …). */
+export function formatRetailerHashtag(
+  retailer: string | null | undefined,
+): string | null {
+  const normalized = retailer?.trim().toLowerCase();
+  if (!normalized || !isProductRetailer(normalized)) return null;
+  return `#${normalized}`;
+}

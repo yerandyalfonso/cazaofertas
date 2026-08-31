@@ -21,7 +21,11 @@ const CATEGORY_SLUG_HINTS: Record<string, string> = {
   guias: "tecnologia",
   análisis: "tecnologia",
   analisis: "tecnologia",
-  comparativas: "tecnologia",
+  oficina: "oficina",
+  otros: "otros",
+  "material escolar": "oficina",
+  papelería: "oficina",
+  papeleria: "oficina",
 };
 
 export function TelegramCategoryCta({

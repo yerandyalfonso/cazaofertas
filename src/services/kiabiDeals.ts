@@ -154,7 +154,7 @@ async function resolveModaCategoryId(
   const { data } = await client
     .from("categories")
     .select("id")
-    .eq("slug", "moda")
+    .eq("slug", "moda-moda")
     .eq("is_active", true)
     .maybeSingle();
   return data?.id ?? null;
@@ -230,7 +230,10 @@ async function maybeNotifyKiabiDeal(
     brand: options.brand ?? "Kiabi",
     categoryId: null,
     categoryName: "Moda",
-    categorySlug: "moda",
+    categorySlug: "moda-moda",
+    parentCategorySlug: "moda",
+    parentCategoryName: "Moda",
+    retailer: "kiabi",
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,

@@ -3,10 +3,10 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
-import { inferAmazonCategorySlug } from "@/lib/amazon-category";
 import {
-  resolveCategoryIdBySlug,
+  resolveCategoryMetaForDeal,
 } from "@/lib/categories";
+import { inferProductSubcategorySlug } from "@/lib/product-category-inference";
 import { roundMoney } from "@/lib/money";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import {
@@ -73,6 +73,8 @@ async function maybeNotifyFlashChannel(
     categoryId?: string | null;
     categoryName?: string | null;
     categorySlug?: string | null;
+    parentCategorySlug?: string | null;
+    parentCategoryName?: string | null;
     imageUrl?: string | null;
     summary?: string | null;
     expiresAt?: string | null;
@@ -86,6 +88,9 @@ async function maybeNotifyFlashChannel(
     categoryId: options.categoryId ?? null,
     categoryName: options.categoryName ?? null,
     categorySlug: options.categorySlug ?? null,
+    parentCategorySlug: options.parentCategorySlug ?? null,
+    parentCategoryName: options.parentCategoryName ?? null,
+    retailer: "amazon",
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
     discountPercentage: options.discountPercentage,
@@ -384,19 +389,16 @@ export async function runFlashDealsCheck(options?: {
         item.origin === "simulated" ||
         item.origin === "live";
 
-      const resolvedCategorySlug =
-        inferAmazonCategorySlug({
-          breadcrumbs: categoryBreadcrumbs,
-          title,
-          brand,
-          feedCategorySlug: item.expectedCategorySlug ?? null,
-        }) ??
-        categorySlugHint ??
-        null;
-      const categoryMeta = resolvedCategorySlug
-        ? await resolveCategoryIdBySlug(client, resolvedCategorySlug)
-        : null;
-      const scoringCategorySlug = resolvedCategorySlug ?? "general";
+      const subcategorySlug = inferProductSubcategorySlug({
+        breadcrumbs: categoryBreadcrumbs,
+        title,
+        brand,
+        feedCategorySlug: item.expectedCategorySlug ?? categorySlugHint ?? null,
+      });
+      const categoryMeta = await resolveCategoryMetaForDeal(
+        client,
+        subcategorySlug,
+      );
 
       const slug = slugify(`${title}-${item.asin}`);
       const now = new Date().toISOString();
@@ -404,7 +406,7 @@ export async function runFlashDealsCheck(options?: {
         currentPrice: price,
         previousPrice: reference > price ? reference : null,
         lowestPrice: price,
-        categorySlug: scoringCategorySlug,
+        categorySlug: categoryMeta.parentSlug,
       });
 
       const { error: slugCleanupError } = await client
@@ -431,7 +433,7 @@ export async function runFlashDealsCheck(options?: {
           brand,
           image_url: imageUrl,
           description,
-          category_id: categoryMeta?.id ?? null,
+          category_id: categoryMeta.categoryId,
           current_price: price,
           previous_price: reference,
           lowest_price: price,
@@ -479,7 +481,7 @@ export async function runFlashDealsCheck(options?: {
         brand,
         image_url: imageUrl,
         description,
-        category_id: categoryMeta?.id ?? null,
+        category_id: categoryMeta.categoryId,
       });
 
       inserted += 1;
@@ -499,9 +501,11 @@ export async function runFlashDealsCheck(options?: {
           amazonUrl,
           productSlug: slug,
           brand,
-          categoryId: categoryMeta?.id ?? null,
-          categoryName: categoryMeta?.name ?? null,
-          categorySlug: scoringCategorySlug,
+          categoryId: categoryMeta.categoryId,
+          categoryName: categoryMeta.subcategoryName,
+          categorySlug: categoryMeta.subcategorySlug,
+          parentCategorySlug: categoryMeta.parentSlug,
+          parentCategoryName: categoryMeta.parentName,
           imageUrl,
           summary: description || brand,
           expiresAt: dealExpiresAt,
