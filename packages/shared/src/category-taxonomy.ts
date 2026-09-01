@@ -19,7 +19,7 @@ export interface SubcategoryDefinition {
   telegramTopicSlug?: string;
 }
 
-export const BLOG_CATEGORIES: BlogCategoryDefinition[] = [
+export const BLOG_CATEGORIES = [
   {
     name: "Bebé y puericultura",
     slug: "bebe",
@@ -197,7 +197,7 @@ export const PRODUCT_SUBCATEGORIES: SubcategoryDefinition[] = [
   { slug: "otros-musica", name: "Música", parentSlug: "otros", telegramTopicSlug: "otros" },
   { slug: "otros-cine", name: "Cine", parentSlug: "otros", telegramTopicSlug: "otros" },
   { slug: "otros-viajes", name: "Viajes", parentSlug: "otros", telegramTopicSlug: "otros" },
-];
+] as const;
 
 export type BlogCategorySlug = (typeof BLOG_CATEGORIES)[number]["slug"];
 
@@ -225,8 +225,7 @@ const SUB_BY_LOOKUP = new Map(
   PRODUCT_SUBCATEGORIES.map((sub) => [subcategoryLookupKey(sub), sub] as const),
 );
 
-/** Slugs legacy (espejo padre-padre o compuesto) → clave de lookup. */
-export const LEGACY_MIRROR_SUBCATEGORY_SLUGS: Record<string, string> = {
+const LEGACY_MIRROR_SUBCATEGORY_SLUGS_MAP = {
   "belleza-belleza": composeSubcategorySlug("belleza", GENERAL_CHILD_SLUG),
   "deportes-deportes": composeSubcategorySlug("deportes", GENERAL_CHILD_SLUG),
   "hogar-hogar": composeSubcategorySlug("hogar", GENERAL_CHILD_SLUG),
@@ -244,7 +243,23 @@ export const LEGACY_MIRROR_SUBCATEGORY_SLUGS: Record<string, string> = {
   ),
   "oficina-oficina": composeSubcategorySlug("oficina", GENERAL_CHILD_SLUG),
   "otros-general": composeSubcategorySlug("otros", GENERAL_CHILD_SLUG),
-};
+} as const;
+
+export type LegacyMirrorSubcategorySlug =
+  keyof typeof LEGACY_MIRROR_SUBCATEGORY_SLUGS_MAP;
+
+/** Slugs legacy (espejo padre-padre o compuesto) → clave de lookup. */
+export const LEGACY_MIRROR_SUBCATEGORY_SLUGS: Record<
+  LegacyMirrorSubcategorySlug,
+  string
+> = LEGACY_MIRROR_SUBCATEGORY_SLUGS_MAP;
+
+function lookupLegacyMirrorSlug(slug: string): string | undefined {
+  if (!(slug in LEGACY_MIRROR_SUBCATEGORY_SLUGS_MAP)) return undefined;
+  return LEGACY_MIRROR_SUBCATEGORY_SLUGS_MAP[
+    slug as LegacyMirrorSubcategorySlug
+  ];
+}
 
 export interface ParsedSubcategorySlug {
   parentSlug: BlogCategorySlug;
@@ -258,11 +273,11 @@ export function parseSubcategorySlug(
 ): ParsedSubcategorySlug | null {
   if (!slug?.trim()) return null;
 
-  const normalized = slug.trim().toLowerCase();
+  const normalized: string = slug.trim().toLowerCase();
   const explicitParent = parentSlug?.trim().toLowerCase() || null;
 
   if (explicitParent && isBlogCategorySlug(explicitParent)) {
-    const legacyKey = LEGACY_MIRROR_SUBCATEGORY_SLUGS[normalized];
+    const legacyKey = lookupLegacyMirrorSlug(normalized);
     if (legacyKey) {
       const sub = SUB_BY_LOOKUP.get(legacyKey);
       if (sub) {
@@ -301,10 +316,10 @@ export function parseSubcategorySlug(
     }
   }
 
-  const legacy = LEGACY_MIRROR_SUBCATEGORY_SLUGS[normalized];
+  const legacy = lookupLegacyMirrorSlug(normalized);
   const lookupCandidate = legacy ?? normalized;
   const sub = SUB_BY_LOOKUP.get(lookupCandidate);
-  if (sub && isBlogCategorySlug(sub.parentSlug)) {
+  if (sub) {
     const child =
       sub.slug === GENERAL_CHILD_SLUG
         ? GENERAL_CHILD_SLUG
@@ -316,29 +331,28 @@ export function parseSubcategorySlug(
     };
   }
 
-  if (isBlogCategorySlug(normalized)) return null;
-
-  const parent = resolveParentSlugFromComposite(normalized);
-  if (!parent) return null;
-
-  const prefix = `${parent}-`;
-  if (!normalized.startsWith(prefix)) return null;
-  const child = normalized.slice(prefix.length);
-  return {
-    parentSlug: parent,
-    childSlug: child || GENERAL_CHILD_SLUG,
-    lookupKey: composeSubcategorySlug(parent, child || GENERAL_CHILD_SLUG),
-  };
+  return parseCompositeSubcategoryTail(normalized as string);
 }
 
-function resolveParentSlugFromComposite(
-  slug: string,
-): BlogCategorySlug | null {
+function parseCompositeSubcategoryTail(
+  normalized: string,
+): ParsedSubcategorySlug | null {
+  if (isBlogCategorySlug(normalized)) return null;
+
   for (const category of BLOG_CATEGORIES) {
-    if (slug.startsWith(`${category.slug}-`)) {
-      return category.slug;
-    }
+    const prefix = `${category.slug}-`;
+    if (!normalized.startsWith(prefix)) continue;
+    const child = normalized.slice(prefix.length);
+    return {
+      parentSlug: category.slug,
+      childSlug: child || GENERAL_CHILD_SLUG,
+      lookupKey: composeSubcategorySlug(
+        category.slug,
+        child || GENERAL_CHILD_SLUG,
+      ),
+    };
   }
+
   return null;
 }
 
@@ -381,7 +395,7 @@ export const LEGACY_PARENT_SLUG_TO_SUBCATEGORY: Record<string, string> = {
   ...DEFAULT_SUBCATEGORY_BY_PARENT,
 };
 
-export function isBlogCategorySlug(slug: string | null | undefined): slug is BlogCategorySlug {
+export function isBlogCategorySlug(slug: string | null | undefined): boolean {
   if (!slug?.trim()) return false;
   return BLOG_BY_SLUG.has(slug.trim().toLowerCase() as BlogCategorySlug);
 }
@@ -410,7 +424,7 @@ export function getSubcategoryByPath(
   const child = childSlug.trim().toLowerCase();
   if (!isBlogCategorySlug(parent)) return null;
 
-  const legacyKey = LEGACY_MIRROR_SUBCATEGORY_SLUGS[`${parent}-${child}`];
+  const legacyKey = lookupLegacyMirrorSlug(`${parent}-${child}`);
   if (legacyKey) return SUB_BY_LOOKUP.get(legacyKey) ?? null;
 
   const lookupKey = composeSubcategorySlug(parent, child);
@@ -430,7 +444,7 @@ export function resolveParentSlug(
 ): BlogCategorySlug | null {
   if (!slug?.trim()) return null;
   const normalized = slug.trim().toLowerCase();
-  if (isBlogCategorySlug(normalized)) return normalized;
+  if (isBlogCategorySlug(normalized)) return normalized as BlogCategorySlug;
   const parsed = parseSubcategorySlug(normalized, parentSlug);
   return parsed?.parentSlug ?? null;
 }
@@ -444,7 +458,7 @@ export function resolveSubcategorySlug(
   const parsed = parseSubcategorySlug(normalized, parentSlug);
   if (parsed) return parsed.lookupKey;
   if (isBlogCategorySlug(normalized)) {
-    return DEFAULT_SUBCATEGORY_BY_PARENT[normalized] ?? null;
+    return DEFAULT_SUBCATEGORY_BY_PARENT[normalized as BlogCategorySlug] ?? null;
   }
   return null;
 }
