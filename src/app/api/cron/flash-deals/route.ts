@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     await assertCronAllowed({ force });
 
     const limitParam = request.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? Number.parseInt(limitParam, 10) : 12;
+    const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
+    const limit =
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
     const feedParam = request.nextUrl.searchParams.get("feeds");
     const feedUrls = feedParam
       ? feedParam.split(",").map((url) => url.trim()).filter(Boolean)
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
     const runMiravia = request.nextUrl.searchParams.get("miravia") !== "0";
 
     const result = await runFlashDealsCheck({
-      limit: Number.isFinite(limit) && limit > 0 ? limit : 12,
+      limit,
       feedUrls,
       injectedAsins,
       allowSimulatedFallback,
@@ -104,12 +106,13 @@ export async function POST(request: NextRequest) {
       notify?: boolean;
       force?: boolean;
       miravia?: boolean;
+      telegramFlush?: boolean;
     };
 
     await assertCronAllowed({ force: body.force });
 
     const result = await runFlashDealsCheck({
-      limit: body.limit ?? 12,
+      limit: body.limit && body.limit > 0 ? body.limit : undefined,
       feedUrls: body.feedUrls,
       injectedAsins: body.injectedAsins,
       allowSimulatedFallback: body.allowSimulatedFallback ?? true,

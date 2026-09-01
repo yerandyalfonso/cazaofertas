@@ -6,6 +6,7 @@ import {
   syntheticAsinForRetailer,
 } from "@/lib/retailers";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
+import { getAppSettings, resolveMiraviaFeedUrlsForRun } from "@/services/appSettings";
 import {
   discoverMiraviaDeals,
   type MiraviaDiscoveredItem,
@@ -15,27 +16,10 @@ import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import { DealLevel, ProductAvailability } from "@/types";
 
-function miraviaDealsEnabled(): boolean {
-  const raw = process.env.MIRAVIA_DEALS_ENABLED?.trim().toLowerCase();
-  if (raw === "0" || raw === "false" || raw === "off") return false;
-  // Por defecto ON: misma cadencia que flash Amazon (cron local).
-  if (raw === undefined || raw === "") return true;
-  return raw === "1" || raw === "true" || raw === "on";
-}
-
-function minMiraviaDiscountPercent(): number {
-  const raw = Number(process.env.MIRAVIA_MIN_DISCOUNT_PERCENT ?? "15");
-  return Number.isFinite(raw) && raw > 0 ? raw : 15;
-}
-
-function miraviaDiscoveryMaxItems(): number {
-  const raw = Number(process.env.MIRAVIA_DISCOVERY_MAX_ITEMS ?? "40");
-  return Number.isFinite(raw) && raw > 0 ? raw : 40;
-}
-
-function miraviaInsertLimitDefault(): number {
-  const raw = Number(process.env.MIRAVIA_FLASH_LIMIT ?? "2");
-  return Number.isFinite(raw) && raw > 0 ? Math.min(5, raw) : 2;
+function miraviaTelegramMinScoreFromSettings(
+  settings: Awaited<ReturnType<typeof getAppSettings>>,
+): number {
+  return settings.miraviaTelegramMinScore;
 }
 
 function slugify(value: string): string {
@@ -83,6 +67,7 @@ export interface MiraviaDealsRunResult {
   };
   processed: number;
   inserted: number;
+  updated: number;
   skippedExisting: number;
   skippedNoDiscount: number;
   channelNotificationsSent: number;
@@ -154,15 +139,19 @@ async function maybeNotifyMiraviaDeal(
  * Pensado para correr junto al cron flash de Amazon (cada ~3 min).
  */
 export async function runMiraviaDealsCheck(options?: {
+  /** Máximo de productos *nuevos* a insertar. */
   limit?: number;
+  /** Máximo de productos ya en catálogo a actualizar (bajadas). */
+  updateLimit?: number;
   feedUrls?: string[];
   notify?: boolean;
   telegramMinScore?: number;
   onlyItems?: MiraviaDiscoveredItem[];
 }): Promise<MiraviaDealsRunResult> {
   const finishedAt = new Date().toISOString();
+  const appSettings = await getAppSettings();
 
-  if (!miraviaDealsEnabled()) {
+  if (!appSettings.miraviaDealsEnabled) {
     return {
       ok: true,
       enabled: false,
@@ -170,6 +159,7 @@ export async function runMiraviaDealsCheck(options?: {
       discovery: { feedsFetched: 0, candidates: 0, feedErrors: [] },
       processed: 0,
       inserted: 0,
+      updated: 0,
       skippedExisting: 0,
       skippedNoDiscount: 0,
       channelNotificationsSent: 0,
@@ -180,12 +170,18 @@ export async function runMiraviaDealsCheck(options?: {
   }
 
   const client = createSupabaseServiceClient();
-  const limit =
+  const insertLimit =
     options?.limit && options.limit > 0
       ? options.limit
-      : miraviaInsertLimitDefault();
+      : appSettings.miraviaFlashLimit;
+  const updateLimit =
+    options?.updateLimit && options.updateLimit > 0
+      ? options.updateLimit
+      : appSettings.miraviaFlashUpdateLimit;
   const shouldNotify = options?.notify ?? true;
-  const minDiscount = minMiraviaDiscountPercent();
+  const minDiscount = appSettings.miraviaMinDiscountPercent;
+  const miraviaTelegramMinScore =
+    options?.telegramMinScore ?? miraviaTelegramMinScoreFromSettings(appSettings);
 
   const discovery = options?.onlyItems?.length
     ? {
@@ -195,11 +191,8 @@ export async function runMiraviaDealsCheck(options?: {
       }
     : await discoverMiraviaDeals({
         feedUrls:
-          options?.feedUrls ??
-          process.env.MIRAVIA_FEED_URLS?.split(/[,\n]/)
-            .map((url) => url.trim())
-            .filter(Boolean),
-        maxItems: miraviaDiscoveryMaxItems(),
+          options?.feedUrls ?? (await resolveMiraviaFeedUrlsForRun()),
+        maxItems: appSettings.miraviaDiscoveryMaxItems,
         minDiscountPercent: minDiscount,
         delayMs: 600,
       });
@@ -223,54 +216,90 @@ export async function runMiraviaDealsCheck(options?: {
       .map((row) => [row.external_id!, row] as const),
   );
 
-  const newCandidates: MiraviaDiscoveredItem[] = [];
-  let skippedExisting = 0;
-
-  for (const item of discovery.items) {
-    if (catalogByExternalId.has(item.externalId)) {
-      skippedExisting += 1;
-      continue;
+  function resolveDealPrices(item: MiraviaDiscoveredItem): {
+    price: number;
+    listPrice: number;
+    discount: number;
+  } | null {
+    if (item.priceHint == null) return null;
+    const price = roundMoney(item.priceHint);
+    let listPrice =
+      item.listPriceHint != null && item.listPriceHint > price
+        ? roundMoney(item.listPriceHint)
+        : null;
+    let discount = computeDiscount(price, listPrice);
+    if (discount < minDiscount && (item.discountHint ?? 0) >= minDiscount) {
+      discount = roundMoney(item.discountHint!);
+      if (listPrice == null) {
+        listPrice = roundMoney(price / (1 - discount / 100));
+      }
     }
-    newCandidates.push(item);
+    if (discount < minDiscount || listPrice == null || listPrice <= price) {
+      return null;
+    }
+    return { price, listPrice, discount };
   }
 
-  const queue = newCandidates.slice(0, limit);
+  const newCandidates: MiraviaDiscoveredItem[] = [];
+  const existingCandidates: Array<{
+    item: MiraviaDiscoveredItem;
+    row: CatalogRow;
+  }> = [];
+  let skippedExistingUnchanged = 0;
+
+  for (const item of discovery.items) {
+    const existing = catalogByExternalId.get(item.externalId);
+    if (!existing) {
+      newCandidates.push(item);
+      continue;
+    }
+    const prices = resolveDealPrices(item);
+    if (!prices) {
+      skippedExistingUnchanged += 1;
+      continue;
+    }
+    const stored = toNumber(existing.current_price);
+    // Solo actualizar/notificar cuando el feed muestra bajada real vs catálogo.
+    const dropped =
+      stored == null || stored - prices.price >= 0.5;
+    if (!dropped) {
+      skippedExistingUnchanged += 1;
+      continue;
+    }
+    existingCandidates.push({ item, row: existing });
+  }
+
+  // Priorizar las bajadas más grandes.
+  existingCandidates.sort((a, b) => {
+    const pa = resolveDealPrices(a.item)?.price ?? 0;
+    const pb = resolveDealPrices(b.item)?.price ?? 0;
+    const sa = toNumber(a.row.current_price) ?? pa;
+    const sb = toNumber(b.row.current_price) ?? pb;
+    return sb - pb - (sa - pa);
+  });
+
+  const insertQueue = newCandidates.slice(0, insertLimit);
+  const updateQueue = existingCandidates.slice(0, updateLimit);
 
   let processed = 0;
   let inserted = 0;
+  let updated = 0;
   let skippedNoDiscount = 0;
   let channelNotificationsSent = 0;
   let channelNotificationsSkipped = 0;
   let channelNotificationsQueued = 0;
   const errors: Array<{ externalId: string; message: string }> = [];
 
-  for (const item of queue) {
+  for (const item of insertQueue) {
     processed += 1;
 
     try {
-      if (item.priceHint == null) {
+      const prices = resolveDealPrices(item);
+      if (!prices) {
         skippedNoDiscount += 1;
         continue;
       }
-
-      const price = roundMoney(item.priceHint);
-      let listPrice =
-        item.listPriceHint != null && item.listPriceHint > price
-          ? roundMoney(item.listPriceHint)
-          : null;
-
-      let discount = computeDiscount(price, listPrice);
-      if (discount < minDiscount && (item.discountHint ?? 0) >= minDiscount) {
-        discount = roundMoney(item.discountHint!);
-        if (listPrice == null) {
-          listPrice = roundMoney(price / (1 - discount / 100));
-        }
-      }
-
-      if (discount < minDiscount || listPrice == null || listPrice <= price) {
-        skippedNoDiscount += 1;
-        continue;
-      }
+      const { price, listPrice, discount } = prices;
 
       const title =
         item.titleHint?.trim() || `Producto Miravia ${item.externalId}`;
@@ -339,39 +368,153 @@ export async function runMiraviaDealsCheck(options?: {
       });
 
       if (shouldNotify) {
-        const channelMinScore = options?.telegramMinScore ?? 75;
-        const qualifiesChannel = scoring.score >= channelMinScore;
-        const isDeal = scoring.level !== DealLevel.NORMAL;
-        if (isDeal || qualifiesChannel) {
-          const affiliateUrl = resolveProductBuyUrl(insertRow);
+        const channelMinScore = miraviaTelegramMinScore;
+        const affiliateUrl = resolveProductBuyUrl(insertRow);
 
-          const notifyResult = await maybeNotifyMiraviaDeal(client, {
-            productId: insertedRow.id,
-            syntheticAsin,
-            title,
-            slug: insertedRow.slug,
-            currentPrice: price,
-            previousPrice: listPrice,
-            discountPercentage: discount,
-            score: scoring.score,
-            dealLevel: scoring.level,
-            dealLabel: scoring.label,
-            productUrl,
-            affiliateUrl,
-            brand: "Miravia",
-            imageUrl: item.imageUrlHint,
-            categoryId: categoryMeta.categoryId,
-            categoryName: categoryMeta.subcategoryName,
-            categorySlug: categoryMeta.subcategorySlug,
-            parentCategorySlug: categoryMeta.parentSlug,
-            parentCategoryName: categoryMeta.parentName,
-            telegramMinScore: channelMinScore,
-          });
-          if (notifyResult === "queued") channelNotificationsQueued += 1;
-          else if (notifyResult === "sent") channelNotificationsSent += 1;
-          else if (notifyResult === "skipped") {
-            channelNotificationsSkipped += 1;
-          }
+        const notifyResult = await maybeNotifyMiraviaDeal(client, {
+          productId: insertedRow.id,
+          syntheticAsin,
+          title,
+          slug: insertedRow.slug,
+          currentPrice: price,
+          previousPrice: listPrice,
+          discountPercentage: discount,
+          score: scoring.score,
+          dealLevel: scoring.level,
+          dealLabel: scoring.label,
+          productUrl,
+          affiliateUrl,
+          brand: "Miravia",
+          imageUrl: item.imageUrlHint,
+          categoryId: categoryMeta.categoryId,
+          categoryName: categoryMeta.subcategoryName,
+          categorySlug: categoryMeta.subcategorySlug,
+          parentCategorySlug: categoryMeta.parentSlug,
+          parentCategoryName: categoryMeta.parentName,
+          telegramMinScore: channelMinScore,
+        });
+        if (notifyResult === "queued") channelNotificationsQueued += 1;
+        else if (notifyResult === "sent") channelNotificationsSent += 1;
+        else if (notifyResult === "skipped") {
+          channelNotificationsSkipped += 1;
+        }
+      }
+    } catch (error) {
+      errors.push({
+        externalId: item.externalId,
+        message: error instanceof Error ? error.message : "Error desconocido",
+      });
+    }
+  }
+
+  for (const { item, row } of updateQueue) {
+    processed += 1;
+    try {
+      const prices = resolveDealPrices(item);
+      if (!prices) {
+        skippedNoDiscount += 1;
+        continue;
+      }
+      const { price, listPrice, discount } = prices;
+      const storedCurrent = toNumber(row.current_price);
+      const previousForNotify =
+        storedCurrent != null && storedCurrent > price
+          ? storedCurrent
+          : listPrice;
+      const now = new Date().toISOString();
+      const lowest =
+        toNumber(row.lowest_price) == null
+          ? price
+          : roundMoney(Math.min(toNumber(row.lowest_price)!, price));
+      const highest = roundMoney(
+        Math.max(
+          toNumber(row.highest_price) ?? price,
+          price,
+          listPrice,
+          storedCurrent ?? price,
+        ),
+      );
+
+      const scoring = dealScoringService.scoreProduct({
+        currentPrice: price,
+        previousPrice: previousForNotify,
+        lowestPrice: lowest,
+        categorySlug: undefined,
+      });
+
+      const { error: updateError } = await client
+        .from("products")
+        .update({
+          current_price: price,
+          previous_price: previousForNotify,
+          discount_percentage: discount,
+          lowest_price: lowest,
+          highest_price: highest,
+          availability: ProductAvailability.IN_STOCK,
+          last_checked_at: now,
+          updated_at: now,
+          ...(item.imageUrlHint ? { image_url: item.imageUrlHint } : {}),
+          ...(item.titleHint?.trim() ? { title: item.titleHint.trim() } : {}),
+          product_url: item.productUrl,
+          amazon_url: item.productUrl,
+          affiliate_url: item.productUrl,
+        })
+        .eq("id", row.id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      await client.from("price_history").insert({
+        product_id: row.id,
+        price,
+        source: "miravia",
+      });
+      updated += 1;
+
+      if (shouldNotify) {
+        const channelMinScore = miraviaTelegramMinScore;
+        const dropPct =
+          previousForNotify > price
+            ? ((previousForNotify - price) / previousForNotify) * 100
+            : 0;
+        const subcategorySlug = inferProductSubcategorySlug({
+          title: item.titleHint ?? row.title,
+        });
+        const categoryMeta = await resolveCategoryMetaForDeal(
+          client,
+          subcategorySlug,
+        );
+        const notifyResult = await maybeNotifyMiraviaDeal(client, {
+          productId: row.id,
+          syntheticAsin: row.asin,
+          title: item.titleHint?.trim() || row.title,
+          slug: row.slug,
+          currentPrice: price,
+          previousPrice: previousForNotify,
+          discountPercentage: Math.max(discount, roundMoney(dropPct)),
+          score: scoring.score,
+          dealLevel: scoring.level,
+          dealLabel: scoring.label,
+          productUrl: item.productUrl,
+          affiliateUrl: resolveProductBuyUrl({
+            retailer: "miravia",
+            product_url: item.productUrl,
+            amazon_url: item.productUrl,
+            affiliate_url: item.productUrl,
+            asin: row.asin,
+          }),
+          brand: row.brand ?? "Miravia",
+          imageUrl: item.imageUrlHint ?? row.image_url,
+          categoryId: categoryMeta.categoryId ?? row.category_id,
+          categoryName: categoryMeta.subcategoryName,
+          categorySlug: categoryMeta.subcategorySlug,
+          parentCategorySlug: categoryMeta.parentSlug,
+          parentCategoryName: categoryMeta.parentName,
+          telegramMinScore: channelMinScore,
+        });
+        if (notifyResult === "queued") channelNotificationsQueued += 1;
+        else if (notifyResult === "sent") channelNotificationsSent += 1;
+        else if (notifyResult === "skipped") {
+          channelNotificationsSkipped += 1;
         }
       }
     } catch (error) {
@@ -393,7 +536,8 @@ export async function runMiraviaDealsCheck(options?: {
     },
     processed,
     inserted,
-    skippedExisting,
+    updated,
+    skippedExisting: skippedExistingUnchanged,
     skippedNoDiscount,
     channelNotificationsSent,
     channelNotificationsSkipped,

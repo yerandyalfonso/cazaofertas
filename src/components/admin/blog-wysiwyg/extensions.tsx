@@ -274,6 +274,78 @@ function BlogProsConsView({
   );
 }
 
+function BlogFaqView({ node, updateAttributes, deleteNode }: NodeViewProps) {
+  const title = String(node.attrs.title ?? "Preguntas frecuentes");
+  const items: Array<{ question: string; answer: string }> = Array.isArray(
+    node.attrs.items,
+  )
+    ? node.attrs.items
+    : [{ question: "", answer: "" }];
+
+  function setItems(next: Array<{ question: string; answer: string }>) {
+    updateAttributes({
+      items: next.length > 0 ? next : [{ question: "", answer: "" }],
+    });
+  }
+
+  return (
+    <AtomChrome label="Preguntas frecuentes (FAQ)" deleteNode={deleteNode}>
+      <div className="space-y-3" contentEditable={false}>
+        <input
+          value={title}
+          onChange={(event) => updateAttributes({ title: event.target.value })}
+          placeholder="Título de la sección"
+          className="h-9 w-full border border-stone-300 bg-white px-3 text-sm font-medium outline-none focus:border-ink"
+        />
+        {items.map((item, idx) => (
+          <div
+            key={`faq-${idx}`}
+            className="space-y-2 border border-stone-200 bg-white p-3"
+          >
+            <input
+              value={item.question}
+              onChange={(event) => {
+                const next = [...items];
+                next[idx] = { ...next[idx]!, question: event.target.value };
+                setItems(next);
+              }}
+              placeholder={`Pregunta ${idx + 1}`}
+              className="h-9 w-full border border-stone-300 px-3 text-sm outline-none focus:border-ink"
+            />
+            <textarea
+              value={item.answer}
+              onChange={(event) => {
+                const next = [...items];
+                next[idx] = { ...next[idx]!, answer: event.target.value };
+                setItems(next);
+              }}
+              rows={3}
+              placeholder="Respuesta"
+              className="w-full border border-stone-300 px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+            <button
+              type="button"
+              onClick={() => setItems(items.filter((_, i) => i !== idx))}
+              className="text-xs font-semibold text-rose-700 hover:underline"
+            >
+              Quitar pregunta
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setItems([...items, { question: "", answer: "" }])
+          }
+          className="text-xs font-semibold text-teal-800 hover:underline"
+        >
+          + Añadir pregunta
+        </button>
+      </div>
+    </AtomChrome>
+  );
+}
+
 export const BlogImage = Node.create({
   name: "blogImage",
   group: "block",
@@ -371,5 +443,27 @@ export const BlogProsCons = Node.create({
   },
   addNodeView() {
     return ReactNodeViewRenderer(BlogProsConsView);
+  },
+});
+
+export const BlogFaq = Node.create({
+  name: "blogFaq",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      title: { default: "Preguntas frecuentes" },
+      items: { default: [{ question: "", answer: "" }] },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="blog-faq"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes, { "data-type": "blog-faq" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(BlogFaqView);
   },
 });

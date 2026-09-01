@@ -4,6 +4,9 @@ import {
   type AmazonCategoryInferenceInput,
 } from "@/lib/product-category-inference";
 import {
+  DEFAULT_SUBCATEGORY_BY_PARENT,
+  GENERAL_CHILD_SLUG,
+  parseSubcategorySlug,
   resolveCategoryDisplayMeta,
   resolveParentSlug,
 } from "@/lib/category-taxonomy";
@@ -15,17 +18,60 @@ export type { SiteCategorySlug };
 export async function resolveCategoryIdBySlug(
   client: TypedSupabaseClient,
   slug: string | null | undefined,
+  options?: { parentSlug?: string | null },
 ): Promise<{ id: string; name: string; slug: string; parent_id: string | null } | null> {
   if (!slug?.trim()) return null;
 
-  const { data } = await client
+  const parsed = parseSubcategorySlug(slug, options?.parentSlug);
+  if (!parsed) {
+    const { data } = await client
+      .from("categories")
+      .select("id, name, slug, parent_id")
+      .eq("slug", slug.trim())
+      .is("parent_id", null)
+      .eq("is_active", true)
+      .maybeSingle();
+    return data ?? null;
+  }
+
+  const { data: parent } = await client
     .from("categories")
-    .select("id, name, slug, parent_id")
-    .eq("slug", slug.trim())
+    .select("id")
+    .eq("slug", parsed.parentSlug)
+    .is("parent_id", null)
     .eq("is_active", true)
     .maybeSingle();
 
-  return data ?? null;
+  if (!parent?.id) return null;
+
+  const { data: childRow } = await client
+    .from("categories")
+    .select("id, name, slug, parent_id")
+    .eq("parent_id", parent.id)
+    .eq("slug", parsed.childSlug)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (childRow) return childRow;
+
+  const legacySlugs = [parsed.lookupKey];
+  if (parsed.childSlug === GENERAL_CHILD_SLUG) {
+    legacySlugs.push(
+      `${parsed.parentSlug}-${GENERAL_CHILD_SLUG}`,
+      `${parsed.parentSlug}-${parsed.parentSlug}`,
+    );
+  }
+
+  for (const legacySlug of legacySlugs) {
+    const { data: legacyRow } = await client
+      .from("categories")
+      .select("id, name, slug, parent_id")
+      .eq("slug", legacySlug)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (legacyRow) return legacyRow;
+  }
+
+  return null;
 }
 
 export async function resolveProductCategoryId(
@@ -56,11 +102,14 @@ export async function resolveCategoryMetaForDeal(
   parentSlug: SiteCategorySlug;
   parentName: string;
 }> {
-  const normalized = normalizeCategorySlugForStorage(slug);
-  const row = await resolveCategoryIdBySlug(client, normalized);
+  const lookupKey = normalizeCategorySlugForStorage(slug);
+  const parsed =
+    parseSubcategorySlug(slug) ?? parseSubcategorySlug(lookupKey);
+  const row = await resolveCategoryIdBySlug(client, slug ?? lookupKey);
   const display =
-    resolveCategoryDisplayMeta(normalized) ??
-    resolveCategoryDisplayMeta("otros-general")!;
+    resolveCategoryDisplayMeta(row?.slug ?? lookupKey, parsed?.parentSlug) ??
+    resolveCategoryDisplayMeta(lookupKey) ??
+    resolveCategoryDisplayMeta(DEFAULT_SUBCATEGORY_BY_PARENT.otros)!;
 
   return {
     categoryId: row?.id ?? null,

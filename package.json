@@ -2,8 +2,19 @@
   "name": "cazaofertas",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3000 --hostname 127.0.0.1",
+    "dev:caza": "next dev --port 3000 --hostname 127.0.0.1",
+    "dev:chollos": "npm run dev -w chollosdehoy",
+    "dev:all": "concurrently -n caza,chollos -c blue,green \"npm run dev:caza\" \"npm run dev:chollos\"",
+    "setup:chollos-env": "bash scripts/sync-chollos-env.sh",
+    "deploy:chollos": "bash scripts/deploy-chollos.sh",
+    "build:chollos": "npm run build -w chollosdehoy",
+    "build:all": "npm run build && npm run build:chollos",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -22,11 +33,15 @@
     "cron:local:install": "bash scripts/local-cron/install-macos.sh",
     "cron:local:uninstall": "bash scripts/local-cron/uninstall-macos.sh",
     "cron:local:test-notify": "tsx --env-file=.env.local scripts/local-cron/test-notify.ts",
-    "cron:local:test-facebook": "tsx --env-file=.env.local scripts/local-cron/test-facebook.ts"
+    "cron:local:test-facebook": "tsx --env-file=.env.local scripts/local-cron/test-facebook.ts",
+    "cron:local:coupons": "npm run cron:local -- coupons-discover",
+    "coupons:discover": "tsx --env-file=.env.local scripts/coupon-discovery/run.ts"
   },
   "dependencies": {
+    "@cazaofertas/shared": "*",
     "@supabase/supabase-js": "^2.112.4",
     "@tiptap/extension-blockquote": "^3.30.5",
+    "@tiptap/extension-link": "^3.30.5",
     "@tiptap/extension-placeholder": "^3.30.5",
     "@tiptap/pm": "^3.30.5",
     "@tiptap/react": "^3.30.5",
@@ -47,6 +62,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",

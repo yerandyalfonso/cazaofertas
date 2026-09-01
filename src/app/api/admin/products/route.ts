@@ -35,6 +35,64 @@ function slugify(value: string): string {
     .slice(0, 80);
 }
 
+const ADMIN_PRODUCT_SORT_KEYS = [
+  "title",
+  "asin",
+  "currentPrice",
+  "referencePrice",
+  "dealScore",
+  "category",
+  "lastCheckedAt",
+] as const;
+
+type AdminProductSortKey = (typeof ADMIN_PRODUCT_SORT_KEYS)[number];
+
+function escapeIlike(value: string): string {
+  return value.replace(/[%_\\]/g, "\\$&");
+}
+
+function resolveProductSort(
+  sort: string | null,
+  dir: string | null,
+): {
+  column: string;
+  ascending: boolean;
+  nullsFirst: boolean;
+  foreignTable?: string;
+} {
+  const key = ADMIN_PRODUCT_SORT_KEYS.includes(sort as AdminProductSortKey)
+    ? (sort as AdminProductSortKey)
+    : "lastCheckedAt";
+  const ascending = dir === "asc";
+
+  switch (key) {
+    case "title":
+      return { column: "title", ascending, nullsFirst: false };
+    case "asin":
+      return { column: "asin", ascending, nullsFirst: false };
+    case "currentPrice":
+      return { column: "current_price", ascending, nullsFirst: false };
+    case "referencePrice":
+      return { column: "previous_price", ascending, nullsFirst: ascending };
+    case "dealScore":
+      return { column: "discount_percentage", ascending, nullsFirst: ascending };
+    case "category":
+      return {
+        column: "name",
+        ascending,
+        nullsFirst: ascending,
+        foreignTable: "categories",
+      };
+    case "lastCheckedAt":
+    default:
+      return {
+        column: "last_checked_at",
+        ascending,
+        nullsFirst: ascending,
+      };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const denied = requireAdminApi(request);
@@ -51,11 +109,63 @@ export async function GET(request: NextRequest) {
     const offset =
       Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 
-    const { data, error, count } = await client
+    const sort = resolveProductSort(
+      searchParams.get("sort"),
+      searchParams.get("dir"),
+    );
+    const q = searchParams.get("q")?.trim() ?? "";
+    const categoryId = searchParams.get("category")?.trim() ?? "";
+    const retailer = searchParams.get("retailer")?.trim() ?? "";
+    const stale = searchParams.get("stale")?.trim() ?? "all";
+    const deal = searchParams.get("deal")?.trim() ?? "all";
+    const staleCutoff = new Date(Date.now() - 48 * 3_600_000).toISOString();
+
+    let query = client
       .from("products")
-      .select("*, categories(id, name, slug)", { count: "exact" })
-      .order("updated_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .select("*, categories(id, name, slug)", { count: "exact" });
+
+    if (categoryId) {
+      query = query.eq("category_id", categoryId);
+    }
+    if (retailer) {
+      query = query.eq("retailer", retailer);
+    }
+    if (q) {
+      const needle = escapeIlike(q);
+      query = query.or(
+        `title.ilike.%${needle}%,asin.ilike.%${needle}%,brand.ilike.%${needle}%,external_id.ilike.%${needle}%`,
+      );
+    }
+    if (stale === "never") {
+      query = query.is("last_checked_at", null);
+    } else if (stale === "fresh") {
+      query = query.gte("last_checked_at", staleCutoff);
+    } else if (stale === "stale") {
+      query = query.or(
+        `last_checked_at.is.null,last_checked_at.lt.${staleCutoff}`,
+      );
+    }
+    if (deal === "offer") {
+      query = query
+        .eq("is_active", true)
+        .neq("availability", ProductAvailability.OUT_OF_STOCK)
+        .gte("discount_percentage", 5);
+    } else if (deal === "normal") {
+      query = query.or(
+        `discount_percentage.lt.5,discount_percentage.is.null,is_active.eq.false,availability.eq.${ProductAvailability.OUT_OF_STOCK}`,
+      );
+    }
+
+    query = query.order(sort.column, {
+      ascending: sort.ascending,
+      nullsFirst: sort.nullsFirst,
+      ...(sort.foreignTable ? { foreignTable: sort.foreignTable } : {}),
+    });
+
+    const { data, error, count } = await query.range(
+      offset,
+      offset + limit - 1,
+    );
 
     if (error) {
       throw new Error(error.message);

@@ -1,9 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
-import { getAppSettings, updateAppSettings } from "@/services/appSettings";
+import { parseFeedUrlsText } from "@/lib/feed-urls";
+import {
+  type AppSettingsPatch,
+  getAppSettings,
+  updateAppSettings,
+} from "@/services/appSettings";
 
 export const runtime = "nodejs";
+
+function parseNumber(
+  value: unknown,
+  field: string,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (value === undefined || value === "") {
+    return { ok: false, error: `${field} es obligatorio.` };
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return { ok: false, error: `${field} no es un número válido.` };
+  }
+  return { ok: true, value: parsed };
+}
+
+function parseOptionalNumber(
+  value: unknown,
+  field: string,
+): { ok: true; value?: number } | { ok: false; error: string } {
+  if (value === undefined || value === "") return { ok: true };
+  return parseNumber(value, field);
+}
+
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  if (value === "1" || value === "true" || value === "on") return true;
+  if (value === "0" || value === "false" || value === "off") return false;
+  return undefined;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,44 +60,72 @@ export async function PATCH(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
 
-    const body = (await request.json().catch(() => ({}))) as {
-      telegramMinScore?: number | string;
-      telegramBatchHours?: number | string;
-    };
+    const body = (await request.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
 
-    const patch: {
-      telegramMinScore?: number;
-      telegramBatchHours?: number;
-    } = {};
+    const patch: AppSettingsPatch = {};
+    const numericFields: Array<keyof AppSettingsPatch> = [
+      "telegramMinScore",
+      "miraviaTelegramMinScore",
+      "kiabiTelegramMinScore",
+      "telegramBatchHours",
+      "telegramFlushRescheduleMinutes",
+      "telegramFlushLimit",
+      "amazonFlashInsertLimit",
+      "amazonDepartmentFeedsPerRun",
+      "miraviaMinDiscountPercent",
+      "miraviaDiscoveryMaxItems",
+      "miraviaFlashLimit",
+      "miraviaFlashUpdateLimit",
+      "miraviaFeedsPerRun",
+      "kiabiMinDiscountPercent",
+      "kiabiDiscoveryMaxItems",
+      "kiabiFeedsPerRun",
+    ];
 
-    if (body.telegramMinScore !== undefined && body.telegramMinScore !== "") {
-      const parsed = Number(body.telegramMinScore);
-      if (!Number.isFinite(parsed)) {
+    for (const field of numericFields) {
+      const parsed = parseOptionalNumber(body[field], field);
+      if (!parsed.ok) {
         return NextResponse.json(
-          { ok: false, error: "telegramMinScore no es un número válido." },
+          { ok: false, error: parsed.error },
           { status: 400 },
         );
       }
-      patch.telegramMinScore = parsed;
-    }
-
-    if (
-      body.telegramBatchHours !== undefined &&
-      body.telegramBatchHours !== ""
-    ) {
-      const parsed = Number(body.telegramBatchHours);
-      if (!Number.isFinite(parsed)) {
-        return NextResponse.json(
-          { ok: false, error: "telegramBatchHours no es un número válido." },
-          { status: 400 },
-        );
+      if (parsed.value !== undefined) {
+        patch[field] = parsed.value as never;
       }
-      patch.telegramBatchHours = parsed;
     }
 
-    if (patch.telegramMinScore === undefined && patch.telegramBatchHours === undefined) {
+    if (body.amazonAssociateTag !== undefined) {
+      patch.amazonAssociateTag = String(body.amazonAssociateTag ?? "").trim();
+    }
+
+    const feedFields = [
+      "amazonFlashFeedUrls",
+      "miraviaFeedUrls",
+      "kiabiFeedUrls",
+    ] as const;
+    for (const field of feedFields) {
+      if (body[field] !== undefined) {
+        patch[field] = parseFeedUrlsText(String(body[field] ?? ""));
+      }
+    }
+
+    const boolFields = [
+      "miraviaDealsEnabled",
+      "kiabiDealsEnabled",
+      "kiabiNewProductsOnly",
+    ] as const;
+    for (const field of boolFields) {
+      const parsed = parseOptionalBoolean(body[field]);
+      if (parsed !== undefined) patch[field] = parsed;
+    }
+
+    if (Object.keys(patch).length === 0) {
       return NextResponse.json(
-        { ok: false, error: "Indica telegramMinScore o telegramBatchHours." },
+        { ok: false, error: "No hay campos válidos para actualizar." },
         { status: 400 },
       );
     }

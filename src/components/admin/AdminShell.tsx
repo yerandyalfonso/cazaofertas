@@ -9,9 +9,11 @@ import { AdminToastProvider } from "@/components/admin/AdminToast";
 const NAV = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/products", label: "Productos" },
+  { href: "/admin/coupons", label: "Cupones" },
   { href: "/admin/categories", label: "Categorías" },
   { href: "/admin/articles", label: "Artículos" },
-  { href: "/admin/cron", label: "Monitorización / Cron" },
+  { href: "/admin/comments", label: "Comentarios" },
+  { href: "/admin/cron", label: "Operaciones" },
   { href: "/admin/social", label: "Redes / Tarjetas" },
   { href: "/admin/carousels", label: "Carruseles" },
 ] as const;
@@ -42,16 +44,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             : item.href === "/admin/social"
               ? pathname.startsWith("/admin/social") ||
                 pathname.startsWith("/admin/videos")
-              : pathname.startsWith(item.href);
+              : item.href === "/admin/cron"
+                ? pathname.startsWith("/admin/cron") ||
+                  pathname.startsWith("/admin/settings")
+                : pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={() => setOpen(false)}
-            className={`rounded-sm px-3 py-2.5 text-sm font-medium transition ${
-              active
-                ? "bg-ink text-paper"
-                : "text-stone-600 hover:bg-stone-100 hover:text-ink"
+            className={`admin-nav-link ${
+              active ? "admin-nav-link--active" : "text-[var(--text-muted)]"
             }`}
           >
             {item.label}
@@ -62,10 +65,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   );
 
   const footer = (
-    <div className="space-y-2 border-t border-stone-200 p-4">
+    <div className="space-y-2 border-t border-[var(--border)] p-4">
       <Link
         href="/"
-        className="block text-xs text-stone-500 underline-offset-2 hover:text-ink hover:underline"
+        className="block text-xs text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text)] hover:underline"
       >
         Ver web pública
       </Link>
@@ -73,7 +76,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         type="button"
         onClick={() => void onLogout()}
         disabled={loggingOut}
-        className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 hover:text-ink disabled:opacity-50"
+        className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50"
       >
         {loggingOut ? "Saliendo…" : "Cerrar sesión"}
       </button>
@@ -82,32 +85,36 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminToastProvider>
-      <div className="flex min-h-screen bg-stone-100 text-ink">
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-stone-300 bg-white md:flex">
-          <div className="border-b border-stone-200 px-5 py-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-teal-800">
+      <div className="admin-shell flex min-h-screen">
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] md:flex">
+          <div className="border-b border-[var(--border)] px-5 py-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
               Admin
             </p>
-            <p className="mt-1 font-display text-xl tracking-tight">CazaOferta</p>
+            <p className="mt-1 text-xl font-bold tracking-tight text-[var(--text)]">
+              CazaOferta
+            </p>
           </div>
           {nav}
           {footer}
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between border-b border-stone-300 bg-white px-4 py-3 md:hidden">
-            <p className="font-display text-lg tracking-tight">Admin</p>
+          <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
+            <p className="text-lg font-bold tracking-tight text-[var(--text)]">
+              Admin
+            </p>
             <button
               type="button"
               aria-label={open ? "Cerrar menú" : "Abrir menú"}
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex h-9 w-9 items-center justify-center border border-stone-300"
+              className="admin-icon-btn"
             >
               {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
           </div>
           {open ? (
-            <div className="border-b border-stone-300 bg-white md:hidden">
+            <div className="border-b border-[var(--border)] bg-[var(--surface)] md:hidden">
               {nav}
               {footer}
             </div>

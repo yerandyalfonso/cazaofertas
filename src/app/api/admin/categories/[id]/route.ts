@@ -27,6 +27,7 @@ export async function PATCH(
       description?: string;
       image_url?: string;
       is_active?: boolean;
+      show_in_blog?: boolean;
     };
 
     const patch: {
@@ -35,6 +36,7 @@ export async function PATCH(
       description?: string | null;
       image_url?: string | null;
       is_active?: boolean;
+      show_in_blog?: boolean;
     } = {};
     if (body.name !== undefined) {
       const name = body.name.trim();
@@ -65,6 +67,9 @@ export async function PATCH(
     if (body.is_active !== undefined) {
       patch.is_active = Boolean(body.is_active);
     }
+    if (body.show_in_blog !== undefined) {
+      patch.show_in_blog = Boolean(body.show_in_blog);
+    }
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json(
@@ -78,7 +83,9 @@ export async function PATCH(
       .from("categories")
       .update(patch)
       .eq("id", id)
-      .select("id, name, slug, description, image_url, is_active, created_at")
+      .select(
+        "id, name, slug, description, image_url, is_active, created_at, parent_id, show_in_blog",
+      )
       .single();
 
     if (error) throw new Error(error.message);

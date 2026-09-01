@@ -13,6 +13,7 @@ import {
   inferRetailerFromAsin,
   productHasRetailMonitorableUrl,
 } from "@/services/products";
+import { clearAsinScrapeFailure } from "@/services/asinScrapeFailures";
 import { previewProductPage } from "@/services/productScrape";
 import { isRetailBlockedError } from "@/lib/retail-url-utils";
 import type { PriceSource } from "@/types";
@@ -157,6 +158,14 @@ export async function runRetailPriceCheck(options?: {
             ? "La tienda bloqueó el scrape (anti-bot)."
             : "La tienda no devolvió precio para este producto.",
         });
+        // Rotar: si no tocamos last_checked, el mismo producto monopoliza el lote.
+        await client
+          .from("products")
+          .update({
+            last_checked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", product.id);
         continue;
       }
 
@@ -225,6 +234,8 @@ export async function runRetailPriceCheck(options?: {
       } else {
         stats.unchanged += 1;
       }
+
+      await clearAsinScrapeFailure(product.asin);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error desconocido";
       if (/agotado|out_of_stock/i.test(message)) {

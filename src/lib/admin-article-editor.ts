@@ -191,6 +191,27 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
       {
         type: "heading",
         level: 2,
+        text: "Preguntas frecuentes",
+      },
+      {
+        type: "faq",
+        title: "Preguntas frecuentes",
+        items: [
+          {
+            question: "¿Cuál es el error más común al comprar?",
+            answer:
+              "Fijarse solo en el porcentaje del cartel sin contrastar con el precio de las últimas semanas.",
+          },
+          {
+            question: "¿Merece la pena esperar a una rebaja mayor?",
+            answer:
+              "Si el precio ya está cerca del mínimo histórico y el producto encaja con tu uso, suele ser buen momento.",
+          },
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
         text: "Recomendación final",
       },
       {
@@ -264,6 +285,7 @@ export type EditorBlockKind =
   | "divider"
   | "image"
   | "prosCons"
+  | "faq"
   | "product"
   | "productGrid";
 
@@ -296,6 +318,11 @@ export type EditorBlock =
       title?: string;
       pros: string[];
       cons: string[];
+    })
+  | (EditorBlockBase & {
+      type: "faq";
+      title?: string;
+      items: Array<{ question: string; answer: string }>;
     })
   | (EditorBlockBase & { type: "product"; slug: string })
   | (EditorBlockBase & { type: "productGrid"; slugs: string[] });
@@ -345,6 +372,16 @@ export function blogBlocksToEditor(blocks: BlogBlock[]): EditorBlock[] {
           title: block.title,
           pros: [...block.pros],
           cons: [...block.cons],
+        };
+      case "faq":
+        return {
+          id,
+          type: "faq",
+          title: block.title,
+          items: block.items.map((item) => ({
+            question: item.question,
+            answer: item.answer,
+          })),
         };
       case "product":
         return { id, type: "product", slug: block.slug };
@@ -416,6 +453,22 @@ export function editorBlocksToBlog(blocks: EditorBlock[]): BlogBlock[] {
         }
         break;
       }
+      case "faq": {
+        const items = block.items
+          .map((item) => ({
+            question: item.question.trim(),
+            answer: item.answer.trim(),
+          }))
+          .filter((item) => item.question && item.answer);
+        if (items.length > 0) {
+          result.push({
+            type: "faq",
+            title: block.title?.trim() || "Preguntas frecuentes",
+            items,
+          });
+        }
+        break;
+      }
       case "product":
         if (block.slug.trim()) {
           result.push({ type: "product", slug: block.slug.trim() });
@@ -459,6 +512,13 @@ export function emptyEditorBlock(kind: EditorBlockKind): EditorBlock {
       return { id, type: "image", src: "", alt: "" };
     case "prosCons":
       return { id, type: "prosCons", title: "Pros y contras", pros: [""], cons: [""] };
+    case "faq":
+      return {
+        id,
+        type: "faq",
+        title: "Preguntas frecuentes",
+        items: [{ question: "", answer: "" }],
+      };
     case "product":
       return { id, type: "product", slug: "" };
     case "productGrid":
@@ -501,6 +561,11 @@ export function getTemplateStyleOutline(template: BlogTemplate): {
         return {
           kind: "Pros / Contras",
           text: `Pros: ${block.pros.join(" · ")} / Contras: ${block.cons.join(" · ")}`,
+        };
+      case "faq":
+        return {
+          kind: "FAQ",
+          text: block.items.map((item) => item.question).join(" · "),
         };
       case "divider":
         return { kind: "Separador", text: "—" };

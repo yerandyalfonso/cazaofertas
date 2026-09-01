@@ -10,6 +10,10 @@ import {
   categorySeoCopy,
   itemListJsonLd,
 } from "@/lib/seo";
+import {
+  categoryPublicPath,
+  PRODUCT_SUBCATEGORIES,
+} from "@/lib/site-categories";
 import { telegramAlertForCategorySlug } from "@/lib/telegram-links";
 
 interface CategoryPageProps {
@@ -65,6 +69,9 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
     .sort((a, b) => b.dealScore - a.dealScore);
   const copy = categorySeoCopy(category.slug, category.name);
   const intro = category.description?.trim() || copy.intro;
+  const subcategories = PRODUCT_SUBCATEGORIES.filter(
+    (sub) => sub.parentSlug === slug,
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
@@ -117,6 +124,23 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
           Alerta Telegram · {category.name}
         </a>
       </section>
+
+      {subcategories.length > 0 ? (
+        <nav
+          className="mt-10 flex flex-wrap gap-2"
+          aria-label="Subcategorías"
+        >
+          {subcategories.map((sub) => (
+            <Link
+              key={`${category.slug}-${sub.slug}`}
+              href={categoryPublicPath(category.slug, sub.slug)}
+              className="border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:border-ink hover:text-ink"
+            >
+              {sub.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
 
       {filtered.length > 0 ? (
         <div className="mt-12 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">

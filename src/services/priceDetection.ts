@@ -19,6 +19,7 @@ import {
   type ChannelNotifyResult,
 } from "@/services/telegram";
 import { productHasMonitorableUrl } from "@/services/products";
+import { clearAsinScrapeFailure } from "@/services/asinScrapeFailures";
 import {
   MockPriceProvider,
   type MockPriceMode,
@@ -33,6 +34,18 @@ import {
 import type { ProductRow } from "@/types/database";
 
 const DEFAULT_BATCH_SIZE = 25;
+
+/** Avanza rotación aunque falle el scrape (si no, el ASIN queda siempre el primero). */
+async function touchLastCheckedOnScrapeMiss(
+  client: TypedSupabaseClient,
+  productId: string,
+  nowIso: string,
+): Promise<void> {
+  await client
+    .from("products")
+    .update({ last_checked_at: nowIso, updated_at: nowIso })
+    .eq("id", productId);
+}
 
 async function refreshProductAverages(
   client: TypedSupabaseClient,
@@ -330,6 +343,8 @@ export async function runPriceDetection(
       const quote = quotesByAsin.get(product.asin);
 
       if (!quote) {
+        const nowMiss = new Date().toISOString();
+        await touchLastCheckedOnScrapeMiss(client, product.id, nowMiss);
         stats.errors.push({
           asin: product.asin,
           message: "El proveedor no devolvió precio para este ASIN.",
@@ -359,6 +374,7 @@ export async function runPriceDetection(
             message: unavailableError.message,
           });
         } else {
+          await clearAsinScrapeFailure(product.asin);
           stats.unavailable += 1;
           if (oosPatch.is_active === false) {
             stats.deactivated += 1;
@@ -368,6 +384,7 @@ export async function runPriceDetection(
       }
 
       if (quote.price === null) {
+        await touchLastCheckedOnScrapeMiss(client, product.id, now);
         stats.errors.push({
           asin: product.asin,
           message: "El proveedor no devolvió precio para este ASIN.",
@@ -376,6 +393,7 @@ export async function runPriceDetection(
       }
 
       try {
+        await clearAsinScrapeFailure(product.asin);
         const storedPrice = requireNumber(product.current_price);
         const nextPrice = roundMoney(quote.price);
         const amazonList = toNumber(quote.previousPrice ?? null);

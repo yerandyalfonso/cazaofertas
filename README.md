@@ -1,6 +1,27 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Desarrollo local (dos plataformas)
+
+Monorepo con **CazaOfertas** (blog) y **Chollos de Hoy** (marketplace), cada uno en su puerto:
+
+| App | Puerto | Comando |
+|-----|--------|---------|
+| CazaOfertas | **3000** | `npm run dev` o `npm run dev:caza` |
+| Chollos de Hoy | **3001** | `npm run dev:chollos` |
+| **Ambas a la vez** | 3000 + 3001 | `npm run dev:all` |
+
+La primera vez (o tras cambiar Supabase en la raíz):
+
+```bash
+npm run setup:chollos-env   # copia credenciales a apps/chollosdehoy/.env.local
+```
+
+- Blog: [http://localhost:3000](http://localhost:3000)
+- Marketplace: [http://localhost:3001](http://localhost:3001)
+
+Código compartido en `packages/shared` (`@cazaofertas/shared`): taxonomía, utilidades de precio, etc.
+
+## Getting Started (solo blog)
 
 First, run the development server:
 

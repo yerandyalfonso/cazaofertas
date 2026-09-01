@@ -1,5 +1,10 @@
 import type { AmazonPriceCheckResult } from "@/services/amazonPriceCheck";
 import {
+  markAsinFailureActionTaken,
+  PERSIST_FAILURE_THRESHOLD,
+  recordAsinScrapeFailure,
+} from "@/services/asinScrapeFailures";
+import {
   notifyCronAlert,
   notifyCronFailure,
 } from "@/services/cronNotify";
@@ -8,6 +13,7 @@ import type { RetailPriceCheckResult } from "@/services/retailPriceCheck";
 import type { KiabiDealsRunResult } from "@/services/kiabiDeals";
 import type { MiraviaDealsRunResult } from "@/services/miraviaDeals";
 import type { UserUrlAlertsResult } from "@/services/userUrlAlerts";
+import { createSupabaseServiceClient } from "@/lib/supabase";
 
 const JOB_PREFIX = "local";
 
@@ -26,6 +32,63 @@ export async function notifyLocalCronFailure(
   await notifyCronFailure({ job: jobId(job), error });
 }
 
+async function deactivatePersistentAsin(asin: string): Promise<boolean> {
+  const client = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const { error } = await client
+    .from("products")
+    .update({
+      is_active: false,
+      last_checked_at: now,
+      updated_at: now,
+    })
+    .eq("asin", asin.toUpperCase())
+    .eq("is_active", true);
+
+  if (error) {
+    console.error(`[cron] No se pudo desactivar ${asin}:`, error.message);
+    return false;
+  }
+  await markAsinFailureActionTaken(asin);
+  return true;
+}
+
+/**
+ * Filtra errores repetidos del mismo ASIN: solo avisa al 1.er fallo,
+ * al umbral de persistencia (y desactiva), o tras cooldown.
+ */
+async function filterAsinErrorsForAlert(
+  errors: Array<{ asin: string; message: string }>,
+): Promise<{
+  lines: string[];
+  deactivated: string[];
+}> {
+  const lines: string[] = [];
+  const deactivated: string[] = [];
+
+  for (const error of errors) {
+    const decision = await recordAsinScrapeFailure(error.asin, error.message);
+    if (!decision.notify) continue;
+
+    const suffix =
+      decision.reason === "persistent"
+        ? ` · ${decision.record.count} fallos → desactivar`
+        : decision.reason === "renotify"
+          ? ` · sigue fallando (${decision.record.count}×)`
+          : "";
+
+    lines.push(`• ${error.asin}: ${error.message}${suffix}`);
+
+    if (decision.shouldDeactivate) {
+      const ok = await deactivatePersistentAsin(error.asin);
+      if (ok) deactivated.push(error.asin);
+    }
+  }
+
+  return { lines, deactivated };
+}
+
+/** Solo errores / pausas. Nunca “revisión OK”. */
 export async function reviewCheckPricesResult(
   result: AmazonPriceCheckResult,
   extras?: {
@@ -66,55 +129,41 @@ export async function reviewCheckPricesResult(
     return;
   }
 
-  const amazonFailed =
-    errors.length > 0 &&
-    ((result.scoped > 0 && errors.length >= result.scoped) ||
-      (result.stats.processed > 0 &&
-        errors.length / result.stats.processed >= 0.5) ||
-      errors.length >= 2);
+  const amazonAlert = await filterAsinErrorsForAlert(errors);
+  const flashAlert = await filterAsinErrorsForAlert(flashErrors);
 
-  if (amazonFailed || flashErrors.length > 0 || flashFeedErrors.length > 0) {
-    await notifyCronAlert({
-      job,
-      headline: "Errores en revisión Amazon / flash",
-      lines: [
-        `Precios: ${result.stats.processed} procesados · ${errors.length} errores`,
-        ...errors.slice(0, 2).map((e) => `• ${e.asin}: ${e.message}`),
-        flash
-          ? `Flash: ${
-              (flash.inserted ?? 0) +
-              (flash.updated ?? 0) +
-              (flash.unchanged ?? 0)
-            } procesados · ${flashErrors.length} errores`
-          : "",
-        ...flashErrors
-          .slice(0, 2)
-          .map((e) => `• Flash ${e.asin}: ${e.message}`),
-        ...flashFeedErrors
-          .slice(0, 1)
-          .map((e) => `• Feed: ${e.message}`),
-      ],
-    });
+  if (
+    amazonAlert.lines.length === 0 &&
+    flashAlert.lines.length === 0 &&
+    flashFeedErrors.length === 0 &&
+    amazonAlert.deactivated.length === 0 &&
+    flashAlert.deactivated.length === 0
+  ) {
     return;
   }
 
-  const updated = result.stats.updated ?? 0;
-  const unchanged = result.stats.unchanged ?? 0;
-  const deals = result.stats.dealsDetected ?? 0;
-  const flashInserted = flash?.inserted ?? 0;
-  const flashUpdated = flash?.updated ?? 0;
-  const flashUnchanged = flash?.unchanged ?? 0;
-  const flashChannel = flash?.channelNotificationsSent ?? 0;
-
   await notifyCronAlert({
     job,
-    headline: "Amazon: revisión OK",
+    headline: "Errores en revisión Amazon / flash",
     lines: [
-      `${result.stats.processed} revisados · ${updated} actualizados · ${unchanged} sin cambios`,
-      deals > 0 ? `Rebajas detectadas: ${deals}` : "",
-      flash
-        ? `Flash: ${flashInserted} nuevos · ${flashUpdated} actualizados · ${flashUnchanged} sin cambios` +
-          (flashChannel > 0 ? ` · canal ${flashChannel}` : "")
+      errors.length > 0
+        ? `Precios: ${result.stats.processed} procesados · ${errors.length} errores`
+        : "",
+      ...amazonAlert.lines.slice(0, 4),
+      flash && flashErrors.length > 0
+        ? `Flash: ${flashErrors.length} errores`
+        : "",
+      ...flashAlert.lines.slice(0, 3).map((line) =>
+        line.startsWith("• ") ? `• Flash ${line.slice(2)}` : line,
+      ),
+      ...flashFeedErrors
+        .slice(0, 1)
+        .map((e) => `• Feed: ${e.message}`),
+      amazonAlert.deactivated.length > 0
+        ? `Desactivados tras ${PERSIST_FAILURE_THRESHOLD} fallos: ${amazonAlert.deactivated.join(", ")}`
+        : "",
+      flashAlert.deactivated.length > 0
+        ? `Flash desactivados: ${flashAlert.deactivated.join(", ")}`
         : "",
     ],
   });
@@ -124,30 +173,24 @@ export async function reviewRetailPricesResult(
   result: RetailPriceCheckResult,
 ): Promise<void> {
   const job = jobId("check-prices");
-  const errors = result.stats.errors ?? [];
-  const blockedOnly =
-    errors.length > 0 &&
-    errors.every((error) => isRetailBlockedError(error.message));
+  const errors = (result.stats.errors ?? []).filter(
+    (error) => !isRetailBlockedError(error.message),
+  );
 
-  // Anti-bot omitido es esperado (DataDome); no spamear Telegram cada 10 min.
+  // Anti-bot esperado (DataDome): no spamear Telegram.
   if (errors.length === 0) return;
+
+  const alert = await filterAsinErrorsForAlert(errors);
+  if (alert.lines.length === 0 && alert.deactivated.length === 0) return;
 
   await notifyCronAlert({
     job,
-    headline: blockedOnly
-      ? "Kiabi: bloqueo al revisar precios"
-      : "Errores en revisión de precios (Kiabi)",
+    headline: "Errores en revisión retail",
     lines: [
-      `Monitorizables: ${result.monitorable}`,
-      `Procesados: ${result.stats.processed}`,
-      `Actualizados: ${result.stats.updated}`,
-      `Omitidos (bloqueo): ${result.stats.skippedBlocked}`,
-      `Errores: ${errors.length}/${result.scoped}`,
-      ...errors
-        .slice(0, 3)
-        .map((error) => `• ${error.asin}: ${error.message}`),
-      blockedOnly
-        ? "Exporta cookies del navegador → KIABI_COOKIES_FILE en .env.local"
+      `Procesados: ${result.stats.processed} · Errores: ${errors.length}`,
+      ...alert.lines.slice(0, 4),
+      alert.deactivated.length > 0
+        ? `Desactivados: ${alert.deactivated.join(", ")}`
         : "",
     ],
   });
@@ -176,42 +219,40 @@ export async function reviewFlashDealsResult(
   const miraviaErrors = miravia?.errors ?? [];
   const miraviaFeedErrors = miravia?.discovery?.feedErrors ?? [];
 
+  const amazonAlert = await filterAsinErrorsForAlert(errors);
+
   if (
-    errors.length === 0 &&
+    amazonAlert.lines.length === 0 &&
     feedErrors.length === 0 &&
     miraviaErrors.length === 0 &&
-    miraviaFeedErrors.length === 0
+    miraviaFeedErrors.length === 0 &&
+    amazonAlert.deactivated.length === 0
   ) {
     return;
   }
-
-  const errorLines = errors
-    .slice(0, 3)
-    .map((e) => `• ${e.asin}: ${e.message}`);
-  const feedLines = feedErrors
-    .slice(0, 2)
-    .map((e) => `• Feed: ${e.message}`);
-  const miraviaLines = [
-    ...miraviaErrors
-      .slice(0, 2)
-      .map((e) => `• Miravia ${e.externalId}: ${e.message}`),
-    ...miraviaFeedErrors
-      .slice(0, 2)
-      .map((e) => `• Miravia feed: ${e.message}`),
-  ];
 
   await notifyCronAlert({
     job,
     headline: "Errores en flash deals",
     lines: [
-      `Errores producto: ${errors.length}`,
-      ...errorLines,
-      feedErrors.length > 0 ? `Feeds fallidos: ${feedErrors.length}` : "",
-      ...feedLines,
-      miravia
-        ? `Miravia: +${miravia.inserted} · err ${miraviaErrors.length}`
+      amazonAlert.lines.length > 0
+        ? `Errores producto: ${errors.length}`
         : "",
-      ...miraviaLines,
+      ...amazonAlert.lines.slice(0, 3),
+      feedErrors.length > 0 ? `Feeds fallidos: ${feedErrors.length}` : "",
+      ...feedErrors.slice(0, 2).map((e) => `• Feed: ${e.message}`),
+      miraviaErrors.length > 0
+        ? `Miravia: ${miraviaErrors.length} errores`
+        : "",
+      ...miraviaErrors
+        .slice(0, 2)
+        .map((e) => `• Miravia ${e.externalId}: ${e.message}`),
+      ...miraviaFeedErrors
+        .slice(0, 2)
+        .map((e) => `• Miravia feed: ${e.message}`),
+      amazonAlert.deactivated.length > 0
+        ? `Desactivados: ${amazonAlert.deactivated.join(", ")}`
+        : "",
     ],
   });
 }
@@ -234,66 +275,22 @@ export async function reviewKiabiDealsResult(
   }
 
   const errors = result.errors ?? [];
-  const feedErrors = result.discovery?.feedErrors ?? [];
-  const dataDomeOnly =
-    feedErrors.length > 0 &&
-    feedErrors.every((e) => isRetailBlockedError(e.message)) &&
-    errors.length === 0;
-  const hasWork =
-    result.inserted > 0 ||
-    result.updated > 0 ||
-    result.channelNotificationsSent > 0;
+  const feedErrors = (result.discovery?.feedErrors ?? []).filter(
+    (e) => !isRetailBlockedError(e.message),
+  );
 
-  if (hasWork || errors.length > 0 || feedErrors.length > 0) {
-    const headline = hasWork
-      ? result.discovery.usedFallback
-        ? "Kiabi: OK (lista de respaldo)"
-        : "Kiabi: sincronización OK"
-      : dataDomeOnly
-        ? "Kiabi: DataDome bloqueó el scrape"
-        : "Kiabi: revisión con incidencias";
-
-    await notifyCronAlert({
-      job,
-      headline,
-      lines: [
-        `Candidatos: ${result.discovery.candidates}`,
-        result.discovery.usedFallback
-          ? "Usó JSON de respaldo (promociones no accesibles desde Node)."
-          : "",
-        `Procesados: ${result.processed}`,
-        `Nuevos: ${result.inserted} · Actualizados: ${result.updated}`,
-        `Sin rebaja: ${result.skippedNoDiscount}`,
-        result.skippedExisting > 0
-          ? `Ya en catálogo (omitidos): ${result.skippedExisting}`
-          : "",
-        `Canal Telegram: ${result.channelNotificationsSent} enviados`,
-        errors.length > 0 ? `Errores ficha: ${errors.length}` : "",
-        errors
-          .slice(0, 2)
-          .map((e) => `• ${e.externalId}: ${e.message}`)
-          .join("\n"),
-        feedErrors.length > 0
-          ? feedErrors
-              .slice(0, 1)
-              .map((e) => `Feed: ${e.message}`)
-              .join("\n")
-          : "",
-        dataDomeOnly && !hasWork
-          ? "El cron disparó bien; Kiabi exige navegador. Opcional: KIABI_COOKIES_FILE en .env.local"
-          : "",
-      ],
-    });
-    return;
-  }
+  // DataDome / sin novedades: silencio. Solo errores reales de ficha o feed.
+  if (errors.length === 0 && feedErrors.length === 0) return;
 
   await notifyCronAlert({
     job,
-    headline: "Kiabi: prueba OK (sin novedades)",
+    headline: "Errores en Kiabi",
     lines: [
-      `Candidatos en rebajas: ${result.discovery.candidates}`,
-      "No hubo chollos nuevos que superen el umbral de descuento.",
-      "El cron está operativo; se reintentará en el próximo horario.",
+      errors.length > 0 ? `Errores ficha: ${errors.length}` : "",
+      ...errors
+        .slice(0, 3)
+        .map((e) => `• ${e.externalId}: ${e.message}`),
+      ...feedErrors.slice(0, 2).map((e) => `• Feed: ${e.message}`),
     ],
   });
 }

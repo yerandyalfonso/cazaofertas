@@ -13,7 +13,8 @@ type LocalCronJob =
   | "flash-deals"
   | "user-alerts"
   | "kiabi-deals"
-  | "telegram-flush";
+  | "telegram-flush"
+  | "coupons-discover";
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
@@ -21,6 +22,7 @@ const JOBS: LocalCronJob[] = [
   "user-alerts",
   "kiabi-deals",
   "telegram-flush",
+  "coupons-discover",
 ];
 
 function parseJob(raw: string | undefined): LocalCronJob {
@@ -33,7 +35,10 @@ function parseJob(raw: string | undefined): LocalCronJob {
 
 async function runCheckPrices(): Promise<void> {
   const { runAmazonPriceCheck } = await import("@/services/amazonPriceCheck");
-  const { reviewCheckPricesResult } = await import("./notify");
+  const { runRetailPriceCheck } = await import("@/services/retailPriceCheck");
+  const { reviewCheckPricesResult, reviewRetailPricesResult } = await import(
+    "./notify"
+  );
 
   const amazon = await runAmazonPriceCheck({
     limit: 2,
@@ -44,25 +49,30 @@ async function runCheckPrices(): Promise<void> {
   });
   console.log(JSON.stringify({ amazon }, null, 2));
 
-  const { flushPendingChannelNotifications } = await import(
-    "@/services/telegramFlush"
-  );
-  const telegramFlush = await flushPendingChannelNotifications({
-    force: false,
+  const retail = await runRetailPriceCheck({
+    limit: Number(process.env.RETAIL_PRICE_CHECK_LIMIT ?? "4") || 4,
+    delayMs: 1_800,
   });
+  console.log(JSON.stringify({ retail }, null, 2));
+
+  const { maybeFlushTelegramBatch } = await import("@/services/telegramFlush");
+  const telegramFlush = await maybeFlushTelegramBatch();
   console.log(JSON.stringify({ telegramFlush }, null, 2));
 
   await reviewCheckPricesResult(amazon);
+  await reviewRetailPricesResult(retail);
 }
 
 async function runFlashDeals(): Promise<void> {
   const { runFlashDealsCheck } = await import("@/services/flashDeals");
   const { runMiraviaDealsCheck } = await import("@/services/miraviaDeals");
   const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
+  const { getAppSettings } = await import("@/services/appSettings");
 
-  // Cada ~3 min (LaunchAgent): hasta 3 ASINs Amazon + Miravia flash (misma cadencia).
+  const appSettings = await getAppSettings();
+
   const result = await runFlashDealsCheck({
-    limit: 3,
+    limit: appSettings.amazonFlashInsertLimit,
     notify: true,
     allowSimulatedFallback: true,
     includeCatalog: false,
@@ -70,7 +80,8 @@ async function runFlashDeals(): Promise<void> {
   });
 
   const miravia = await runMiraviaDealsCheck({
-    limit: Number(process.env.MIRAVIA_FLASH_LIMIT ?? "2") || 2,
+    limit: appSettings.miraviaFlashLimit,
+    updateLimit: appSettings.miraviaFlashUpdateLimit,
     notify: true,
   });
 
@@ -132,6 +143,14 @@ async function runTelegramFlush(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 }
 
+async function runCouponsDiscover(): Promise<void> {
+  const { runCouponDiscovery } = await import(
+    "@/services/coupon-discovery/runDiscovery"
+  );
+  const result = await runCouponDiscovery({ writeBackupJson: true });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function main(): Promise<void> {
   const job = parseJob(process.argv[2]);
   const started = new Date().toISOString();
@@ -158,6 +177,9 @@ async function main(): Promise<void> {
       break;
     case "telegram-flush":
       await runTelegramFlush();
+      break;
+    case "coupons-discover":
+      await runCouponsDiscover();
       break;
   }
 

@@ -15,6 +15,10 @@ import {
 } from "@/providers/price/amazonFlashDiscovery";
 import { previewAmazonProductPage } from "@/providers/price";
 import { dealScoringService } from "@/services/deal-scoring";
+import {
+  getAppSettings,
+  resolveAmazonFlashFeedUrlsForRun,
+} from "@/services/appSettings";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import type { DealCandidate } from "@/services/alertMatching";
 import {
@@ -201,13 +205,20 @@ export async function runFlashDealsCheck(options?: {
   delayMs?: number;
 }): Promise<FlashDealsRunResult> {
   const client = createSupabaseServiceClient();
-  const limit = options?.limit && options.limit > 0 ? options.limit : 25;
+  const appSettings = await getAppSettings();
+  const limit =
+    options?.limit && options.limit > 0
+      ? options.limit
+      : appSettings.amazonFlashInsertLimit;
   const delayMs =
     options?.delayMs ?? (process.env.VERCEL ? 2_000 : 1_200);
   const shouldNotify = options?.notify ?? true;
 
+  const feedUrls =
+    options?.feedUrls ?? (await resolveAmazonFlashFeedUrlsForRun());
+
   const discovery = await discoverFlashDealListings({
-    feedUrls: options?.feedUrls,
+    feedUrls,
     injectedAsins: options?.injectedAsins,
     maxItems: Math.max(limit * 4, 60),
     delayMs: 800,

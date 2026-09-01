@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { AdminPageLoadingSkeleton } from "@/components/admin/AdminSkeleton";
 import {
   CAROUSEL_FORMATS,
   CAROUSEL_PALETTES,
@@ -17,8 +19,7 @@ import {
   type CarouselProject,
 } from "@/lib/carousel-projects";
 
-const iconBtnClass =
-  "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:opacity-40";
+const iconBtnClass = "admin-icon-btn";
 
 function templateLabel(id: string): string {
   return CAROUSEL_TEMPLATES.find((item) => item.id === id)?.label ?? id;
@@ -81,15 +82,28 @@ export function CarouselListClient() {
         </div>
         <Link
           href="/admin/carousels/new"
-          className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
+          className="admin-btn admin-btn-primary"
         >
           <Plus className="h-4 w-4" aria-hidden />
           Nuevo carrusel
         </Link>
       </header>
 
-      <div className="mt-8 overflow-x-auto border border-stone-300 bg-white">
-        <table className="min-w-full text-left text-sm">
+      {loading ? (
+        <div className="mt-8">
+          <AdminPageLoadingSkeleton variant="table" />
+        </div>
+      ) : projects.length === 0 ? (
+        <AdminEmptyState
+          className="mt-10"
+          title="Aún no hay carruseles guardados"
+          subtitle="Crea carruseles para Instagram y TikTok. Se guardan en este navegador."
+          actionLabel="Crear el primero"
+          actionHref="/admin/carousels/new"
+        />
+      ) : (
+        <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
+          <table className="min-w-full text-left text-sm">
           <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
             <tr>
               <th className="px-4 py-3 font-semibold">Nombre</th>
@@ -103,28 +117,7 @@ export function CarouselListClient() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-stone-500">
-                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                  Cargando…
-                </td>
-              </tr>
-            ) : projects.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-stone-500">
-                  No hay carruseles guardados.{" "}
-                  <Link
-                    href="/admin/carousels/new"
-                    className="font-medium text-teal-800 hover:underline"
-                  >
-                    Crea el primero
-                  </Link>
-                  .
-                </td>
-              </tr>
-            ) : (
-              projects.map((project) => (
+            {projects.map((project) => (
                 <tr
                   key={project.id}
                   className="border-t border-stone-100 align-middle"
@@ -187,11 +180,11 @@ export function CarouselListClient() {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
