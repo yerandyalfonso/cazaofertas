@@ -5,7 +5,8 @@ import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import {
   getAppSettings,
-  resolveTelegramMinScore,
+  getTelegramFlushRescheduleMinutes,
+  resolveTelegramMinScoreForRetailer,
   updateAppSettings,
 } from "@/services/appSettings";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -20,8 +21,10 @@ export interface TelegramFlushResult {
   skipped: boolean;
   reason?: string;
   nextFlushAt: string | null;
+  resumeAt: string | null;
   batchHours: number;
   pendingBefore: number;
+  remainingPending: number;
   sent: number;
   skippedExpired: number;
   skippedLowScore: number;
@@ -39,13 +42,23 @@ function nextFlushIso(lastFlushAt: string | null, batchHours: number): string {
   return new Date(base + batchHours * 60 * 60 * 1000).toISOString();
 }
 
+function resumeIso(minutes: number): string {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
 export async function countPendingChannelNotifications(): Promise<number> {
+  return countQueuedChannelNotifications(["pending"]);
+}
+
+export async function countQueuedChannelNotifications(
+  statuses: Array<"pending" | "failed"> = ["pending", "failed"],
+): Promise<number> {
   try {
     const client = createSupabaseServiceClient();
     const { count, error } = await client
       .from("channel_notifications")
       .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
+      .in("status", statuses);
     if (error) return 0;
     return count ?? 0;
   } catch {
@@ -55,7 +68,7 @@ export async function countPendingChannelNotifications(): Promise<number> {
 
 /**
  * Publica en Telegram los chollos pendientes (grupo + canal).
- * Si `force` es false, respeta el intervalo de admin (default 4 h).
+ * Respeta el intervalo de admin; si quedan pendientes programa un reintento.
  */
 export async function flushPendingChannelNotifications(options?: {
   force?: boolean;
@@ -65,26 +78,34 @@ export async function flushPendingChannelNotifications(options?: {
   const settings = await getAppSettings();
   const batchHours = settings.telegramBatchHours;
   const lastFlush = settings.lastTelegramFlushAt;
+  const resumeAt = settings.telegramFlushResumeAt;
   const nextFlushAt = nextFlushIso(lastFlush, batchHours);
+  const rescheduleMinutes = await getTelegramFlushRescheduleMinutes();
 
-  if (!options?.force && lastFlush) {
-    const dueAt = new Date(lastFlush).getTime() + batchHours * 60 * 60 * 1000;
-    if (Date.now() < dueAt) {
-      return {
-        ok: true,
-        skipped: true,
-        reason: `Aún no toca el lote (cada ${batchHours} h).`,
-        nextFlushAt,
-        batchHours,
-        pendingBefore: await countPendingChannelNotifications(),
-        sent: 0,
-        skippedExpired: 0,
-        skippedLowScore: 0,
-        skippedUnavailable: 0,
-        failed: 0,
-        finishedAt,
-      };
-    }
+  const batchDue =
+    !lastFlush ||
+    Date.now() >=
+      new Date(lastFlush).getTime() + batchHours * 60 * 60 * 1000;
+  const resumeDue =
+    resumeAt !== null && Date.now() >= new Date(resumeAt).getTime();
+
+  if (!options?.force && !batchDue && !resumeDue) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: `Aún no toca el lote (cada ${batchHours} h).`,
+      nextFlushAt,
+      resumeAt,
+      batchHours,
+      pendingBefore: await countQueuedChannelNotifications(),
+      remainingPending: await countQueuedChannelNotifications(),
+      sent: 0,
+      skippedExpired: 0,
+      skippedLowScore: 0,
+      skippedUnavailable: 0,
+      failed: 0,
+      finishedAt,
+    };
   }
 
   const client = createSupabaseServiceClient();
@@ -92,12 +113,13 @@ export async function flushPendingChannelNotifications(options?: {
     options?.limit && options.limit > 0
       ? Math.min(options.limit, 80)
       : DEFAULT_FLUSH_LIMIT;
-  const minScore = await resolveTelegramMinScore();
+
+  const pendingBefore = await countQueuedChannelNotifications();
 
   const { data: pending, error: pendingError } = await client
     .from("channel_notifications")
     .select("id, product_id, created_at, old_price, new_price")
-    .eq("status", "pending")
+    .in("status", ["pending", "failed"])
     .order("created_at", { ascending: true })
     .limit(limit);
 
@@ -183,6 +205,9 @@ export async function flushPendingChannelNotifications(options?: {
         categorySlug: parentSlug ?? "otros",
       });
 
+      const minScore = await resolveTelegramMinScoreForRetailer(
+        product.retailer,
+      );
       if (scoring.score < minScore) {
         await client
           .from("channel_notifications")
@@ -263,21 +288,30 @@ export async function flushPendingChannelNotifications(options?: {
     }
   }
 
-  await updateAppSettings({ lastTelegramFlushAt: finishedAt }).catch(
-    (error) => {
-      console.warn(
-        "[telegram-flush] no se pudo guardar last_telegram_flush_at",
-        error instanceof Error ? error.message : error,
-      );
-    },
-  );
+  const remainingPending = await countQueuedChannelNotifications();
+  const nextResumeAt =
+    remainingPending > 0 ? resumeIso(rescheduleMinutes) : null;
+  const nextLastFlushAt =
+    batchDue || remainingPending === 0 ? finishedAt : lastFlush;
+
+  await updateAppSettings({
+    lastTelegramFlushAt: nextLastFlushAt,
+    telegramFlushResumeAt: nextResumeAt,
+  }).catch((error) => {
+    console.warn(
+      "[telegram-flush] no se pudo guardar ajustes de lote",
+      error instanceof Error ? error.message : error,
+    );
+  });
 
   return {
     ok: true,
     skipped: false,
-    nextFlushAt: nextFlushIso(finishedAt, batchHours),
+    nextFlushAt: nextFlushIso(nextLastFlushAt, batchHours),
+    resumeAt: nextResumeAt,
     batchHours,
-    pendingBefore: rows.length,
+    pendingBefore,
+    remainingPending,
     sent,
     skippedExpired,
     skippedLowScore,

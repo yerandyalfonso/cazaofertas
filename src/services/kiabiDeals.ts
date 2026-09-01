@@ -14,34 +14,11 @@ import {
   type KiabiDiscoveredItem,
   type KiabiProductQuote,
 } from "@/providers/retail/kiabi";
+import { getAppSettings } from "@/services/appSettings";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import { DealLevel, ProductAvailability } from "@/types";
-
-function kiabiDealsEnabled(): boolean {
-  const raw = process.env.KIABI_DEALS_ENABLED?.trim().toLowerCase();
-  if (raw === "0" || raw === "false" || raw === "off") return false;
-  return raw === "1" || raw === "true" || raw === "on";
-}
-
-function minKiabiDiscountPercent(): number {
-  const raw = Number(process.env.KIABI_MIN_DISCOUNT_PERCENT ?? "10");
-  return Number.isFinite(raw) && raw > 0 ? raw : 10;
-}
-
-/** Solo productos nuevos (+ bajadas de precio detectadas en el listado). */
-function kiabiDiscoveryMaxItems(): number {
-  const raw = Number(process.env.KIABI_DISCOVERY_MAX_ITEMS ?? "100");
-  return Number.isFinite(raw) && raw > 0 ? raw : 100;
-}
-
-function kiabiNewProductsOnly(): boolean {
-  const raw = process.env.KIABI_NEW_PRODUCTS_ONLY?.trim().toLowerCase();
-  if (raw === "0" || raw === "false" || raw === "off") return false;
-  if (raw === "1" || raw === "true" || raw === "on") return true;
-  return true;
-}
 
 function loadKiabiFallbackItems(): KiabiDiscoveredItem[] | null {
   const rawPath =
@@ -269,8 +246,9 @@ export async function runKiabiDealsCheck(options?: {
   telegramMinScore?: number;
 }): Promise<KiabiDealsRunResult> {
   const finishedAt = new Date().toISOString();
+  const appSettings = await getAppSettings();
 
-  if (!kiabiDealsEnabled()) {
+  if (!appSettings.kiabiDealsEnabled) {
     return {
       ok: true,
       enabled: false,
@@ -293,7 +271,11 @@ export async function runKiabiDealsCheck(options?: {
   const limit = options?.limit && options.limit > 0 ? options.limit : 12;
   const delayMs = options?.delayMs ?? 1_800;
   const shouldNotify = options?.notify ?? true;
-  const minDiscount = minKiabiDiscountPercent();
+  const minDiscount = appSettings.kiabiMinDiscountPercent;
+  const kiabiTelegramMinScore =
+    options?.telegramMinScore ?? appSettings.kiabiTelegramMinScore;
+  const newProductsOnly =
+    options?.newProductsOnly ?? appSettings.kiabiNewProductsOnly;
   const modaCategoryId = await resolveModaCategoryId(client);
 
   const discoveryResult = options?.onlyItems?.length
@@ -305,7 +287,7 @@ export async function runKiabiDealsCheck(options?: {
       }
     : await discoverKiabiDeals({
         feedUrls: options?.feedUrls,
-        maxItems: kiabiDiscoveryMaxItems(),
+        maxItems: appSettings.kiabiDiscoveryMaxItems,
         delayMs: 1_000,
       });
 
@@ -349,7 +331,7 @@ export async function runKiabiDealsCheck(options?: {
   const existingCandidates: KiabiDiscoveredItem[] = [];
   const priceDropCandidates: KiabiDiscoveredItem[] = [];
   let skippedExisting = 0;
-  const newOnly = options?.newProductsOnly ?? kiabiNewProductsOnly();
+  const newOnly = newProductsOnly;
 
   for (const item of discovery.items) {
     const existing = catalogByExternalId.get(item.externalId.toUpperCase());
@@ -485,7 +467,7 @@ export async function runKiabiDealsCheck(options?: {
         });
 
         if (shouldNotify) {
-          const channelMinScore = options?.telegramMinScore ?? 75;
+          const channelMinScore = kiabiTelegramMinScore;
           const qualifiesChannel = scoring.score >= channelMinScore;
           const isDeal = scoring.level !== DealLevel.NORMAL;
           if (isDeal || qualifiesChannel) {
@@ -567,7 +549,7 @@ export async function runKiabiDealsCheck(options?: {
           updated += 1;
 
           if (shouldNotify) {
-            const channelMinScore = options?.telegramMinScore ?? 75;
+            const channelMinScore = kiabiTelegramMinScore;
             const qualifiesChannel = scoring.score >= channelMinScore;
             const isDeal = scoring.level !== DealLevel.NORMAL;
             if (isDeal || qualifiesChannel) {

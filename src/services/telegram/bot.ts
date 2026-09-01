@@ -11,12 +11,13 @@ import {
 } from "@/lib/env";
 import { postDealToFacebookPage } from "@/services/facebook";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
-import { absoluteUrl } from "@/lib/site";
+import { telegramAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
 import { resolveTelegramTopicId } from "@/lib/telegram-topics";
 import { formatRetailerHashtag } from "@/lib/retailers";
+import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { inferRetailerFromAsin } from "@/services/products";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -247,19 +248,56 @@ function formatDealStamp(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** Hashtag Telegram (#belleza) a partir del slug de categoría. */
-export function formatCategoryHashtag(
-  name?: string | null,
-  slug?: string | null,
-): string | null {
-  const raw = slug?.trim() || name?.trim();
-  if (!raw) return null;
+/** Normaliza un fragmento a hashtag Telegram (#bebe). */
+function toTelegramHashtag(raw: string): string | null {
   const tag = raw
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
   return tag ? `#${tag}` : null;
+}
+
+/**
+ * Hashtag de categoría/subcategoría.
+ * Para subcategorías `padre-hijo` (p. ej. bebe-bebes) → hoja #bebes.
+ * Defaults `moda-moda` / `belleza-belleza` → solo #moda / #belleza (sin #modamoda).
+ */
+export function formatCategoryHashtag(
+  name?: string | null,
+  slug?: string | null,
+  options?: { parentSlug?: string | null },
+): string | null {
+  const explicitParent = options?.parentSlug?.trim().toLowerCase() || null;
+  let raw = slug?.trim() || "";
+  const resolvedParent =
+    explicitParent || (raw ? resolveParentSlug(raw) : null);
+
+  if (raw && resolvedParent) {
+    const prefix = `${resolvedParent}-`;
+    const lower = raw.toLowerCase();
+    if (lower.startsWith(prefix)) {
+      const leaf = lower.slice(prefix.length);
+      // moda-moda / belleza-belleza / juguetes-juguetes → misma etiqueta que el padre
+      if (!leaf || leaf === resolvedParent) {
+        raw = resolvedParent;
+      } else {
+        raw = leaf;
+      }
+    }
+  }
+
+  // Si el slug era solo el padre o quedó vacío, preferir el nombre corto.
+  if (!raw || (resolvedParent && raw.toLowerCase() === resolvedParent)) {
+    const fromName = name?.trim() || "";
+    if (fromName) {
+      // Evitar hashtags largos tipo #bellezaycuidadopersonal si tenemos slug padre.
+      raw = resolvedParent || fromName;
+    }
+  }
+
+  if (!raw) return null;
+  return toTelegramHashtag(raw);
 }
 
 export function buildDealAlertText(
@@ -308,35 +346,51 @@ export function buildDealAlertText(
     lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${offerUrl}`);
     if (deal.productSlug?.trim()) {
       lines.push(
-        `🌐 Ver en la web: ${absoluteUrl(`/producto/${deal.productSlug.trim()}`)}`,
+        `🌐 Ver en la web: ${telegramAbsoluteUrl(`/producto/${deal.productSlug.trim()}`)}`,
       );
     }
   }
 
   const parentLabel = deal.parentCategoryName?.trim();
   const subLabel = deal.categoryName?.trim();
+  const parentSlug = deal.parentCategorySlug?.trim().toLowerCase() || "";
+  const subSlug = deal.categorySlug?.trim().toLowerCase() || "";
+  const isMirrorDefaultSub =
+    Boolean(parentSlug) && subSlug === `${parentSlug}-${parentSlug}`;
   const categoryLine =
-    parentLabel && subLabel && parentLabel !== subLabel
+    parentLabel &&
+    subLabel &&
+    parentLabel !== subLabel &&
+    !isMirrorDefaultSub
       ? `${parentLabel} · ${subLabel}`
-      : subLabel || parentLabel || null;
+      : parentLabel || subLabel || null;
 
   const parentTag = formatCategoryHashtag(
     deal.parentCategoryName,
     deal.parentCategorySlug,
   );
-  const subTag = formatCategoryHashtag(deal.categoryName, deal.categorySlug);
+  const subTag = formatCategoryHashtag(deal.categoryName, deal.categorySlug, {
+    parentSlug: deal.parentCategorySlug,
+  });
+  // Si la sub es el default espejo (moda-moda), no repetir hashtag.
+  const effectiveSubTag =
+    isMirrorDefaultSub || subTag === parentTag ? null : subTag;
   const retailerTag = formatRetailerHashtag(
     deal.retailer ?? inferRetailerFromAsin(deal.asin),
   );
 
-  if (categoryLine || parentTag || subTag || retailerTag) {
+  if (categoryLine || parentTag || effectiveSubTag || retailerTag) {
     lines.push("");
     if (categoryLine) {
       lines.push(`📂 ${escapeHtml(categoryLine)}`);
     }
-    const tags = [parentTag, subTag, retailerTag].filter(Boolean).join(" ");
-    if (tags) {
-      lines.push(tags);
+    // Orden fijo: #categoria #subcategoria #tienda (sin duplicados).
+    const tags = [parentTag, effectiveSubTag, retailerTag].filter(
+      (tag, index, all): tag is string =>
+        Boolean(tag) && all.indexOf(tag) === index,
+    );
+    if (tags.length > 0) {
+      lines.push(tags.join(" "));
     }
   }
 
@@ -367,7 +421,7 @@ export function buildOfferActionMarkup(options: {
   if (options.productSlug?.trim()) {
     row.push({
       text: "🌐 Ver en la web",
-      url: absoluteUrl(`/producto/${options.productSlug.trim()}`),
+      url: telegramAbsoluteUrl(`/producto/${options.productSlug.trim()}`),
     });
   }
   return { inline_keyboard: [row] };

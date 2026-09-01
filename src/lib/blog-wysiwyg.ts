@@ -1,5 +1,9 @@
 import type { JSONContent } from "@tiptap/core";
 import {
+  applyTipTapMarks,
+  markdownInlineToTipTapNodes,
+} from "@/lib/article-inline-markdown";
+import {
   newBlockId,
   type EditorBlock,
 } from "@/lib/admin-article-editor";
@@ -11,8 +15,10 @@ function textNode(text: string): JSONContent {
 
 function paragraphNode(text: string): JSONContent {
   const trimmed = text.trim();
-  return trimmed
-    ? { type: "paragraph", content: [textNode(trimmed)] }
+  if (!trimmed) return { type: "paragraph" };
+  const inline = markdownInlineToTipTapNodes(trimmed);
+  return inline.length
+    ? { type: "paragraph", content: inline as JSONContent[] }
     : { type: "paragraph" };
 }
 
@@ -20,7 +26,9 @@ function inlineText(node: JSONContent | undefined): string {
   if (!node?.content?.length) return "";
   return node.content
     .map((child) => {
-      if (child.type === "text") return child.text ?? "";
+      if (child.type === "text") {
+        return applyTipTapMarks(child.text ?? "", child.marks);
+      }
       if (child.type === "hardBreak") return "\n";
       return inlineText(child);
     })
@@ -31,10 +39,11 @@ function blockToNode(block: EditorBlock): JSONContent | null {
   switch (block.type) {
     case "heading": {
       const text = block.text.trim();
+      const inline = text ? markdownInlineToTipTapNodes(text) : [];
       return {
         type: "heading",
         attrs: { level: block.level },
-        content: text ? [textNode(text)] : undefined,
+        content: inline.length > 0 ? (inline as JSONContent[]) : undefined,
       };
     }
     case "paragraph":
@@ -76,6 +85,14 @@ function blockToNode(block: EditorBlock): JSONContent | null {
           title: block.title ?? "Pros y contras",
           pros: block.pros,
           cons: block.cons,
+        },
+      };
+    case "faq":
+      return {
+        type: "blogFaq",
+        attrs: {
+          title: block.title ?? "Preguntas frecuentes",
+          items: block.items,
         },
       };
     case "product":
@@ -191,6 +208,24 @@ function nodeToBlock(node: JSONContent): EditorBlock | null {
         title: String(node.attrs?.title ?? "Pros y contras"),
         pros: pros.length > 0 ? pros : [""],
         cons: cons.length > 0 ? cons : [""],
+      };
+    }
+    case "blogFaq": {
+      const rawItems = Array.isArray(node.attrs?.items)
+        ? (node.attrs.items as Array<{ question?: string; answer?: string }>)
+        : [];
+      const items =
+        rawItems.length > 0
+          ? rawItems.map((item) => ({
+              question: String(item.question ?? ""),
+              answer: String(item.answer ?? ""),
+            }))
+          : [{ question: "", answer: "" }];
+      return {
+        id,
+        type: "faq",
+        title: String(node.attrs?.title ?? "Preguntas frecuentes"),
+        items,
       };
     }
     case "blogProduct":

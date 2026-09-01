@@ -54,6 +54,19 @@ export async function GET(request: NextRequest) {
         })
       : null;
 
+    const queuedTelegram =
+      (miravia?.channelNotificationsQueued ?? 0) +
+      (result.channelNotificationsQueued ?? 0);
+    let telegramFlush = null;
+    if (request.nextUrl.searchParams.get("telegramFlush") !== "0") {
+      const { flushPendingChannelNotifications, countQueuedChannelNotifications } =
+        await import("@/services/telegramFlush");
+      const pendingBefore = await countQueuedChannelNotifications();
+      if (queuedTelegram > 0 || pendingBefore > 0) {
+        telegramFlush = await flushPendingChannelNotifications({ force: true });
+      }
+    }
+
     const processed =
       (result.inserted ?? 0) +
       (result.updated ?? 0) +
@@ -68,6 +81,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...result,
       miravia,
+      telegramFlush,
       pause: {
         activated: pause.paused,
         denials: pause.denials,
@@ -104,6 +118,7 @@ export async function POST(request: NextRequest) {
       notify?: boolean;
       force?: boolean;
       miravia?: boolean;
+      telegramFlush?: boolean;
     };
 
     await assertCronAllowed({ force: body.force });
@@ -125,6 +140,19 @@ export async function POST(request: NextRequest) {
             notify: body.notify ?? true,
           });
 
+    const queuedTelegram =
+      (miravia?.channelNotificationsQueued ?? 0) +
+      (result.channelNotificationsQueued ?? 0);
+    let telegramFlush = null;
+    if (body.telegramFlush !== false) {
+      const { flushPendingChannelNotifications, countQueuedChannelNotifications } =
+        await import("@/services/telegramFlush");
+      const pendingBefore = await countQueuedChannelNotifications();
+      if (queuedTelegram > 0 || pendingBefore > 0) {
+        telegramFlush = await flushPendingChannelNotifications({ force: true });
+      }
+    }
+
     const processed =
       (result.inserted ?? 0) +
       (result.updated ?? 0) +
@@ -139,6 +167,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...result,
       miravia,
+      telegramFlush,
       pause: {
         activated: pause.paused,
         denials: pause.denials,

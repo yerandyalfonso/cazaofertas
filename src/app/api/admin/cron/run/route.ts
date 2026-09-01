@@ -9,7 +9,7 @@ import {
   resumeCronJobs,
 } from "@/services/cronControl";
 import { createSupabaseServiceClient } from "@/lib/supabase";
-import { countPendingChannelNotifications } from "@/services/telegramFlush";
+import { countQueuedChannelNotifications } from "@/services/telegramFlush";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         .eq("is_active", true),
       getCronControlState().catch(() => null),
       getAppSettings().catch(() => null),
-      countPendingChannelNotifications(),
+      countQueuedChannelNotifications(),
     ]);
 
     if (error) {

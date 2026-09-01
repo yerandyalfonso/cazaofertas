@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
@@ -19,8 +20,13 @@ interface CronStatus {
   } | null;
   settings?: {
     telegramMinScore: number;
+    miraviaTelegramMinScore?: number;
+    kiabiTelegramMinScore?: number;
     telegramBatchHours: number;
+    telegramFlushRescheduleMinutes?: number;
+    amazonAssociateTag?: string;
     lastTelegramFlushAt: string | null;
+    telegramFlushResumeAt?: string | null;
     source: "database" | "env";
     updatedAt: string | null;
   } | null;
@@ -106,12 +112,6 @@ export function CronAdminClient() {
   const [flashLimit, setFlashLimit] = useState("12");
   const [error, setError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
-  const [telegramMinScore, setTelegramMinScore] = useState("75");
-  const [telegramBatchHours, setTelegramBatchHours] = useState("4");
-  const [telegramMinScoreSource, setTelegramMinScoreSource] = useState<
-    "database" | "env" | null
-  >(null);
-  const [savingSettings, setSavingSettings] = useState(false);
   const [flushingTelegram, setFlushingTelegram] = useState(false);
 
   async function readJsonSafe<T>(response: Response): Promise<T | null> {
@@ -153,13 +153,6 @@ export function CronAdminClient() {
         pendingTelegram: data.pendingTelegram ?? 0,
         facebookConfigured: data.facebookConfigured ?? false,
       });
-      if (data.settings?.telegramMinScore != null) {
-        setTelegramMinScore(String(data.settings.telegramMinScore));
-        setTelegramMinScoreSource(data.settings.source);
-      }
-      if (data.settings?.telegramBatchHours != null) {
-        setTelegramBatchHours(String(data.settings.telegramBatchHours));
-      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Error de red al cargar estado.";
@@ -339,55 +332,6 @@ export function CronAdminClient() {
     }
   }
 
-  async function saveTelegramSettings() {
-    setSavingSettings(true);
-    setError(null);
-    try {
-      const parsedScore = Number.parseFloat(telegramMinScore);
-      const parsedHours = Number.parseFloat(telegramBatchHours);
-      if (!Number.isFinite(parsedScore) || parsedScore < 0 || parsedScore > 100) {
-        throw new Error("El umbral debe ser un número entre 0 y 100.");
-      }
-      if (!Number.isFinite(parsedHours) || parsedHours < 1 || parsedHours > 24) {
-        throw new Error("El intervalo debe estar entre 1 y 24 horas.");
-      }
-      const response = await fetch("/api/admin/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          telegramMinScore: parsedScore,
-          telegramBatchHours: parsedHours,
-        }),
-      });
-      const data = await readJsonSafe<{
-        ok?: boolean;
-        error?: string;
-        settings?: CronStatus["settings"];
-      }>(response);
-      if (!response.ok || !data?.ok || !data.settings) {
-        const message =
-          data?.error ?? "No se pudieron guardar los ajustes de Telegram.";
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      setTelegramMinScore(String(data.settings.telegramMinScore));
-      setTelegramBatchHours(String(data.settings.telegramBatchHours));
-      setTelegramMinScoreSource(data.settings.source);
-      toast.success(
-        `Ajustes Telegram: umbral ${data.settings.telegramMinScore} · lote cada ${data.settings.telegramBatchHours} h`,
-      );
-      await loadStatus();
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Error al guardar ajustes.";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setSavingSettings(false);
-    }
-  }
-
   async function flushTelegramNow() {
     setFlushingTelegram(true);
     setError(null);
@@ -405,6 +349,8 @@ export function CronAdminClient() {
         skippedLowScore?: number;
         failed?: number;
         pendingBefore?: number;
+        remainingPending?: number;
+        resumeAt?: string | null;
       }>(response);
       if (!response.ok || !data?.ok) {
         const message = data?.error ?? "No se pudo enviar el lote de Telegram.";
@@ -412,8 +358,14 @@ export function CronAdminClient() {
         toast.error(message);
         return;
       }
+      const resumeHint =
+        data.remainingPending && data.remainingPending > 0 && data.resumeAt
+          ? ` · reintento ${new Date(data.resumeAt).toLocaleString("es-ES")}`
+          : "";
       toast.success(
         `Lote Telegram · ${data.sent ?? 0} enviadas` +
+          (data.remainingPending ? ` · ${data.remainingPending} pendientes` : "") +
+          resumeHint +
           (data.skippedExpired ? ` · ${data.skippedExpired} caducadas` : "") +
           (data.failed ? ` · ${data.failed} fallos` : ""),
       );
@@ -474,7 +426,7 @@ export function CronAdminClient() {
           </button>
         </div>
       ) : (
-        <div className="mt-6 flex flex-wrap items-center gap-3 border border-stone-300 bg-white px-4 py-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3 admin-card px-4 py-3">
           <p className="text-sm text-stone-600">
             Estado: <span className="font-medium text-ink">activos</span>
             {status?.neverChecked != null
@@ -488,14 +440,14 @@ export function CronAdminClient() {
             type="button"
             disabled={pauseBusy || loadingStatus}
             onClick={() => void setPause("pause")}
-            className="ml-auto inline-flex h-9 items-center border border-stone-300 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink hover:text-ink disabled:opacity-60"
+            className="admin-btn admin-btn-ghost ml-auto h-9"
           >
             {pauseBusy ? "…" : "Pausar 90 min"}
           </button>
         </div>
       )}
 
-      <section className="mt-8 border border-stone-300 bg-white p-6">
+      <section className="mt-8 admin-card p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
           Telegram
         </p>
@@ -504,46 +456,30 @@ export function CronAdminClient() {
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
           El cron sigue recopilando ofertas. Al grupo, a @cazador_de_ofertas y
-          a Facebook (si hay token) se envía un lote con lo pendiente cada N
-          horas (no al momento). Las alertas personales del bot no cambian.
-          {telegramMinScoreSource === "env"
-            ? " Ahora mismo usa valores de entorno hasta que guardes aquí."
-            : ""}
+          a Facebook (si hay token) se envía un lote con lo pendiente según la
+          configuración. Las alertas personales del bot no cambian.
         </p>
-        <div className="mt-5 flex flex-wrap items-end gap-4">
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Score mínimo (0–100)
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={telegramMinScore}
-              onChange={(event) => setTelegramMinScore(event.target.value)}
-              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
-            />
-          </label>
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Enviar cada (horas)
-            <input
-              type="number"
-              min="1"
-              max="24"
-              step="1"
-              value={telegramBatchHours}
-              onChange={(event) => setTelegramBatchHours(event.target.value)}
-              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={savingSettings || loadingStatus}
-            onClick={() => void saveTelegramSettings()}
-            className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-stone-800 disabled:opacity-60"
-          >
-            {savingSettings ? "Guardando…" : "Guardar ajustes"}
-          </button>
-        </div>
+        {status?.settings ? (
+          <p className="mt-3 text-sm text-stone-600">
+            Umbrales: Amazon ≥ {status.settings.telegramMinScore}
+            {status.settings.miraviaTelegramMinScore != null
+              ? ` · Miravia ≥ ${status.settings.miraviaTelegramMinScore}`
+              : ""}
+            {status.settings.kiabiTelegramMinScore != null
+              ? ` · Kiabi ≥ ${status.settings.kiabiTelegramMinScore}`
+              : ""}
+            {" · "}lote cada {status.settings.telegramBatchHours} h
+            {status.settings.telegramFlushRescheduleMinutes != null
+              ? ` · reintento ${status.settings.telegramFlushRescheduleMinutes} min`
+              : ""}
+            {status.settings.source === "env" ? " (valores de entorno)" : ""}
+          </p>
+        ) : null}
+        <p className="mt-2 text-sm">
+          <Link href="/admin/settings" className="font-medium text-teal-800 underline">
+            Editar configuración →
+          </Link>
+        </p>
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
           <p className="text-sm text-stone-600">
             Pendientes en cola:{" "}
@@ -559,12 +495,21 @@ export function CronAdminClient() {
                 )}
               </>
             ) : null}
+            {status?.settings?.telegramFlushResumeAt ? (
+              <>
+                {" "}
+                · reintento programado{" "}
+                {new Date(
+                  status.settings.telegramFlushResumeAt,
+                ).toLocaleString("es-ES")}
+              </>
+            ) : null}
           </p>
           <button
             type="button"
             disabled={flushingTelegram || loadingStatus}
             onClick={() => void flushTelegramNow()}
-            className="inline-flex h-9 items-center border border-stone-300 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink hover:text-ink disabled:opacity-60"
+            className="admin-btn admin-btn-ghost h-9"
           >
             {flushingTelegram ? "Enviando…" : "Enviar lote ahora"}
           </button>
@@ -580,7 +525,7 @@ export function CronAdminClient() {
       </section>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="border border-stone-300 bg-white p-5">
+        <div className="admin-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Activos
           </p>
@@ -588,7 +533,7 @@ export function CronAdminClient() {
             {loadingStatus ? "…" : (status?.activeProducts ?? "—")}
           </p>
         </div>
-        <div className="border border-stone-300 bg-white p-5">
+        <div className="admin-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Con URL Amazon
           </p>
@@ -596,7 +541,7 @@ export function CronAdminClient() {
             {loadingStatus ? "…" : (status?.withAmazonUrl ?? "—")}
           </p>
         </div>
-        <div className="border border-stone-300 bg-white p-5">
+        <div className="admin-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Última revisión
           </p>
@@ -610,7 +555,7 @@ export function CronAdminClient() {
         </div>
       </section>
 
-      <section className="mt-8 border border-stone-300 bg-white p-6">
+      <section className="mt-8 admin-card p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
           Acción primaria
         </p>
@@ -631,14 +576,14 @@ export function CronAdminClient() {
               max="50"
               value={limit}
               onChange={(event) => setLimit(event.target.value)}
-              className="mt-2 block h-11 w-28 border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2 !w-28"
             />
           </label>
           <button
             type="button"
             disabled={running || runningFlash}
             onClick={() => void runCron()}
-            className="inline-flex h-11 items-center bg-ink px-6 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
+            className="admin-btn admin-btn-primary"
           >
             {running ? "Revisando…" : "Revisar precios ahora"}
           </button>
@@ -666,7 +611,7 @@ export function CronAdminClient() {
               max="40"
               value={flashLimit}
               onChange={(event) => setFlashLimit(event.target.value)}
-              className="mt-2 block h-11 w-28 border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2 !w-28"
             />
           </label>
           <button
@@ -719,7 +664,7 @@ export function CronAdminClient() {
           ) : null}
 
           {flashResult.products && flashResult.products.length > 0 ? (
-            <div className="border border-stone-300 bg-white">
+            <div className="admin-card">
               <div className="border-b border-stone-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
                 Productos Flash insertados
               </div>
@@ -770,7 +715,7 @@ export function CronAdminClient() {
                       }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-9 shrink-0 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper transition hover:bg-teal-900"
+                      className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-[10px]"
                     >
                       Ir a Amazon
                     </a>
@@ -822,7 +767,7 @@ export function CronAdminClient() {
           ) : null}
 
           {result.stats.deals.length > 0 ? (
-            <div className="border border-stone-300 bg-white">
+            <div className="admin-card">
               <div className="border-b border-stone-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
                 Chollos en esta pasada
               </div>
@@ -862,7 +807,7 @@ export function CronAdminClient() {
                       }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-9 shrink-0 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper transition hover:bg-teal-900"
+                      className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-[10px]"
                     >
                       Ir a Amazon
                     </a>
@@ -898,7 +843,7 @@ export function CronAdminClient() {
 
 function ResultStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="border border-stone-300 bg-white p-5">
+    <div className="admin-card p-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
         {label}
       </p>

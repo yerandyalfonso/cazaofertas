@@ -1,29 +1,76 @@
 /**
  * URL pública del sitio (previews OG, enlaces Telegram “Ver en la web”).
  */
+function normalizeSiteBase(url: string): string {
+  return url.replace(/\/$/, "");
+}
+
+function isLocalDevHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".local")
+  );
+}
+
+function vercelProductionSiteUrl(): string | null {
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercel) {
+    return `https://${normalizeSiteBase(vercel)}`;
+  }
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    return `https://${normalizeSiteBase(vercelUrl)}`;
+  }
+  return null;
+}
+
 export function getSiteUrl(): string {
   const explicit =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     process.env.SITE_URL?.trim();
   if (explicit) {
-    return explicit.replace(/\/$/, "");
+    return normalizeSiteBase(explicit);
   }
 
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel) {
-    return `https://${vercel.replace(/\/$/, "")}`;
+  return vercelProductionSiteUrl() ?? "https://cazaofertas-olive.vercel.app";
+}
+
+/**
+ * URL HTTPS para botones/enlaces de Telegram (nunca localhost).
+ * Prioridad: TELEGRAM_SITE_URL → sitio público no local → Vercel → fallback prod.
+ */
+export function getTelegramSiteUrl(): string {
+  const telegramExplicit = process.env.TELEGRAM_SITE_URL?.trim();
+  if (telegramExplicit) {
+    return normalizeSiteBase(telegramExplicit);
   }
 
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) {
-    return `https://${vercelUrl.replace(/\/$/, "")}`;
+  const explicit =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.SITE_URL?.trim();
+  if (explicit) {
+    try {
+      const parsed = new URL(explicit);
+      if (parsed.protocol === "https:" && !isLocalDevHost(parsed.hostname)) {
+        return normalizeSiteBase(explicit);
+      }
+    } catch {
+      // ignore malformed URL
+    }
   }
 
-  return "https://cazaofertas-olive.vercel.app";
+  return vercelProductionSiteUrl() ?? "https://cazaofertas-olive.vercel.app";
 }
 
 export function absoluteUrl(path: string): string {
   const base = getSiteUrl();
+  if (!path || path === "/") return base;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function telegramAbsoluteUrl(path: string): string {
+  const base = getTelegramSiteUrl();
   if (!path || path === "/") return base;
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }

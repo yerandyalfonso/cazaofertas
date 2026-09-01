@@ -5,6 +5,8 @@ import {
   EditorialDivider,
 } from "@/components/blog/EditorialChrome";
 import { ProsCons } from "@/components/blog/ProsCons";
+import { FaqBlock } from "@/components/blog/FaqBlock";
+import { renderArticleInlineText } from "@/lib/article-inline-markdown";
 import type { BlogBlock } from "@/lib/blog";
 import type { CatalogProduct } from "@/lib/catalog";
 
@@ -64,12 +66,13 @@ export function BlogContent({
               key={key}
               className="text-base leading-relaxed text-stone-700 md:text-lg md:leading-8"
             >
-              {block.text}
+              {renderArticleInlineText(block.text)}
             </p>
           );
         }
 
         if (block.type === "heading") {
+          const headingText = renderArticleInlineText(block.text);
           if (block.level === 2) {
             return (
               <h2
@@ -78,7 +81,7 @@ export function BlogContent({
                   index === 0 ? "" : "!mt-12 md:!mt-16"
                 }`}
               >
-                {block.text}
+                {headingText}
               </h2>
             );
           }
@@ -91,7 +94,7 @@ export function BlogContent({
                   index === 0 ? "" : "!mt-8"
                 }`}
               >
-                {block.text}
+                {headingText}
               </h4>
             );
           }
@@ -103,7 +106,7 @@ export function BlogContent({
                 index === 0 ? "" : "!mt-10"
               }`}
             >
-              {block.text}
+              {headingText}
             </h3>
           );
         }
@@ -118,7 +121,9 @@ export function BlogContent({
               }`}
             >
               {block.items.map((item, itemIndex) => (
-                <li key={`${key}-${itemIndex}`}>{item}</li>
+                <li key={`${key}-${itemIndex}`}>
+                  {renderArticleInlineText(item)}
+                </li>
               ))}
             </ListTag>
           );
@@ -162,6 +167,16 @@ export function BlogContent({
               pros={block.pros}
               cons={block.cons}
               title={block.title}
+            />
+          );
+        }
+
+        if (block.type === "faq") {
+          return (
+            <FaqBlock
+              key={key}
+              title={block.title}
+              items={block.items}
             />
           );
         }

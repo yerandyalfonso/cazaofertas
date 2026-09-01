@@ -1,3 +1,4 @@
+import { resolveAmazonAssociateTagSync } from "@/services/appSettings";
 import { AmazonCreatorsApiProvider } from "@/providers/price/AmazonCreatorsApiProvider";
 import { AmazonHtmlPriceProvider } from "@/providers/price/AmazonHtmlPriceProvider";
 import { KeepaPriceProvider } from "@/providers/price/KeepaPriceProvider";
@@ -37,7 +38,7 @@ function hasCreatorsCredentials(): boolean {
   return Boolean(
     process.env.AMAZON_API_ACCESS_KEY?.trim() &&
       process.env.AMAZON_API_SECRET?.trim() &&
-      (process.env.AMAZON_ASSOCIATE_TAG?.trim() ||
+      (resolveAmazonAssociateTagSync() ||
         process.env.AMAZON_PARTNER_TAG?.trim()),
   );
 }
@@ -70,7 +71,7 @@ function createCreatorsProvider(
   const accessKey = process.env.AMAZON_API_ACCESS_KEY?.trim() ?? "";
   const secretKey = process.env.AMAZON_API_SECRET?.trim() ?? "";
   const partnerTag =
-    process.env.AMAZON_ASSOCIATE_TAG?.trim() ||
+    resolveAmazonAssociateTagSync() ||
     process.env.AMAZON_PARTNER_TAG?.trim() ||
     "";
 

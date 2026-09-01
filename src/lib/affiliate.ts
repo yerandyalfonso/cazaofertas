@@ -1,3 +1,5 @@
+import { resolveAmazonAssociateTagSync } from "@/services/appSettings";
+
 const MARKETPLACE_DOMAINS: Record<string, string> = {
   ES: "www.amazon.es",
   FR: "www.amazon.fr",
@@ -17,7 +19,7 @@ export interface AffiliateProductInput {
 export type AffiliateUrlInput = string | AffiliateProductInput;
 
 function getAssociateTag(): string {
-  return process.env.AMAZON_ASSOCIATE_TAG?.trim() || DEFAULT_ASSOCIATE_TAG;
+  return resolveAmazonAssociateTagSync();
 }
 
 function getMarketplaceDomain(): string {

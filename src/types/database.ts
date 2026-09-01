@@ -491,6 +491,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      article_comments: {
+        Row: {
+          id: string;
+          article_id: string;
+          parent_id: string | null;
+          author_name: string;
+          author_email: string | null;
+          body: string;
+          admin_reply: string | null;
+          admin_replied_at: string | null;
+          status: string;
+          notify_on_reply: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          article_id: string;
+          parent_id?: string | null;
+          author_name: string;
+          author_email?: string | null;
+          body: string;
+          admin_reply?: string | null;
+          admin_replied_at?: string | null;
+          status?: string;
+          notify_on_reply?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          article_id?: string;
+          parent_id?: string | null;
+          author_name?: string;
+          author_email?: string | null;
+          body?: string;
+          admin_reply?: string | null;
+          admin_replied_at?: string | null;
+          status?: string;
+          notify_on_reply?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "article_comments_article_id_fkey";
+            columns: ["article_id"];
+            isOneToOne: false;
+            referencedRelation: "articles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       article_products: {
         Row: {
           id: string;
@@ -560,26 +613,128 @@ export type Database = {
         };
         Relationships: [];
       };
+      coupons: {
+        Row: {
+          id: string;
+          retailer: string;
+          title: string;
+          code: string;
+          description: string;
+          url: string;
+          starts_at: string | null;
+          expires_at: string | null;
+          highlight: boolean;
+          source: string;
+          is_active: boolean;
+          external_id: string | null;
+          terms: string | null;
+          last_seen_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          retailer: string;
+          title: string;
+          code: string;
+          description?: string;
+          url: string;
+          starts_at?: string | null;
+          expires_at?: string | null;
+          highlight?: boolean;
+          source?: string;
+          is_active?: boolean;
+          external_id?: string | null;
+          terms?: string | null;
+          last_seen_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          retailer?: string;
+          title?: string;
+          code?: string;
+          description?: string;
+          url?: string;
+          starts_at?: string | null;
+          expires_at?: string | null;
+          highlight?: boolean;
+          source?: string;
+          is_active?: boolean;
+          external_id?: string | null;
+          terms?: string | null;
+          last_seen_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       app_settings: {
         Row: {
           id: string;
           telegram_min_score: number;
+          miravia_telegram_min_score: number;
+          kiabi_telegram_min_score: number;
           telegram_batch_hours: number;
+          telegram_flush_reschedule_minutes: number;
+          amazon_associate_tag: string | null;
+          amazon_flash_insert_limit: number;
+          miravia_deals_enabled: boolean;
+          miravia_min_discount_percent: number;
+          miravia_discovery_max_items: number;
+          miravia_flash_limit: number;
+          miravia_flash_update_limit: number;
+          kiabi_deals_enabled: boolean;
+          kiabi_min_discount_percent: number;
+          kiabi_discovery_max_items: number;
+          kiabi_new_products_only: boolean;
           last_telegram_flush_at: string | null;
+          telegram_flush_resume_at: string | null;
           updated_at: string;
         };
         Insert: {
           id?: string;
           telegram_min_score?: number;
+          miravia_telegram_min_score?: number;
+          kiabi_telegram_min_score?: number;
           telegram_batch_hours?: number;
+          telegram_flush_reschedule_minutes?: number;
+          amazon_associate_tag?: string | null;
+          amazon_flash_insert_limit?: number;
+          miravia_deals_enabled?: boolean;
+          miravia_min_discount_percent?: number;
+          miravia_discovery_max_items?: number;
+          miravia_flash_limit?: number;
+          miravia_flash_update_limit?: number;
+          kiabi_deals_enabled?: boolean;
+          kiabi_min_discount_percent?: number;
+          kiabi_discovery_max_items?: number;
+          kiabi_new_products_only?: boolean;
           last_telegram_flush_at?: string | null;
+          telegram_flush_resume_at?: string | null;
           updated_at?: string;
         };
         Update: {
           id?: string;
           telegram_min_score?: number;
+          miravia_telegram_min_score?: number;
+          kiabi_telegram_min_score?: number;
           telegram_batch_hours?: number;
+          telegram_flush_reschedule_minutes?: number;
+          amazon_associate_tag?: string | null;
+          amazon_flash_insert_limit?: number;
+          miravia_deals_enabled?: boolean;
+          miravia_min_discount_percent?: number;
+          miravia_discovery_max_items?: number;
+          miravia_flash_limit?: number;
+          miravia_flash_update_limit?: number;
+          kiabi_deals_enabled?: boolean;
+          kiabi_min_discount_percent?: number;
+          kiabi_discovery_max_items?: number;
+          kiabi_new_products_only?: boolean;
           last_telegram_flush_at?: string | null;
+          telegram_flush_resume_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -608,3 +763,4 @@ export type PriceHistoryRow =
 export type ArticleRow = Database["public"]["Tables"]["articles"]["Row"];
 export type ArticleProductRow =
   Database["public"]["Tables"]["article_products"]["Row"];
+export type CouponRow = Database["public"]["Tables"]["coupons"]["Row"];
