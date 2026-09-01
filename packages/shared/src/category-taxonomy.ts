@@ -334,7 +334,6 @@ export function parseSubcategorySlug(
 function resolveParentSlugFromComposite(
   slug: string,
 ): BlogCategorySlug | null {
-  if (isBlogCategorySlug(slug)) return slug;
   for (const category of BLOG_CATEGORIES) {
     if (slug.startsWith(`${category.slug}-`)) {
       return category.slug;

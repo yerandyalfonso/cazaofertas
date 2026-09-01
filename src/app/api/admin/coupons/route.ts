@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
+
+type CouponUpdate = Database["public"]["Tables"]["coupons"]["Update"];
 
 type CouponBody = {
   id?: string;
@@ -107,7 +110,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const patch: Record<string, unknown> = {
+    const patch: CouponUpdate = {
       updated_at: new Date().toISOString(),
     };
     if (body.retailer !== undefined) {

@@ -6,7 +6,7 @@
  * https://www.miravia.es/ch/coupon-catalogue/coupon-catalogue
  */
 
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -285,7 +285,7 @@ async function fetchCatalogueBenefitsViaChrome(): Promise<BenefitVO[]> {
 
   const port = 9300 + Math.floor(Math.random() * 200);
   const userDataDir = join(tmpdir(), `miravia-coupons-${randomUUID()}`);
-  const proc: ChildProcessWithoutNullStreams = spawn(
+  const proc: ChildProcess = spawn(
     bin,
     [
       `--remote-debugging-port=${port}`,

@@ -16,6 +16,10 @@ import {
   rotateFeedUrls,
 } from "@/lib/feed-urls";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import type { Database } from "@/types/database";
+
+type AppSettingsInsert = Database["public"]["Tables"]["app_settings"]["Insert"];
+type AppSettingsUpdate = Database["public"]["Tables"]["app_settings"]["Update"];
 
 export const APP_SETTINGS_ID = "default";
 export const DEFAULT_TELEGRAM_BATCH_HOURS = 4;
@@ -409,7 +413,7 @@ async function ensureRow(): Promise<AppSettingsRow | null> {
     if (existing) return existing;
 
     const env = envDefaults();
-    const insertAttempts = [
+    const insertAttempts: AppSettingsInsert[] = [
       {
         id: APP_SETTINGS_ID,
         telegram_min_score: env.telegramMinScore,
@@ -450,7 +454,7 @@ export async function persistTelegramFlushAt(
 ): Promise<void> {
   const client = createSupabaseServiceClient();
   const now = new Date().toISOString();
-  const attempts: Array<Record<string, string | null>> = [
+  const attempts: AppSettingsUpdate[] = [
     {
       last_telegram_flush_at: lastFlushAt,
       telegram_flush_resume_at: null,
