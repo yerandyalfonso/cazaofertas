@@ -4,12 +4,25 @@
  */
 
 import { getTelegramMinScore as getTelegramMinScoreFromEnv } from "@/lib/env";
+import {
+  DEFAULT_AMAZON_FLASH_FEED_URLS,
+  DEFAULT_KIABI_FEED_URLS,
+  DEFAULT_MIRAVIA_FEED_URLS,
+  effectiveFeedUrls,
+} from "@/lib/default-feed-urls";
+import {
+  formatFeedUrlsText,
+  parseFeedUrlsText,
+  rotateFeedUrls,
+} from "@/lib/feed-urls";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 
 export const APP_SETTINGS_ID = "default";
 export const DEFAULT_TELEGRAM_BATCH_HOURS = 4;
 export const DEFAULT_TELEGRAM_FLUSH_RESCHEDULE_MINUTES = 20;
 export const DEFAULT_AMAZON_ASSOCIATE_TAG = "cazaoferta-21";
+
+export const DEFAULT_TELEGRAM_FLUSH_LIMIT = 40;
 
 const SETTINGS_CACHE_TTL_MS = 30_000;
 let settingsCache: { value: AppSettings; expiresAt: number } | null = null;
@@ -32,6 +45,13 @@ export interface AppSettings {
   kiabiMinDiscountPercent: number;
   kiabiDiscoveryMaxItems: number;
   kiabiNewProductsOnly: boolean;
+  amazonFlashFeedUrls: string[];
+  miraviaFeedUrls: string[];
+  kiabiFeedUrls: string[];
+  amazonDepartmentFeedsPerRun: number;
+  miraviaFeedsPerRun: number;
+  kiabiFeedsPerRun: number;
+  telegramFlushLimit: number;
   lastTelegramFlushAt: string | null;
   telegramFlushResumeAt: string | null;
   updatedAt: string | null;
@@ -57,6 +77,13 @@ export type AppSettingsPatch = Partial<
     | "kiabiMinDiscountPercent"
     | "kiabiDiscoveryMaxItems"
     | "kiabiNewProductsOnly"
+    | "amazonFlashFeedUrls"
+    | "miraviaFeedUrls"
+    | "kiabiFeedUrls"
+    | "amazonDepartmentFeedsPerRun"
+    | "miraviaFeedsPerRun"
+    | "kiabiFeedsPerRun"
+    | "telegramFlushLimit"
     | "lastTelegramFlushAt"
     | "telegramFlushResumeAt"
   >
@@ -80,13 +107,67 @@ type AppSettingsRow = {
   kiabi_min_discount_percent?: number | string | null;
   kiabi_discovery_max_items?: number | string | null;
   kiabi_new_products_only?: boolean | null;
+  amazon_flash_feed_urls?: string | null;
+  miravia_feed_urls?: string | null;
+  kiabi_feed_urls?: string | null;
+  amazon_department_feeds_per_run?: number | string | null;
+  miravia_feeds_per_run?: number | string | null;
+  kiabi_feeds_per_run?: number | string | null;
+  telegram_flush_limit?: number | string | null;
   last_telegram_flush_at?: string | null;
   telegram_flush_resume_at?: string | null;
   updated_at?: string | null;
 };
 
 const SETTINGS_COLUMNS =
+  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, amazon_flash_feed_urls, miravia_feed_urls, kiabi_feed_urls, amazon_department_feeds_per_run, miravia_feeds_per_run, kiabi_feeds_per_run, telegram_flush_limit, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+
+/** Sin columnas de feeds (0027). */
+const SETTINGS_COLUMNS_WITHOUT_FEEDS =
   "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+
+/** Solo Telegram batch (0018 + 0025). */
+const SETTINGS_COLUMNS_TELEGRAM_BATCH =
+  "id, telegram_min_score, telegram_batch_hours, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+
+const SETTINGS_SELECT_TIERS = [
+  SETTINGS_COLUMNS,
+  SETTINGS_COLUMNS_WITHOUT_FEEDS,
+  SETTINGS_COLUMNS_TELEGRAM_BATCH,
+  "id, telegram_min_score, telegram_batch_hours, last_telegram_flush_at, updated_at",
+  "id, telegram_min_score, updated_at",
+] as const;
+
+function isSchemaColumnError(error: { message?: string } | null): boolean {
+  const msg = error?.message?.toLowerCase() ?? "";
+  return (
+    msg.includes("schema cache") ||
+    (msg.includes("could not find") && msg.includes("column"))
+  );
+}
+
+async function fetchSettingsRow(
+  client: ReturnType<typeof createSupabaseServiceClient>,
+): Promise<AppSettingsRow | null> {
+  for (const columns of SETTINGS_SELECT_TIERS) {
+    const { data, error } = await client
+      .from("app_settings")
+      .select(columns)
+      .eq("id", APP_SETTINGS_ID)
+      .maybeSingle();
+
+    if (!error) {
+      return (data ?? null) as AppSettingsRow | null;
+    }
+    if (!isSchemaColumnError(error)) {
+      console.warn("[app_settings]", error.message);
+      return null;
+    }
+  }
+  return null;
+}
+
+export { formatFeedUrlsText };
 
 function clampScore(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -161,6 +242,24 @@ function envDefaults(): Omit<
       process.env.KIABI_DISCOVERY_MAX_ITEMS ?? "100",
     ),
     kiabiNewProductsOnly: envBool(process.env.KIABI_NEW_PRODUCTS_ONLY, true),
+    amazonFlashFeedUrls:
+      parseFeedUrlsText(process.env.AMAZON_FLASH_FEED_URLS).length > 0
+        ? parseFeedUrlsText(process.env.AMAZON_FLASH_FEED_URLS)
+        : [...DEFAULT_AMAZON_FLASH_FEED_URLS],
+    miraviaFeedUrls:
+      parseFeedUrlsText(process.env.MIRAVIA_FEED_URLS).length > 0
+        ? parseFeedUrlsText(process.env.MIRAVIA_FEED_URLS)
+        : [...DEFAULT_MIRAVIA_FEED_URLS],
+    kiabiFeedUrls:
+      parseFeedUrlsText(process.env.KIABI_FEED_URLS).length > 0
+        ? parseFeedUrlsText(process.env.KIABI_FEED_URLS)
+        : [...DEFAULT_KIABI_FEED_URLS],
+    amazonDepartmentFeedsPerRun: Number(
+      process.env.AMAZON_FLASH_DEPARTMENT_FEEDS_PER_RUN ?? "3",
+    ),
+    miraviaFeedsPerRun: 1,
+    kiabiFeedsPerRun: 1,
+    telegramFlushLimit: DEFAULT_TELEGRAM_FLUSH_LIMIT,
   };
 }
 
@@ -231,6 +330,37 @@ function mapRow(row: AppSettingsRow): AppSettings {
     ),
     kiabiNewProductsOnly:
       row.kiabi_new_products_only ?? env.kiabiNewProductsOnly,
+    amazonFlashFeedUrls: row.amazon_flash_feed_urls?.trim()
+      ? parseFeedUrlsText(row.amazon_flash_feed_urls)
+      : env.amazonFlashFeedUrls,
+    miraviaFeedUrls: row.miravia_feed_urls?.trim()
+      ? parseFeedUrlsText(row.miravia_feed_urls)
+      : env.miraviaFeedUrls,
+    kiabiFeedUrls: row.kiabi_feed_urls?.trim()
+      ? parseFeedUrlsText(row.kiabi_feed_urls)
+      : env.kiabiFeedUrls,
+    amazonDepartmentFeedsPerRun: clampSmallInt(
+      Number(
+        row.amazon_department_feeds_per_run ?? env.amazonDepartmentFeedsPerRun,
+      ),
+      env.amazonDepartmentFeedsPerRun,
+      8,
+    ),
+    miraviaFeedsPerRun: clampSmallInt(
+      Number(row.miravia_feeds_per_run ?? env.miraviaFeedsPerRun),
+      env.miraviaFeedsPerRun,
+      5,
+    ),
+    kiabiFeedsPerRun: clampSmallInt(
+      Number(row.kiabi_feeds_per_run ?? env.kiabiFeedsPerRun),
+      env.kiabiFeedsPerRun,
+      5,
+    ),
+    telegramFlushLimit: clampSmallInt(
+      Number(row.telegram_flush_limit ?? env.telegramFlushLimit),
+      env.telegramFlushLimit,
+      80,
+    ),
     lastTelegramFlushAt: row.last_telegram_flush_at ?? null,
     telegramFlushResumeAt: row.telegram_flush_resume_at ?? null,
     updatedAt: row.updated_at ?? null,
@@ -275,40 +405,103 @@ export function resolveAmazonAssociateTagSync(): string {
 async function ensureRow(): Promise<AppSettingsRow | null> {
   try {
     const client = createSupabaseServiceClient();
-    const { data, error } = await client
-      .from("app_settings")
-      .select(SETTINGS_COLUMNS)
-      .eq("id", APP_SETTINGS_ID)
-      .maybeSingle();
-
-    if (error) {
-      console.warn("[app_settings]", error.message);
-      return null;
-    }
-    if (data) return data as AppSettingsRow;
+    const existing = await fetchSettingsRow(client);
+    if (existing) return existing;
 
     const env = envDefaults();
-    const { data: inserted, error: insertError } = await client
-      .from("app_settings")
-      .insert({
+    const insertAttempts = [
+      {
         id: APP_SETTINGS_ID,
         telegram_min_score: env.telegramMinScore,
         telegram_batch_hours: env.telegramBatchHours,
-      })
-      .select(SETTINGS_COLUMNS)
-      .single();
+      },
+      {
+        id: APP_SETTINGS_ID,
+        telegram_min_score: env.telegramMinScore,
+      },
+    ];
 
-    if (insertError) {
-      console.warn("[app_settings] insert", insertError.message);
-      return null;
+    for (const payload of insertAttempts) {
+      const { error: insertError } = await client
+        .from("app_settings")
+        .insert(payload);
+      if (!insertError) {
+        return fetchSettingsRow(client);
+      }
+      if (!isSchemaColumnError(insertError)) {
+        console.warn("[app_settings] insert", insertError.message);
+        return null;
+      }
     }
-    return inserted as AppSettingsRow;
+
+    return null;
   } catch (error) {
     console.warn(
       "[app_settings]",
       error instanceof Error ? error.message : error,
     );
     return null;
+  }
+}
+
+/** Actualiza solo el timestamp del último lote Telegram (sin upsert completo). */
+export async function persistTelegramFlushAt(
+  lastFlushAt: string,
+): Promise<void> {
+  const client = createSupabaseServiceClient();
+  const now = new Date().toISOString();
+  const attempts: Array<Record<string, string | null>> = [
+    {
+      last_telegram_flush_at: lastFlushAt,
+      telegram_flush_resume_at: null,
+      updated_at: now,
+    },
+    {
+      last_telegram_flush_at: lastFlushAt,
+      updated_at: now,
+    },
+  ];
+
+  for (const patch of attempts) {
+    const { error } = await client
+      .from("app_settings")
+      .update(patch)
+      .eq("id", APP_SETTINGS_ID);
+    if (!error) {
+      if (settingsCache) {
+        settingsCache = {
+          value: {
+            ...settingsCache.value,
+            lastTelegramFlushAt: lastFlushAt,
+            telegramFlushResumeAt: null,
+          },
+          expiresAt: settingsCache.expiresAt,
+        };
+      }
+      return;
+    }
+    if (!isSchemaColumnError(error)) {
+      throw new Error(error.message);
+    }
+  }
+
+  throw new Error(
+    "No se pudo guardar last_telegram_flush_at. Aplica las migraciones 0018–0027 en Supabase.",
+  );
+}
+
+export async function clearTelegramFlushResumeAt(): Promise<void> {
+  const client = createSupabaseServiceClient();
+  const { error } = await client
+    .from("app_settings")
+    .update({
+      telegram_flush_resume_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", APP_SETTINGS_ID);
+
+  if (error && !isSchemaColumnError(error)) {
+    console.warn("[app_settings] clear resume", error.message);
   }
 }
 
@@ -431,6 +624,38 @@ export async function updateAppSettings(
         : current.kiabiDiscoveryMaxItems,
     kiabiNewProductsOnly:
       patch.kiabiNewProductsOnly ?? current.kiabiNewProductsOnly,
+    amazonFlashFeedUrls:
+      patch.amazonFlashFeedUrls !== undefined
+        ? patch.amazonFlashFeedUrls
+        : current.amazonFlashFeedUrls,
+    miraviaFeedUrls:
+      patch.miraviaFeedUrls !== undefined
+        ? patch.miraviaFeedUrls
+        : current.miraviaFeedUrls,
+    kiabiFeedUrls:
+      patch.kiabiFeedUrls !== undefined
+        ? patch.kiabiFeedUrls
+        : current.kiabiFeedUrls,
+    amazonDepartmentFeedsPerRun:
+      patch.amazonDepartmentFeedsPerRun !== undefined
+        ? clampSmallInt(
+            patch.amazonDepartmentFeedsPerRun,
+            current.amazonDepartmentFeedsPerRun,
+            8,
+          )
+        : current.amazonDepartmentFeedsPerRun,
+    miraviaFeedsPerRun:
+      patch.miraviaFeedsPerRun !== undefined
+        ? clampSmallInt(patch.miraviaFeedsPerRun, current.miraviaFeedsPerRun, 5)
+        : current.miraviaFeedsPerRun,
+    kiabiFeedsPerRun:
+      patch.kiabiFeedsPerRun !== undefined
+        ? clampSmallInt(patch.kiabiFeedsPerRun, current.kiabiFeedsPerRun, 5)
+        : current.kiabiFeedsPerRun,
+    telegramFlushLimit:
+      patch.telegramFlushLimit !== undefined
+        ? clampSmallInt(patch.telegramFlushLimit, current.telegramFlushLimit, 80)
+        : current.telegramFlushLimit,
     lastTelegramFlushAt:
       patch.lastTelegramFlushAt !== undefined
         ? patch.lastTelegramFlushAt
@@ -465,6 +690,13 @@ export async function updateAppSettings(
         kiabi_min_discount_percent: merged.kiabiMinDiscountPercent,
         kiabi_discovery_max_items: merged.kiabiDiscoveryMaxItems,
         kiabi_new_products_only: merged.kiabiNewProductsOnly,
+        amazon_flash_feed_urls: formatFeedUrlsText(merged.amazonFlashFeedUrls),
+        miravia_feed_urls: formatFeedUrlsText(merged.miraviaFeedUrls),
+        kiabi_feed_urls: formatFeedUrlsText(merged.kiabiFeedUrls),
+        amazon_department_feeds_per_run: merged.amazonDepartmentFeedsPerRun,
+        miravia_feeds_per_run: merged.miraviaFeedsPerRun,
+        kiabi_feeds_per_run: merged.kiabiFeedsPerRun,
+        telegram_flush_limit: merged.telegramFlushLimit,
         last_telegram_flush_at: merged.lastTelegramFlushAt,
         telegram_flush_resume_at: merged.telegramFlushResumeAt,
         updated_at: now,
@@ -477,7 +709,7 @@ export async function updateAppSettings(
   if (error || !data) {
     throw new Error(
       error?.message ??
-        "No se pudo guardar app_settings. ¿Aplicaste las migraciones 0017–0026?",
+        "No se pudo guardar app_settings. Aplica en Supabase las migraciones 0025–0027 (scripts/supabase-pending-app-settings.sql).",
     );
   }
 
@@ -490,4 +722,37 @@ export async function updateTelegramMinScore(
   score: number,
 ): Promise<AppSettings> {
   return updateAppSettings({ telegramMinScore: score });
+}
+
+export async function resolveAmazonFlashFeedUrlsForRun(): Promise<string[]> {
+  const settings = await getAppSettings();
+  const pool = effectiveFeedUrls(
+    settings.amazonFlashFeedUrls,
+    DEFAULT_AMAZON_FLASH_FEED_URLS,
+  );
+  return rotateFeedUrls(pool, {
+    perRun: settings.amazonDepartmentFeedsPerRun,
+  });
+}
+
+export async function resolveMiraviaFeedUrlsForRun(): Promise<string[]> {
+  const settings = await getAppSettings();
+  const pool = effectiveFeedUrls(
+    settings.miraviaFeedUrls,
+    DEFAULT_MIRAVIA_FEED_URLS,
+  );
+  return rotateFeedUrls(pool, { perRun: settings.miraviaFeedsPerRun });
+}
+
+export async function resolveKiabiFeedUrlsForRun(): Promise<string[]> {
+  const settings = await getAppSettings();
+  const pool = effectiveFeedUrls(
+    settings.kiabiFeedUrls,
+    DEFAULT_KIABI_FEED_URLS,
+  );
+  return rotateFeedUrls(pool, { perRun: settings.kiabiFeedsPerRun });
+}
+
+export async function resolveTelegramFlushLimit(): Promise<number> {
+  return (await getAppSettings()).telegramFlushLimit;
 }

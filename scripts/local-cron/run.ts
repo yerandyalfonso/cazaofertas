@@ -55,12 +55,8 @@ async function runCheckPrices(): Promise<void> {
   });
   console.log(JSON.stringify({ retail }, null, 2));
 
-  const { flushPendingChannelNotifications } = await import(
-    "@/services/telegramFlush"
-  );
-  const telegramFlush = await flushPendingChannelNotifications({
-    force: false,
-  });
+  const { maybeFlushTelegramBatch } = await import("@/services/telegramFlush");
+  const telegramFlush = await maybeFlushTelegramBatch();
   console.log(JSON.stringify({ telegramFlush }, null, 2));
 
   await reviewCheckPricesResult(amazon);
@@ -89,23 +85,6 @@ async function runFlashDeals(): Promise<void> {
     notify: true,
   });
 
-  const queuedTelegram =
-    (miravia.channelNotificationsQueued ?? 0) +
-    (result.channelNotificationsQueued ?? 0);
-  let telegramFlush: Awaited<
-    ReturnType<
-      typeof import("@/services/telegramFlush")["flushPendingChannelNotifications"]
-    >
-  > | null = null;
-  if (process.env.TELEGRAM_FLUSH_ON_FLASH !== "0") {
-    const { flushPendingChannelNotifications, countQueuedChannelNotifications } =
-      await import("@/services/telegramFlush");
-    const pendingBefore = await countQueuedChannelNotifications();
-    if (queuedTelegram > 0 || pendingBefore > 0) {
-      telegramFlush = await flushPendingChannelNotifications({ force: true });
-    }
-  }
-
   const processed =
     (result.inserted ?? 0) +
     (result.updated ?? 0) +
@@ -120,7 +99,6 @@ async function runFlashDeals(): Promise<void> {
   const payload = {
     ...result,
     miravia,
-    telegramFlush,
     pause: {
       activated: pause.paused,
       denials: pause.denials,

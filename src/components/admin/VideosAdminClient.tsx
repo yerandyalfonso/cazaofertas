@@ -665,7 +665,7 @@ export function VideosAdminClient({
           <button
             type="button"
             onClick={() => persist()}
-            className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em]"
+            className="admin-btn admin-btn-ghost"
           >
             <Save className="h-3.5 w-3.5" />
             Guardar
@@ -681,7 +681,7 @@ export function VideosAdminClient({
                 setPreviewing(false);
               }
             }}
-            className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em]"
+            className="admin-btn admin-btn-ghost"
           >
             {previewing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -690,7 +690,7 @@ export function VideosAdminClient({
             )}
             Preview
           </button>
-          <div className="flex items-center gap-1 border border-stone-300 bg-white p-1">
+          <div className="admin-card flex items-center gap-1 p-1">
             {(["webm", "mp4"] as const).map((fmt) => (
               <button
                 key={fmt}
@@ -715,7 +715,7 @@ export function VideosAdminClient({
                 setExporting(false);
               }
             }}
-            className="inline-flex h-11 items-center gap-2 bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
+            className="admin-btn admin-btn-primary"
           >
             {exporting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -797,7 +797,7 @@ export function VideosAdminClient({
               {loading ? (
                 <p className="text-sm text-stone-500">Cargando productos…</p>
               ) : (
-                <ul className="max-h-[42vh] divide-y divide-stone-200 overflow-auto border border-stone-200 bg-white">
+                <ul className="max-h-[42vh] divide-y divide-stone-200 admin-table-wrap">
                   {filteredProducts.map((product) => {
                     const thumb = proxiedThumb(product.imageUrl);
                     return (
@@ -854,7 +854,7 @@ export function VideosAdminClient({
                 </ul>
               )}
 
-              <div className="border border-stone-200 bg-white p-4 md:p-5">
+              <div className="admin-card p-4 md:p-5">
                 <p className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
                   Estilo de tarjeta (productos)
                 </p>
@@ -866,7 +866,7 @@ export function VideosAdminClient({
               </div>
             </>
           ) : (
-            <ul className="max-h-[52vh] divide-y divide-stone-200 overflow-auto border border-stone-200 bg-white">
+            <ul className="max-h-[52vh] divide-y divide-stone-200 admin-table-wrap">
               {cardProjects.length === 0 ? (
                 <li className="px-4 py-8 text-sm text-stone-500">
                   No hay tarjetas guardadas. Crea alguna en Redes / Tarjetas.
@@ -899,7 +899,7 @@ export function VideosAdminClient({
         </div>
 
         <aside className="space-y-4">
-          <div className="border border-stone-200 bg-white p-4">
+          <div className="admin-card p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
               Timeline
             </p>

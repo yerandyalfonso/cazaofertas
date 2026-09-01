@@ -21,6 +21,7 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           parent_id: string | null;
+          show_in_blog: boolean;
         };
         Insert: {
           id?: string;
@@ -31,6 +32,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           parent_id?: string | null;
+          show_in_blog?: boolean;
         };
         Update: {
           id?: string;
@@ -41,6 +43,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           parent_id?: string | null;
+          show_in_blog?: boolean;
         };
         Relationships: [
           {
@@ -689,6 +692,13 @@ export type Database = {
           kiabi_min_discount_percent: number;
           kiabi_discovery_max_items: number;
           kiabi_new_products_only: boolean;
+          amazon_flash_feed_urls: string | null;
+          miravia_feed_urls: string | null;
+          kiabi_feed_urls: string | null;
+          amazon_department_feeds_per_run: number;
+          miravia_feeds_per_run: number;
+          kiabi_feeds_per_run: number;
+          telegram_flush_limit: number;
           last_telegram_flush_at: string | null;
           telegram_flush_resume_at: string | null;
           updated_at: string;
@@ -711,6 +721,13 @@ export type Database = {
           kiabi_min_discount_percent?: number;
           kiabi_discovery_max_items?: number;
           kiabi_new_products_only?: boolean;
+          amazon_flash_feed_urls?: string | null;
+          miravia_feed_urls?: string | null;
+          kiabi_feed_urls?: string | null;
+          amazon_department_feeds_per_run?: number;
+          miravia_feeds_per_run?: number;
+          kiabi_feeds_per_run?: number;
+          telegram_flush_limit?: number;
           last_telegram_flush_at?: string | null;
           telegram_flush_resume_at?: string | null;
           updated_at?: string;
@@ -733,6 +750,13 @@ export type Database = {
           kiabi_min_discount_percent?: number;
           kiabi_discovery_max_items?: number;
           kiabi_new_products_only?: boolean;
+          amazon_flash_feed_urls?: string | null;
+          miravia_feed_urls?: string | null;
+          kiabi_feed_urls?: string | null;
+          amazon_department_feeds_per_run?: number;
+          miravia_feeds_per_run?: number;
+          kiabi_feeds_per_run?: number;
+          telegram_flush_limit?: number;
           last_telegram_flush_at?: string | null;
           telegram_flush_resume_at?: string | null;
           updated_at?: string;

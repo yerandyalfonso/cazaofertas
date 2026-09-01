@@ -240,6 +240,19 @@ export function retailerLabel(retailer: string | null | undefined): string {
   return retailer.charAt(0).toUpperCase() + retailer.slice(1);
 }
 
+/** Colores de badge de tienda (alineados con marketplace /cupones). */
+export const RETAILER_COLORS: Record<string, string> = {
+  amazon: "#FF9900",
+  kiabi: "#E4002B",
+  carrefour: "#004E9F",
+  miravia: "#6C2BD9",
+};
+
+export function retailerColor(retailer: string | null | undefined): string {
+  if (!retailer) return "#4f7f6a";
+  return RETAILER_COLORS[retailer.toLowerCase()] ?? "#4f7f6a";
+}
+
 /** CTA principal en ficha de producto: "Ir a Kiabi", "Ir a Amazon", etc. */
 export function retailerBuyCtaLabel(retailer: string | null | undefined): string {
   return `Ir a ${retailerLabel(retailer)}`;

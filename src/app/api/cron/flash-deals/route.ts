@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     await assertCronAllowed({ force });
 
     const limitParam = request.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? Number.parseInt(limitParam, 10) : 12;
+    const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
+    const limit =
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
     const feedParam = request.nextUrl.searchParams.get("feeds");
     const feedUrls = feedParam
       ? feedParam.split(",").map((url) => url.trim()).filter(Boolean)
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
     const runMiravia = request.nextUrl.searchParams.get("miravia") !== "0";
 
     const result = await runFlashDealsCheck({
-      limit: Number.isFinite(limit) && limit > 0 ? limit : 12,
+      limit,
       feedUrls,
       injectedAsins,
       allowSimulatedFallback,
@@ -53,19 +55,6 @@ export async function GET(request: NextRequest) {
           notify: request.nextUrl.searchParams.get("notify") !== "0",
         })
       : null;
-
-    const queuedTelegram =
-      (miravia?.channelNotificationsQueued ?? 0) +
-      (result.channelNotificationsQueued ?? 0);
-    let telegramFlush = null;
-    if (request.nextUrl.searchParams.get("telegramFlush") !== "0") {
-      const { flushPendingChannelNotifications, countQueuedChannelNotifications } =
-        await import("@/services/telegramFlush");
-      const pendingBefore = await countQueuedChannelNotifications();
-      if (queuedTelegram > 0 || pendingBefore > 0) {
-        telegramFlush = await flushPendingChannelNotifications({ force: true });
-      }
-    }
 
     const processed =
       (result.inserted ?? 0) +
@@ -81,7 +70,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...result,
       miravia,
-      telegramFlush,
       pause: {
         activated: pause.paused,
         denials: pause.denials,
@@ -124,7 +112,7 @@ export async function POST(request: NextRequest) {
     await assertCronAllowed({ force: body.force });
 
     const result = await runFlashDealsCheck({
-      limit: body.limit ?? 12,
+      limit: body.limit && body.limit > 0 ? body.limit : undefined,
       feedUrls: body.feedUrls,
       injectedAsins: body.injectedAsins,
       allowSimulatedFallback: body.allowSimulatedFallback ?? true,
@@ -140,19 +128,6 @@ export async function POST(request: NextRequest) {
             notify: body.notify ?? true,
           });
 
-    const queuedTelegram =
-      (miravia?.channelNotificationsQueued ?? 0) +
-      (result.channelNotificationsQueued ?? 0);
-    let telegramFlush = null;
-    if (body.telegramFlush !== false) {
-      const { flushPendingChannelNotifications, countQueuedChannelNotifications } =
-        await import("@/services/telegramFlush");
-      const pendingBefore = await countQueuedChannelNotifications();
-      if (queuedTelegram > 0 || pendingBefore > 0) {
-        telegramFlush = await flushPendingChannelNotifications({ force: true });
-      }
-    }
-
     const processed =
       (result.inserted ?? 0) +
       (result.updated ?? 0) +
@@ -167,7 +142,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...result,
       miravia,
-      telegramFlush,
       pause: {
         activated: pause.paused,
         denials: pause.denials,

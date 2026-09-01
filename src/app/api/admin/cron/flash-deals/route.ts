@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await runFlashDealsCheck({
-      limit: body.limit ?? 20,
+      limit: body.limit && body.limit > 0 ? body.limit : undefined,
       feedUrls: body.feedUrls,
       injectedAsins: body.injectedAsins,
       allowSimulatedFallback: body.allowSimulatedFallback ?? true,

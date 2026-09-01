@@ -8,6 +8,7 @@ import {
 } from "@/components/blog/EditorialChrome";
 import { ProsCons } from "@/components/blog/ProsCons";
 import { TelegramCategoryCta } from "@/components/blog/TelegramCategoryCta";
+import { ArticleComments } from "@/components/blog/ArticleComments";
 import type { BlogPost } from "@/lib/blog";
 import { BLOG_IMAGES } from "@/lib/blog-images";
 import type { CatalogProduct } from "@/lib/catalog";
@@ -65,6 +66,12 @@ export function BlogArticleView({ post, products }: BlogArticleViewProps) {
           }
           articleId={post.id}
         />
+
+        {post.id ? (
+          <div className="mt-14">
+            <ArticleComments articleId={post.id} articleSlug={post.slug} />
+          </div>
+        ) : null}
 
         {(presentation.pros.length > 0 || presentation.cons.length > 0) &&
         !post.body.some((block) => block.type === "prosCons") ? (

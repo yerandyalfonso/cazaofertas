@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { AdminPageLoadingSkeleton } from "@/components/admin/AdminSkeleton";
 import {
   formatVideoProjectDate,
   loadVideoProjects,
@@ -12,8 +14,7 @@ import {
   type VideoProject,
 } from "@/lib/video-projects";
 
-const iconBtnClass =
-  "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:opacity-40";
+const iconBtnClass = "admin-icon-btn";
 
 const TRANSITION_LABEL: Record<string, string> = {
   fade: "Fade",
@@ -65,7 +66,7 @@ export function VideoListClient() {
         </div>
         <Link
           href="/admin/videos/new"
-          className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper hover:bg-teal-900"
+          className="admin-btn admin-btn-primary"
         >
           <Plus className="h-4 w-4" />
           Nuevo vídeo
@@ -73,20 +74,17 @@ export function VideoListClient() {
       </div>
 
       {loading ? (
-        <div className="mt-10 flex items-center justify-center text-stone-500">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Cargando…
+        <div className="mt-8">
+          <AdminPageLoadingSkeleton variant="table" />
         </div>
       ) : projects.length === 0 ? (
-        <div className="mt-10 border border-dashed border-stone-300 bg-white px-6 py-12 text-center">
-          <p className="text-sm text-stone-600">Aún no hay vídeos guardados.</p>
-          <Link
-            href="/admin/videos/new"
-            className="mt-4 inline-flex text-sm font-medium text-teal-800 underline"
-          >
-            Crear el primero
-          </Link>
-        </div>
+        <AdminEmptyState
+          className="mt-10"
+          title="Aún no hay vídeos guardados"
+          subtitle="Crea timelines con productos o tarjetas para redes."
+          actionLabel="Crear el primero"
+          actionHref="/admin/videos/new"
+        />
       ) : (
         <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
           <table className="min-w-full text-left text-sm">

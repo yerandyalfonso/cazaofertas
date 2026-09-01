@@ -28,7 +28,7 @@ export function ArticleStyleGuide({
   const outline = getTemplateStyleOutline(focusTemplate);
 
   return (
-    <section className="border border-stone-300 bg-white">
+    <section className="admin-card">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -112,7 +112,7 @@ export function ArticleStyleGuide({
               })}
             </div>
 
-            <div className="mt-4 border border-stone-200 bg-stone-50/80 p-4">
+            <div className="mt-4 admin-card bg-[var(--surface-muted)]/80 p-4">
               <p className="font-display text-lg tracking-tight text-ink">
                 {outline.label}
               </p>

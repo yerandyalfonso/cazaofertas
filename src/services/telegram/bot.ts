@@ -17,7 +17,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
 import { resolveTelegramTopicId } from "@/lib/telegram-topics";
 import { formatRetailerHashtag } from "@/lib/retailers";
-import { resolveParentSlug } from "@/lib/category-taxonomy";
+import { isGeneralSubcategorySlug, resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { inferRetailerFromAsin } from "@/services/products";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -261,7 +261,7 @@ function toTelegramHashtag(raw: string): string | null {
 /**
  * Hashtag de categoría/subcategoría.
  * Para subcategorías `padre-hijo` (p. ej. bebe-bebes) → hoja #bebes.
- * Defaults `moda-moda` / `belleza-belleza` → solo #moda / #belleza (sin #modamoda).
+ * Subcategoría General (hogar-general) → solo hashtag del padre (#hogar).
  */
 export function formatCategoryHashtag(
   name?: string | null,
@@ -278,8 +278,8 @@ export function formatCategoryHashtag(
     const lower = raw.toLowerCase();
     if (lower.startsWith(prefix)) {
       const leaf = lower.slice(prefix.length);
-      // moda-moda / belleza-belleza / juguetes-juguetes → misma etiqueta que el padre
-      if (!leaf || leaf === resolvedParent) {
+      // padre-general → misma etiqueta que el padre
+      if (!leaf || leaf === "general" || leaf === resolvedParent) {
         raw = resolvedParent;
       } else {
         raw = leaf;
@@ -355,13 +355,12 @@ export function buildDealAlertText(
   const subLabel = deal.categoryName?.trim();
   const parentSlug = deal.parentCategorySlug?.trim().toLowerCase() || "";
   const subSlug = deal.categorySlug?.trim().toLowerCase() || "";
-  const isMirrorDefaultSub =
-    Boolean(parentSlug) && subSlug === `${parentSlug}-${parentSlug}`;
+  const isGeneralSub = isGeneralSubcategorySlug(subSlug, parentSlug);
   const categoryLine =
     parentLabel &&
     subLabel &&
     parentLabel !== subLabel &&
-    !isMirrorDefaultSub
+    !isGeneralSub
       ? `${parentLabel} · ${subLabel}`
       : parentLabel || subLabel || null;
 
@@ -372,9 +371,9 @@ export function buildDealAlertText(
   const subTag = formatCategoryHashtag(deal.categoryName, deal.categorySlug, {
     parentSlug: deal.parentCategorySlug,
   });
-  // Si la sub es el default espejo (moda-moda), no repetir hashtag.
+  // Si la sub es General, no repetir hashtag.
   const effectiveSubTag =
-    isMirrorDefaultSub || subTag === parentTag ? null : subTag;
+    isGeneralSub || subTag === parentTag ? null : subTag;
   const retailerTag = formatRetailerHashtag(
     deal.retailer ?? inferRetailerFromAsin(deal.asin),
   );

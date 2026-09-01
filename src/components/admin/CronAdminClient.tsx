@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { retailerLabel } from "@/lib/retailers";
 
 interface CronStatus {
   activeProducts: number;
   withAmazonUrl: number;
+  retailMonitorable?: number;
   lastCheckedAt: string | null;
   oldestCheckedAt?: string | null;
   neverChecked?: number;
+  byRetailer?: Array<{ retailer: string; count: number }>;
   cronControl?: {
     isPaused: boolean;
     pausedUntil: string | null;
@@ -24,6 +28,7 @@ interface CronStatus {
     kiabiTelegramMinScore?: number;
     telegramBatchHours: number;
     telegramFlushRescheduleMinutes?: number;
+    telegramFlushLimit?: number;
     amazonAssociateTag?: string;
     lastTelegramFlushAt: string | null;
     telegramFlushResumeAt?: string | null;
@@ -31,6 +36,10 @@ interface CronStatus {
     updatedAt: string | null;
   } | null;
   pendingTelegram?: number;
+  failedTelegram?: number;
+  queuedTelegram?: number;
+  telegramBatchDue?: boolean;
+  telegramNextFlushAt?: string | null;
   facebookConfigured?: boolean;
 }
 
@@ -100,7 +109,15 @@ interface FlashRunResult {
   errors?: Array<{ asin: string; message: string }>;
 }
 
-export function CronAdminClient() {
+export function CronAdminClient({
+  mode = "full",
+  embedded = false,
+}: {
+  mode?: "full" | "monitor" | "run";
+  embedded?: boolean;
+} = {}) {
+  const showMonitor = mode === "full" || mode === "monitor";
+  const showRun = mode === "full" || mode === "run";
   const toast = useAdminToast();
   const [status, setStatus] = useState<CronStatus | null>(null);
   const [result, setResult] = useState<CronRunResult | null>(null);
@@ -145,12 +162,18 @@ export function CronAdminClient() {
       setStatus({
         activeProducts: data.activeProducts,
         withAmazonUrl: data.withAmazonUrl,
+        retailMonitorable: data.retailMonitorable,
         lastCheckedAt: data.lastCheckedAt,
         oldestCheckedAt: data.oldestCheckedAt,
         neverChecked: data.neverChecked,
+        byRetailer: data.byRetailer,
         cronControl: data.cronControl,
         settings: data.settings ?? null,
         pendingTelegram: data.pendingTelegram ?? 0,
+        failedTelegram: data.failedTelegram ?? 0,
+        queuedTelegram: data.queuedTelegram ?? 0,
+        telegramBatchDue: data.telegramBatchDue,
+        telegramNextFlushAt: data.telegramNextFlushAt ?? null,
         facebookConfigured: data.facebookConfigured ?? false,
       });
     } catch (err) {
@@ -382,26 +405,30 @@ export function CronAdminClient() {
 
   return (
     <div>
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
-          Operaciones
-        </p>
-        <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
-          Monitorización / Cron
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Rotación por lotes (los más antiguos primero) para cubrir el catálogo
-          al día sin saturar Amazon. Si hay denegaciones, los crons se pausan
-          solos un tiempo prudencial.
-        </p>
-      </header>
+      {!embedded ? (
+        <header>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+            Operaciones
+          </p>
+          <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
+            Monitorización / Cron
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-stone-600">
+            Rotación por lotes (los más antiguos primero) para cubrir el catálogo
+            al día sin saturar Amazon. Si hay denegaciones, los crons se pausan
+            solos un tiempo prudencial.
+          </p>
+        </header>
+      ) : null}
 
       {error ? (
-        <p className="mt-6 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <p className={`${embedded ? "" : "mt-6"} border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800`}>
           {error}
         </p>
       ) : null}
 
+      {showMonitor ? (
+        <>
       {status?.cronControl?.isPaused ? (
         <div className="mt-6 border border-amber-300 bg-amber-50 px-4 py-4">
           <p className="text-sm font-semibold text-amber-950">
@@ -455,9 +482,9 @@ export function CronAdminClient() {
           Canal / grupo Telegram
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
-          El cron sigue recopilando ofertas. Al grupo, a @cazador_de_ofertas y
-          a Facebook (si hay token) se envía un lote con lo pendiente según la
-          configuración. Las alertas personales del bot no cambian.
+          Los crons solo encolan ofertas. El envío al grupo respeta el intervalo
+          configurado (p. ej. cada 4 h); check-prices o «Enviar lote ahora»
+          publican cuando toca.
         </p>
         {status?.settings ? (
           <p className="mt-3 text-sm text-stone-600">
@@ -469,23 +496,48 @@ export function CronAdminClient() {
               ? ` · Kiabi ≥ ${status.settings.kiabiTelegramMinScore}`
               : ""}
             {" · "}lote cada {status.settings.telegramBatchHours} h
-            {status.settings.telegramFlushRescheduleMinutes != null
-              ? ` · reintento ${status.settings.telegramFlushRescheduleMinutes} min`
+            {status.settings.telegramFlushLimit != null
+              ? ` · máx. ${status.settings.telegramFlushLimit} por envío`
+              : ""}
+            {status?.telegramBatchDue ? " · lote listo para enviar" : ""}
+            {!loadingStatus && status?.telegramNextFlushAt && !status?.telegramBatchDue
+              ? ` · próximo lote ${new Date(status.telegramNextFlushAt).toLocaleString("es-ES")}`
               : ""}
             {status.settings.source === "env" ? " (valores de entorno)" : ""}
           </p>
         ) : null}
         <p className="mt-2 text-sm">
-          <Link href="/admin/settings" className="font-medium text-teal-800 underline">
+          <Link
+            href="/admin/cron?tab=config"
+            className="font-medium text-teal-800 underline"
+          >
             Editar configuración →
           </Link>
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
           <p className="text-sm text-stone-600">
-            Pendientes en cola:{" "}
+            Pendientes:{" "}
             <span className="font-medium text-ink">
               {loadingStatus ? "…" : (status?.pendingTelegram ?? 0)}
             </span>
+            {!loadingStatus && (status?.failedTelegram ?? 0) > 0 ? (
+              <>
+                {" "}
+                · fallidos (reintento):{" "}
+                <span className="font-medium text-amber-900">
+                  {status?.failedTelegram}
+                </span>
+              </>
+            ) : null}
+            {!loadingStatus && (status?.queuedTelegram ?? 0) > 0 ? (
+              <>
+                {" "}
+                · en cola total:{" "}
+                <span className="font-medium text-ink">
+                  {status?.queuedTelegram}
+                </span>
+              </>
+            ) : null}
             {status?.settings?.lastTelegramFlushAt ? (
               <>
                 {" "}
@@ -493,15 +545,6 @@ export function CronAdminClient() {
                 {new Date(status.settings.lastTelegramFlushAt).toLocaleString(
                   "es-ES",
                 )}
-              </>
-            ) : null}
-            {status?.settings?.telegramFlushResumeAt ? (
-              <>
-                {" "}
-                · reintento programado{" "}
-                {new Date(
-                  status.settings.telegramFlushResumeAt,
-                ).toLocaleString("es-ES")}
               </>
             ) : null}
           </p>
@@ -524,7 +567,7 @@ export function CronAdminClient() {
         </p>
       </section>
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-3">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="admin-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Activos
@@ -535,10 +578,26 @@ export function CronAdminClient() {
         </div>
         <div className="admin-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
-            Con URL Amazon
+            Amazon monitorizable
           </p>
           <p className="mt-3 font-display text-2xl">
             {loadingStatus ? "…" : (status?.withAmazonUrl ?? "—")}
+          </p>
+        </div>
+        <div className="admin-card p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            Retail monitorizable
+          </p>
+          <p className="mt-3 font-display text-2xl">
+            {loadingStatus ? "…" : (status?.retailMonitorable ?? "—")}
+          </p>
+        </div>
+        <div className="admin-card p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            Sin revisar
+          </p>
+          <p className="mt-3 font-display text-2xl">
+            {loadingStatus ? "…" : (status?.neverChecked ?? "—")}
           </p>
         </div>
         <div className="admin-card p-5">
@@ -555,6 +614,43 @@ export function CronAdminClient() {
         </div>
       </section>
 
+      {!loadingStatus && (status?.byRetailer?.length ?? 0) > 0 ? (
+        <section className="admin-card mt-6 max-w-xl p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+            Por tienda
+          </p>
+          <ul className="mt-3 divide-y divide-stone-100">
+            {status!.byRetailer!.map((row) => {
+              const total = status?.activeProducts || 1;
+              const pct = Math.round((row.count / total) * 100);
+              return (
+                <li
+                  key={row.retailer}
+                  className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+                >
+                  <span className="w-24 shrink-0 text-sm font-medium text-ink">
+                    {retailerLabel(row.retailer)}
+                  </span>
+                  <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-teal-700"
+                      style={{ width: `${Math.max(pct, 2)}%` }}
+                    />
+                  </div>
+                  <span className="w-16 shrink-0 text-right text-sm tabular-nums text-stone-600">
+                    {row.count}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+        </>
+      ) : null}
+
+      {showRun ? (
+        <>
       <section className="mt-8 admin-card p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
           Acción primaria
@@ -568,17 +664,16 @@ export function CronAdminClient() {
           catálogo y alimentan el histórico.
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Límite de productos
+          <AdminField label="Límite de productos" className="!w-28 shrink-0">
             <input
               type="number"
               min="1"
               max="50"
               value={limit}
               onChange={(event) => setLimit(event.target.value)}
-              className="admin-input mt-2 !w-28"
+              className="admin-input w-full"
             />
-          </label>
+          </AdminField>
           <button
             type="button"
             disabled={running || runningFlash}
@@ -603,17 +698,16 @@ export function CronAdminClient() {
           lo vigila «Revisar precios» (bajadas → notificación).
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Límite
+          <AdminField label="Límite" className="!w-28 shrink-0">
             <input
               type="number"
               min="1"
               max="40"
               value={flashLimit}
               onChange={(event) => setFlashLimit(event.target.value)}
-              className="admin-input mt-2 !w-28"
+              className="admin-input w-full"
             />
-          </label>
+          </AdminField>
           <button
             type="button"
             disabled={running || runningFlash}
@@ -836,6 +930,8 @@ export function CronAdminClient() {
             </div>
           ) : null}
         </section>
+      ) : null}
+        </>
       ) : null}
     </div>
   );

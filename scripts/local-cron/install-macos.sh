@@ -99,10 +99,11 @@ echo "Logs: $LOG_DIR"
 echo
 
 write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20 *:30 *:40 *:50"
-# Flash dedicado: cada 180 s, hasta 3 ofertas nuevas (feeds por departamento rotados).
+# Flash dedicado: cada 180 s (feeds por departamento rotados; límites vía env).
 write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "180" ""
 write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
+write_plist "com.cazaofertas.cron.coupons-discover" "coupons-discover" "" "10:00 18:00"
 
 echo
 echo "Cargando LaunchAgents..."
@@ -110,19 +111,23 @@ load_agent "com.cazaofertas.cron.check-prices"
 load_agent "com.cazaofertas.cron.flash-deals"
 load_agent "com.cazaofertas.cron.user-alerts"
 load_agent "com.cazaofertas.cron.kiabi-deals"
+load_agent "com.cazaofertas.cron.coupons-discover"
 
 echo
 echo "Listo. Horarios (hora local del Mac):"
-echo "  • check-prices: 2 precios Amazon + lote Telegram si toca — :00, :10, :20, :30, :40, :50"
-echo "  • flash-deals:  cada 3 min · hasta 3 Amazon + Miravia flash · departamentos rotados"
+echo "  • flash-deals:  cada 3 min · solo encola en Telegram (no envía al grupo)"
+echo "  • check-prices: cada 10 min · revisa precios y envía lote Telegram si toca el intervalo"
 echo "  • user-alerts:  08:15 y 20:15 (1 min entre alertas)"
 echo "  • kiabi-deals:  09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1; solo estas 2 pasadas)"
+echo "  • coupons:      10:00 y 18:00 (Amazon/Kiabi/Miravia/Carrefour → tabla coupons)"
 echo "  • telegram:     el lote al grupo se envía según el intervalo del admin (default 4 h)"
 echo
 echo "Prueba manual:"
 echo "  cd \"$REPO_ROOT\" && npm run cron:local:flash"
 echo "  cd \"$REPO_ROOT\" && npm run cron:local:prices"
+echo "  cd \"$REPO_ROOT\" && npm run coupons:discover"
 echo
 echo "Ver logs:"
 echo "  tail -f \"$LOG_DIR/flash-deals.log\""
 echo "  tail -f \"$LOG_DIR/check-prices.log\""
+echo "  tail -f \"$LOG_DIR/coupons-discover.log\""

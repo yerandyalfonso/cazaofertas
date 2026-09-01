@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError, isFacebookPageConfigured } from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
+import { getAdminCatalogStats } from "@/services/adminDashboard";
 import { getAppSettings } from "@/services/appSettings";
 import {
   getCronControlState,
   pauseCronJobs,
   resumeCronJobs,
 } from "@/services/cronControl";
-import { createSupabaseServiceClient } from "@/lib/supabase";
-import { countQueuedChannelNotifications } from "@/services/telegramFlush";
+import {
+  getChannelNotificationQueueStats,
+  getTelegramBatchSchedule,
+} from "@/services/telegramFlush";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -18,45 +21,32 @@ export async function GET(request: NextRequest) {
   try {
     const denied = requireAdminApi(request);
     if (denied) return denied;
-    const client = createSupabaseServiceClient();
 
-    const [{ data, error }, cronControl, appSettings, pendingTelegram] =
+    const [catalog, cronControl, appSettings, telegramQueue, telegramBatch] =
       await Promise.all([
-      client
-        .from("products")
-        .select("last_checked_at, is_active, amazon_url")
-        .eq("is_active", true),
-      getCronControlState().catch(() => null),
-      getAppSettings().catch(() => null),
-      countQueuedChannelNotifications(),
-    ]);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = data ?? [];
-    const checked = rows
-      .map((row) => row.last_checked_at)
-      .filter((value): value is string => Boolean(value))
-      .sort()
-      .reverse();
-    const neverChecked = rows.filter((row) => !row.last_checked_at).length;
-    const oldest = rows
-      .map((row) => row.last_checked_at)
-      .filter((value): value is string => Boolean(value))
-      .sort()[0];
+        getAdminCatalogStats(),
+        getCronControlState().catch(() => null),
+        getAppSettings().catch(() => null),
+        getChannelNotificationQueueStats(),
+        getTelegramBatchSchedule(),
+      ]);
 
     return NextResponse.json({
       ok: true,
-      activeProducts: rows.length,
-      withAmazonUrl: rows.filter((row) => Boolean(row.amazon_url)).length,
-      lastCheckedAt: checked[0] ?? null,
-      oldestCheckedAt: oldest ?? null,
-      neverChecked,
+      activeProducts: catalog.activeProducts,
+      withAmazonUrl: catalog.amazonMonitorable,
+      retailMonitorable: catalog.retailMonitorable,
+      lastCheckedAt: catalog.lastCheckedAt,
+      oldestCheckedAt: catalog.oldestCheckedAt,
+      neverChecked: catalog.neverChecked,
+      byRetailer: catalog.byRetailer,
       cronControl,
       settings: appSettings,
-      pendingTelegram,
+      pendingTelegram: telegramQueue.pending,
+      failedTelegram: telegramQueue.failed,
+      queuedTelegram: telegramQueue.queued,
+      telegramBatchDue: telegramBatch.batchDue,
+      telegramNextFlushAt: telegramBatch.nextFlushAt,
       facebookConfigured: isFacebookPageConfigured(),
     });
   } catch (error) {

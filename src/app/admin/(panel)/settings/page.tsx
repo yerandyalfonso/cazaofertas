@@ -1,5 +1,5 @@
-import { SettingsAdminClient } from "@/components/admin/SettingsAdminClient";
+import { redirect } from "next/navigation";
 
 export default function AdminSettingsPage() {
-  return <SettingsAdminClient />;
+  redirect("/admin/cron?tab=config");
 }

@@ -34,29 +34,35 @@ export default function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-100 px-5">
+    <div className="admin-shell admin-login">
       <form
         onSubmit={(event) => void onSubmit(event)}
-        className="w-full max-w-sm border border-stone-300 bg-white p-8 shadow-sm"
+        className="admin-login-card"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-800">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
           CazaOferta
         </p>
-        <h1 className="mt-2 font-display text-3xl tracking-tight text-ink">
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--text)]">
           Acceso admin
         </h1>
-        <p className="mt-2 text-sm text-stone-600">
+        <p className="mt-2 text-sm text-[var(--text-muted)]">
           Introduce la contraseña de administrador (
-          <code className="rounded bg-stone-100 px-1">ADMIN_PASSWORD</code> o{" "}
-          <code className="rounded bg-stone-100 px-1">CRON_SECRET</code>).
+          <code className="rounded bg-[var(--surface-muted)] px-1">
+            ADMIN_PASSWORD
+          </code>{" "}
+          o{" "}
+          <code className="rounded bg-[var(--surface-muted)] px-1">
+            CRON_SECRET
+          </code>
+          ).
         </p>
-        <label className="mt-6 block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <label className="mt-6 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
           Contraseña
           <input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm text-ink outline-none focus:border-ink"
+            className="admin-input mt-2"
             autoComplete="current-password"
             required
           />
@@ -67,7 +73,7 @@ export default function AdminLoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-6 inline-flex h-11 w-full items-center justify-center bg-ink text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
+          className="admin-btn admin-btn-primary mt-6 w-full"
         >
           {loading ? "Entrando…" : "Entrar"}
         </button>

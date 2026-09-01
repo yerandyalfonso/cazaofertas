@@ -6,7 +6,7 @@ import {
   syntheticAsinForRetailer,
 } from "@/lib/retailers";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
-import { getAppSettings } from "@/services/appSettings";
+import { getAppSettings, resolveMiraviaFeedUrlsForRun } from "@/services/appSettings";
 import {
   discoverMiraviaDeals,
   type MiraviaDiscoveredItem,
@@ -191,10 +191,7 @@ export async function runMiraviaDealsCheck(options?: {
       }
     : await discoverMiraviaDeals({
         feedUrls:
-          options?.feedUrls ??
-          process.env.MIRAVIA_FEED_URLS?.split(/[,\n]/)
-            .map((url) => url.trim())
-            .filter(Boolean),
+          options?.feedUrls ?? (await resolveMiraviaFeedUrlsForRun()),
         maxItems: appSettings.miraviaDiscoveryMaxItems,
         minDiscountPercent: minDiscount,
         delayMs: 600,

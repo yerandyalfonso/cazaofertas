@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
+import { parseFeedUrlsText } from "@/lib/feed-urls";
 import {
   type AppSettingsPatch,
   getAppSettings,
@@ -71,13 +72,17 @@ export async function PATCH(request: NextRequest) {
       "kiabiTelegramMinScore",
       "telegramBatchHours",
       "telegramFlushRescheduleMinutes",
+      "telegramFlushLimit",
       "amazonFlashInsertLimit",
+      "amazonDepartmentFeedsPerRun",
       "miraviaMinDiscountPercent",
       "miraviaDiscoveryMaxItems",
       "miraviaFlashLimit",
       "miraviaFlashUpdateLimit",
+      "miraviaFeedsPerRun",
       "kiabiMinDiscountPercent",
       "kiabiDiscoveryMaxItems",
+      "kiabiFeedsPerRun",
     ];
 
     for (const field of numericFields) {
@@ -95,6 +100,17 @@ export async function PATCH(request: NextRequest) {
 
     if (body.amazonAssociateTag !== undefined) {
       patch.amazonAssociateTag = String(body.amazonAssociateTag ?? "").trim();
+    }
+
+    const feedFields = [
+      "amazonFlashFeedUrls",
+      "miraviaFeedUrls",
+      "kiabiFeedUrls",
+    ] as const;
+    for (const field of feedFields) {
+      if (body[field] !== undefined) {
+        patch[field] = parseFeedUrlsText(String(body[field] ?? ""));
+      }
     }
 
     const boolFields = [

@@ -8,6 +8,7 @@ import { BlogWysiwygEditor } from "@/components/admin/blog-wysiwyg/BlogWysiwygEd
 import { ArticleQuickImport } from "@/components/admin/ArticleQuickImport";
 import { ArticleStyleGuide } from "@/components/admin/ArticleStyleGuide";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { AdminSkeleton } from "@/components/admin/AdminSkeleton";
 import {
   ARTICLE_TEMPLATE_OPTIONS,
   blogBlocksToEditor,
@@ -340,9 +341,17 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
 
   if (loading) {
     return (
-      <p className="flex items-center gap-2 text-sm text-stone-500">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cargando artículo…
-      </p>
+      <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col gap-4">
+        <div>
+          <AdminSkeleton className="h-3 w-24" />
+          <AdminSkeleton className="mt-3 h-9 w-72" />
+        </div>
+        <div className="admin-card flex-1 space-y-4 p-5">
+          <AdminSkeleton className="h-10 w-full max-w-xl" />
+          <AdminSkeleton className="h-64 w-full rounded-[var(--radius-sm)]" />
+          <AdminSkeleton className="h-10 w-40" />
+        </div>
+      </div>
     );
   }
 
@@ -389,7 +398,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
 
         <ArticleStyleGuide activeTemplate={template} />
 
-        <section className="border border-stone-300 bg-white p-6">
+        <section className="admin-card p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Tipo de artículo
           </p>
@@ -427,7 +436,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
           </div>
         </section>
 
-        <section className="grid gap-4 border border-stone-300 bg-white p-6 md:grid-cols-2">
+        <section className="grid gap-4 admin-card p-6 md:grid-cols-2">
           <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
             Título
             <input
@@ -438,7 +447,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
                 setTitle(next);
                 if (!slugTouched) setSlug(slugify(next));
               }}
-              className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
 
@@ -451,7 +460,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
                 setSlugTouched(true);
                 setSlug(slugify(event.target.value));
               }}
-              className="mt-2 h-11 w-full border border-stone-300 px-3 font-mono text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2 font-mono"
             />
           </label>
 
@@ -460,7 +469,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              className="mt-2 h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             >
               <option value="draft">Borrador</option>
               <option value="published">Publicado</option>
@@ -473,7 +482,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             <select
               value={category}
               onChange={(event) => setCategory(event.target.value)}
-              className="mt-2 h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             >
               {CATEGORIES.map((item) => (
                 <option key={item} value={item}>
@@ -488,7 +497,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             <input
               value={author}
               onChange={(event) => setAuthor(event.target.value)}
-              className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
 
@@ -498,7 +507,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
               value={excerpt}
               onChange={(event) => setExcerpt(event.target.value)}
               rows={2}
-              className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
 
@@ -517,7 +526,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
                 type="button"
                 disabled={uploadingImage}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-stone-50 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink disabled:opacity-60"
+                className="admin-btn admin-btn-ghost"
               >
                 {uploadingImage ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -560,7 +569,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
           </label>
         </section>
 
-        <section className="border border-stone-300 bg-white p-6">
+        <section className="admin-card p-6">
           <div className="mb-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
               Contenido
@@ -580,13 +589,13 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
           />
         </section>
 
-        <section className="grid gap-4 border border-stone-300 bg-white p-6 md:grid-cols-2">
+        <section className="grid gap-4 admin-card p-6 md:grid-cols-2">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
             SEO título
             <input
               value={seoTitle}
               onChange={(event) => setSeoTitle(event.target.value)}
-              className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -594,12 +603,12 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             <input
               value={seoDescription}
               onChange={(event) => setSeoDescription(event.target.value)}
-              className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
         </section>
 
-        <section className="border border-stone-300 bg-white p-6">
+        <section className="admin-card p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
             Productos vinculados
           </p>
@@ -747,7 +756,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
+            className="admin-btn admin-btn-primary"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {saving

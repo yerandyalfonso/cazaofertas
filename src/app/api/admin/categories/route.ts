@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
     const client = createSupabaseServiceClient();
     let query = client
       .from("categories")
-      .select("id, name, slug, description, image_url, is_active, created_at")
+      .select(
+        "id, name, slug, description, image_url, is_active, created_at, parent_id, show_in_blog",
+      )
       .order("name");
 
     if (!includeAll) {
@@ -76,6 +78,7 @@ export async function POST(request: NextRequest) {
       slug?: string;
       description?: string;
       image_url?: string;
+      show_in_blog?: boolean;
     };
 
     const name = body.name?.trim();
@@ -104,6 +107,7 @@ export async function POST(request: NextRequest) {
           description: body.description?.trim() || null,
           image_url: body.image_url?.trim() || null,
           is_active: true,
+          show_in_blog: Boolean(body.show_in_blog),
         },
         { onConflict: "slug" },
       )

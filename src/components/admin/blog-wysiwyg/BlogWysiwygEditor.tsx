@@ -3,6 +3,8 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { HelpCircle, Link2, Unlink } from "lucide-react";
+import Link from "@tiptap/extension-link";
 import {
   Bold,
   Heading2,
@@ -21,6 +23,7 @@ import {
 import { useMemo, useRef } from "react";
 import {
   BlogBlockquote,
+  BlogFaq,
   BlogImage,
   BlogProduct,
   BlogProductGrid,
@@ -104,6 +107,17 @@ export function BlogWysiwygEditor({
           code: false,
           codeBlock: false,
           strike: false,
+          link: false,
+        }),
+        Link.configure({
+          openOnClick: false,
+          autolink: true,
+          linkOnPaste: true,
+          HTMLAttributes: {
+            rel: "noopener noreferrer",
+            target: "_blank",
+            class: "text-teal-800 underline",
+          },
         }),
         BlogBlockquote,
         Placeholder.configure({
@@ -114,6 +128,7 @@ export function BlogWysiwygEditor({
         BlogProduct,
         BlogProductGrid,
         BlogProsCons,
+        BlogFaq,
       ],
       content: initialContent,
       editorProps: {
@@ -194,6 +209,41 @@ export function BlogWysiwygEditor({
             <Italic className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
+            label="Enlace"
+            active={editor.isActive("link")}
+            onClick={() => {
+              const previous = editor.getAttributes("link").href as
+                | string
+                | undefined;
+              const url = window.prompt(
+                "URL del enlace",
+                previous || "https://",
+              );
+              if (url === null) return;
+              if (url.trim() === "") {
+                editor.chain().focus().extendMarkRange("link").unsetLink().run();
+                return;
+              }
+              editor
+                .chain()
+                .focus()
+                .extendMarkRange("link")
+                .setLink({ href: url.trim() })
+                .run();
+            }}
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            Enlace
+          </ToolbarButton>
+          <ToolbarButton
+            label="Quitar enlace"
+            onClick={() =>
+              editor.chain().focus().extendMarkRange("link").unsetLink().run()
+            }
+          >
+            <Unlink className="h-3.5 w-3.5" />
+          </ToolbarButton>
+          <ToolbarButton
             label="Lista con viñetas"
             active={editor.isActive("bulletList")}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -261,6 +311,25 @@ export function BlogWysiwygEditor({
             Pros/Contras
           </ToolbarButton>
           <ToolbarButton
+            label="Preguntas frecuentes"
+            onClick={() =>
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: "blogFaq",
+                  attrs: {
+                    title: "Preguntas frecuentes",
+                    items: [{ question: "", answer: "" }],
+                  },
+                })
+                .run()
+            }
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            FAQ
+          </ToolbarButton>
+          <ToolbarButton
             label="Producto"
             onClick={() =>
               editor
@@ -299,9 +368,8 @@ export function BlogWysiwygEditor({
         </div>
 
         <p className="text-xs text-stone-500">
-          Editor visual híbrido: al guardar se convierten a los mismos bloques
-          tipados (sin cambiar la BD). Negrita/cursiva ayudan al redactar; el
-          sitio público publica texto plano por bloque.
+          Editor visual: bloques tipados al guardar. Usa enlace, negrita y cursiva
+          en párrafos; inserta bloques FAQ, imagen o producto desde la barra.
         </p>
       </div>
     </BlogWysiwygContext.Provider>

@@ -1,3 +1,5 @@
+import { resolveCategoryIdBySlug } from "@/lib/categories";
+import { composeSubcategorySlug } from "@/lib/category-taxonomy";
 import { roundMoney, toNumber } from "@/lib/money";
 import { formatDescriptionForStorage } from "@/lib/product-description";
 import { existsSync, readFileSync } from "node:fs";
@@ -14,7 +16,7 @@ import {
   type KiabiDiscoveredItem,
   type KiabiProductQuote,
 } from "@/providers/retail/kiabi";
-import { getAppSettings } from "@/services/appSettings";
+import { getAppSettings, resolveKiabiFeedUrlsForRun } from "@/services/appSettings";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
@@ -128,13 +130,11 @@ async function resolveKiabiQuote(
 async function resolveModaCategoryId(
   client: TypedSupabaseClient,
 ): Promise<string | null> {
-  const { data } = await client
-    .from("categories")
-    .select("id")
-    .eq("slug", "moda-moda")
-    .eq("is_active", true)
-    .maybeSingle();
-  return data?.id ?? null;
+  const category = await resolveCategoryIdBySlug(
+    client,
+    composeSubcategorySlug("moda", "general"),
+  );
+  return category?.id ?? null;
 }
 
 interface CatalogRow {
@@ -207,7 +207,7 @@ async function maybeNotifyKiabiDeal(
     brand: options.brand ?? "Kiabi",
     categoryId: null,
     categoryName: "Moda",
-    categorySlug: "moda-moda",
+    categorySlug: "general",
     parentCategorySlug: "moda",
     parentCategoryName: "Moda",
     retailer: "kiabi",
@@ -286,7 +286,7 @@ export async function runKiabiDealsCheck(options?: {
         usedFallback: false,
       }
     : await discoverKiabiDeals({
-        feedUrls: options?.feedUrls,
+        feedUrls: options?.feedUrls ?? (await resolveKiabiFeedUrlsForRun()),
         maxItems: appSettings.kiabiDiscoveryMaxItems,
         delayMs: 1_000,
       });

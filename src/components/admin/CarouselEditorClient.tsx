@@ -592,7 +592,7 @@ export function CarouselEditorClient({
               type="button"
               onClick={saveCurrentProject}
               disabled={slides.length === 0}
-              className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-ink hover:bg-stone-50 disabled:opacity-40"
+              className="admin-btn admin-btn-ghost"
             >
               <Save className="h-4 w-4" />
               Guardar
@@ -601,7 +601,7 @@ export function CarouselEditorClient({
               type="button"
               onClick={() => void downloadZip()}
               disabled={exporting || slides.length === 0}
-              className="inline-flex h-11 items-center gap-2 bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper disabled:opacity-50"
+              className="admin-btn admin-btn-primary"
             >
               {exporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -822,7 +822,7 @@ export function CarouselEditorClient({
                     aria-label="Slide anterior"
                     disabled={activeIndex <= 0 || exporting}
                     onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
-                    className="inline-flex h-9 w-9 items-center justify-center border border-stone-300 bg-white disabled:opacity-40"
+                    className="admin-icon-btn disabled:opacity-40"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -835,7 +835,7 @@ export function CarouselEditorClient({
                     onClick={() =>
                       setActiveIndex((i) => Math.min(slides.length - 1, i + 1))
                     }
-                    className="inline-flex h-9 w-9 items-center justify-center border border-stone-300 bg-white disabled:opacity-40"
+                    className="admin-icon-btn disabled:opacity-40"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>

@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
+import {
+  AdminPageHeader,
+  AdminSearchToolbar,
+  AdminSortButton,
+} from "@/components/admin/AdminListChrome";
+import { AdminTableSkeleton } from "@/components/admin/AdminSkeleton";
+import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
 import { useAdminToast } from "@/components/admin/AdminToast";
 
 interface AdminCategory {
@@ -11,18 +19,22 @@ interface AdminCategory {
   description: string | null;
   image_url: string | null;
   is_active: boolean;
+  parent_id: string | null;
+  show_in_blog: boolean;
   created_at: string;
   productCount: number;
 }
 
-const iconBtnClass =
-  "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:opacity-40";
+type SortKey = "name" | "slug" | "productCount" | "is_active";
+type SortDir = "asc" | "desc";
+type ActiveFilter = "all" | "active" | "inactive";
 
 const emptyForm = {
   name: "",
   slug: "",
   description: "",
   image_url: "",
+  show_in_blog: false,
 };
 
 export function CategoriesAdminClient() {
@@ -34,6 +46,12 @@ export function CategoriesAdminClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchWorking, setBatchWorking] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +67,7 @@ export function CategoriesAdminClient() {
         return;
       }
       setCategories(data.categories ?? []);
+      setSelectedIds(new Set());
     } catch {
       toast.error("Error de red al cargar categorías.");
     } finally {
@@ -73,6 +92,7 @@ export function CategoriesAdminClient() {
       slug: category.slug,
       description: category.description ?? "",
       image_url: category.image_url ?? "",
+      show_in_blog: category.show_in_blog,
     });
     setShowForm(true);
   }
@@ -101,6 +121,7 @@ export function CategoriesAdminClient() {
             slug: form.slug.trim() || undefined,
             description: form.description.trim() || null,
             image_url: form.image_url.trim() || null,
+            show_in_blog: form.show_in_blog,
           }),
         });
         const data = (await response.json()) as { ok?: boolean; error?: string };
@@ -118,6 +139,7 @@ export function CategoriesAdminClient() {
             slug: form.slug.trim() || undefined,
             description: form.description.trim() || undefined,
             image_url: form.image_url.trim() || undefined,
+            show_in_blog: form.show_in_blog,
           }),
         });
         const data = (await response.json()) as { ok?: boolean; error?: string };
@@ -192,50 +214,223 @@ export function CategoriesAdminClient() {
     }
   }
 
-  return (
-    <div>
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
-            Catálogo
-          </p>
-          <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
-            Categorías
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-stone-600">
-            Gestiona las secciones del sitio y la auto-categorización de productos.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          Nueva categoría
-        </button>
-      </header>
+  async function onBatchDelete() {
+    const selected = categories.filter((c) => selectedIds.has(c.id));
+    if (selected.length === 0) return;
+    if (
+      !window.confirm(
+        `¿Eliminar/desactivar ${selected.length} categorías seleccionadas?`,
+      )
+    ) {
+      return;
+    }
+    setBatchWorking(true);
+    let ok = 0;
+    let fail = 0;
+    for (const category of selected) {
+      try {
+        const response = await fetch(`/api/admin/categories/${category.id}`, {
+          method: "DELETE",
+        });
+        const data = (await response.json()) as { ok?: boolean };
+        if (!response.ok || !data.ok) fail += 1;
+        else ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBatchWorking(false);
+    if (ok) toast.success(`Procesadas: ${ok}`);
+    if (fail) toast.error(`Fallaron: ${fail}`);
+    await load();
+  }
 
-      {showForm ? (
-        <section className="mt-6 border border-stone-300 bg-white p-5">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-display text-xl text-ink">
-              {editingId ? "Editar categoría" : "Nueva categoría"}
-            </h2>
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = categories.filter((c) => {
+      if (activeFilter === "active" && !c.is_active) return false;
+      if (activeFilter === "inactive" && c.is_active) return false;
+      if (!q) return true;
+      return [c.name, c.slug, c.description ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+
+    return [...filtered].sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
+      switch (sortKey) {
+        case "name":
+          av = a.name.toLocaleLowerCase("es");
+          bv = b.name.toLocaleLowerCase("es");
+          break;
+        case "slug":
+          av = a.slug;
+          bv = b.slug;
+          break;
+        case "productCount":
+          av = a.productCount;
+          bv = b.productCount;
+          break;
+        case "is_active":
+          av = a.is_active ? 1 : 0;
+          bv = b.is_active ? 1 : 0;
+          break;
+      }
+      let cmp = 0;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av).localeCompare(String(bv), "es", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [categories, query, activeFilter, sortKey, sortDir]);
+
+  const hasFilters = Boolean(query.trim()) || activeFilter !== "all";
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "productCount" ? "desc" : "asc");
+  }
+
+  function toggleSelectAllVisible() {
+    const ids = visible.map((c) => c.id);
+    const all = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (all) for (const id of ids) next.delete(id);
+      else for (const id of ids) next.add(id);
+      return next;
+    });
+  }
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const editingCategory = editingId
+    ? categories.find((c) => c.id === editingId)
+    : null;
+  const canToggleBlog =
+    !editingCategory || editingCategory.parent_id === null;
+
+  return (
+    <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col md:min-h-[calc(100dvh-5rem)]">
+      <AdminPageHeader
+        eyebrow="Catálogo"
+        title="Categorías"
+        description={
+          loading
+            ? "Cargando categorías…"
+            : `${visible.length} de ${categories.length} categorías`
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={loading}
+              className="admin-btn admin-btn-ghost"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Recargar
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="admin-btn admin-btn-primary"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Nueva categoría
+            </button>
+          </>
+        }
+      />
+
+      <AdminSearchToolbar
+        value={query}
+        onChange={setQuery}
+        placeholder="Buscar por nombre o slug…"
+      >
+        <select
+          value={activeFilter}
+          onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
+          className="admin-select min-w-[140px] w-auto"
+          aria-label="Filtrar por estado"
+        >
+          <option value="all">Todas</option>
+          <option value="active">Activas</option>
+          <option value="inactive">Inactivas</option>
+        </select>
+        {hasFilters ? (
+          <button
+            type="button"
+            className="admin-btn admin-btn-ghost"
+            onClick={() => {
+              setQuery("");
+              setActiveFilter("all");
+            }}
+          >
+            Limpiar filtros
+          </button>
+        ) : null}
+        {selectedIds.size > 0 ? (
+          <button
+            type="button"
+            disabled={batchWorking}
+            onClick={() => void onBatchDelete()}
+            className="admin-btn admin-btn-danger"
+          >
+            {batchWorking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Eliminar ({selectedIds.size})
+          </button>
+        ) : null}
+      </AdminSearchToolbar>
+
+      <AdminSidePanel
+        open={showForm}
+        onClose={closeForm}
+        eyebrow={editingId ? "Editar" : "Alta"}
+        title={editingId ? "Editar categoría" : "Nueva categoría"}
+        size="md"
+        footer={
+          <>
             <button
               type="button"
               onClick={closeForm}
-              className={iconBtnClass}
-              aria-label="Cerrar formulario"
+              className="admin-btn admin-btn-ghost"
             >
-              <X className="h-3.5 w-3.5" />
+              Cancelar
             </button>
-          </div>
-          <form
+            <button
+              type="submit"
+              form="admin-category-form"
+              disabled={saving}
+              className="admin-btn admin-btn-primary"
+            >
+              {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear"}
+            </button>
+          </>
+        }
+      >
+        <form
+            id="admin-category-form"
             onSubmit={(event) => void onSave(event)}
-            className="mt-4 grid gap-4 md:grid-cols-2"
+            className="grid gap-4 md:grid-cols-2"
           >
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="admin-field-label">
               Nombre
               <input
                 required
@@ -243,10 +438,10 @@ export function CategoriesAdminClient() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, name: event.target.value }))
                 }
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="admin-field-label">
               Slug (opcional)
               <input
                 value={form.slug}
@@ -254,10 +449,10 @@ export function CategoriesAdminClient() {
                   setForm((prev) => ({ ...prev, slug: event.target.value }))
                 }
                 placeholder="se-genera-del-nombre"
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
-            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="admin-field-label md:col-span-2">
               Descripción
               <textarea
                 value={form.description}
@@ -268,10 +463,10 @@ export function CategoriesAdminClient() {
                   }))
                 }
                 rows={2}
-                className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
-            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="admin-field-label md:col-span-2">
               URL imagen (opcional)
               <input
                 value={form.image_url}
@@ -279,76 +474,142 @@ export function CategoriesAdminClient() {
                   setForm((prev) => ({ ...prev, image_url: event.target.value }))
                 }
                 placeholder="https://..."
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
-            <div className="md:col-span-2 flex gap-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex h-11 items-center bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper disabled:opacity-50"
-              >
-                {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear"}
-              </button>
-              <button
-                type="button"
-                onClick={closeForm}
-                className="inline-flex h-11 items-center border border-stone-300 px-5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-700"
-              >
-                Cancelar
-              </button>
-            </div>
+            {canToggleBlog ? (
+              <label className="md:col-span-2 flex items-center gap-2 text-sm text-[var(--text)]">
+                <input
+                  type="checkbox"
+                  checked={form.show_in_blog}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      show_in_blog: event.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 accent-[var(--primary)]"
+                />
+                Mostrar en el blog (categoría padre visible en el catálogo público)
+              </label>
+            ) : null}
           </form>
-        </section>
-      ) : null}
+      </AdminSidePanel>
 
-      <div className="mt-8 overflow-x-auto border border-stone-300 bg-white">
+      {!loading && categories.length === 0 ? (
+        <AdminEmptyState
+          className="mt-6"
+          title="Aún no hay categorías"
+          subtitle="Crea la primera categoría para organizar el catálogo y el blog."
+          actionLabel="Crear la primera"
+          onAction={openCreate}
+        />
+      ) : (
+      <div className="admin-table-wrap admin-table-wrap--fill mt-6">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border)] text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
             <tr>
-              <th className="px-4 py-3 font-semibold">Nombre</th>
-              <th className="px-4 py-3 font-semibold">Slug</th>
-              <th className="px-4 py-3 font-semibold">Productos</th>
-              <th className="px-4 py-3 font-semibold">Estado</th>
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={
+                    visible.length > 0 &&
+                    visible.every((c) => selectedIds.has(c.id))
+                  }
+                  onChange={toggleSelectAllVisible}
+                  disabled={loading || visible.length === 0}
+                  aria-label="Seleccionar todas"
+                  className="h-4 w-4 accent-[var(--primary)]"
+                />
+              </th>
+              <th className="px-4 py-3">
+                <AdminSortButton
+                  label="Nombre"
+                  active={sortKey === "name"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("name")}
+                />
+              </th>
+              <th className="px-4 py-3">
+                <AdminSortButton
+                  label="Slug"
+                  active={sortKey === "slug"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("slug")}
+                />
+              </th>
+              <th className="px-4 py-3">
+                <AdminSortButton
+                  label="Productos"
+                  active={sortKey === "productCount"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("productCount")}
+                />
+              </th>
+              <th className="px-4 py-3">Blog</th>
+              <th className="px-4 py-3">
+                <AdminSortButton
+                  label="Estado"
+                  active={sortKey === "is_active"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("is_active")}
+                />
+              </th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
+              <AdminTableSkeleton rows={14} cols={7} />
+            ) : categories.length === 0 ? null : visible.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-stone-500">
-                  Cargando…
-                </td>
-              </tr>
-            ) : categories.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-stone-500">
-                  No hay categorías.
+                <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                  Ninguna categoría coincide con los filtros.
                 </td>
               </tr>
             ) : (
-              categories.map((category) => (
+              visible.map((category) => (
                 <tr
                   key={category.id}
-                  className={`border-t border-stone-100 align-middle ${
-                    !category.is_active ? "bg-stone-50/80" : ""
+                  className={`border-t border-[var(--border)] align-middle ${
+                    !category.is_active ? "bg-[var(--surface-muted)]/80" : ""
                   }`}
                 >
-                  <td className="px-4 py-3 font-medium text-ink">
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(category.id)}
+                      onChange={() => toggleOne(category.id)}
+                      aria-label={`Seleccionar ${category.name}`}
+                      className="h-4 w-4 accent-[var(--primary)]"
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-[var(--text)]">
                     {category.name}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-stone-500">
+                  <td className="px-4 py-3 font-mono text-xs text-[var(--text-muted)]">
                     {category.slug}
                   </td>
-                  <td className="px-4 py-3 text-stone-600">
+                  <td className="px-4 py-3 text-[var(--text-muted)]">
                     {category.productCount}
                   </td>
                   <td className="px-4 py-3">
+                    {category.parent_id === null ? (
+                      <span
+                        className={`admin-badge ${
+                          category.show_in_blog ? "" : "admin-badge--muted"
+                        }`}
+                      >
+                        {category.show_in_blog ? "Blog" : "Oculta"}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--text-muted)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <span
-                      className={`inline-block px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] ${
-                        category.is_active
-                          ? "bg-teal-50 text-teal-900"
-                          : "bg-stone-200 text-stone-600"
+                      className={`admin-badge ${
+                        category.is_active ? "" : "admin-badge--muted"
                       }`}
                     >
                       {category.is_active ? "Activa" : "Inactiva"}
@@ -361,7 +622,7 @@ export function CategoriesAdminClient() {
                         title="Editar"
                         aria-label="Editar categoría"
                         onClick={() => openEdit(category)}
-                        className={iconBtnClass}
+                        className="admin-icon-btn"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -370,7 +631,7 @@ export function CategoriesAdminClient() {
                           type="button"
                           onClick={() => void onReactivate(category)}
                           disabled={saving}
-                          className="inline-flex h-8 items-center rounded-sm border border-teal-800 px-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-teal-900"
+                          className="admin-btn admin-btn-ghost h-8 px-2 text-[10px]"
                         >
                           Activar
                         </button>
@@ -381,7 +642,7 @@ export function CategoriesAdminClient() {
                           aria-label="Eliminar categoría"
                           disabled={deletingId === category.id}
                           onClick={() => void onDelete(category)}
-                          className={`${iconBtnClass} hover:border-rose-600 hover:text-rose-700`}
+                          className="admin-icon-btn hover:border-rose-600 hover:text-rose-700"
                         >
                           {deletingId === category.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -398,6 +659,7 @@ export function CategoriesAdminClient() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,9 @@
-import { resolveParentSlug } from "@/lib/category-taxonomy";
+import {
+  categoryPublicPath,
+  childSlugFromSubcategory,
+  resolveCategoryDisplayMeta,
+  resolveParentSlug,
+} from "@/lib/category-taxonomy";
 import {
   normalizeRetailer,
   resolveProductBuyUrl,
@@ -54,6 +59,8 @@ export interface CatalogProduct {
     slug: string;
     parentSlug: string | null;
     parentName: string | null;
+    childSlug: string | null;
+    path: string;
   } | null;
   dealLevel: DealLevel;
   dealScore: number;
@@ -93,8 +100,19 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     : (parentRaw ?? null);
 
   const subSlug = categoryNode?.slug ?? null;
+  const display = subSlug
+    ? resolveCategoryDisplayMeta(subSlug, parentNode?.slug ?? null)
+    : null;
   const parentSlug =
-    parentNode?.slug ?? (subSlug ? resolveParentSlug(subSlug) : null);
+    parentNode?.slug ??
+    display?.parentSlug ??
+    (subSlug ? resolveParentSlug(subSlug, parentNode?.slug ?? null) : null);
+  const parentName = parentNode?.name ?? display?.parentName ?? null;
+  const subcategoryName =
+    categoryNode?.name ?? display?.subcategoryName ?? null;
+  const childSlug = subSlug
+    ? childSlugFromSubcategory(subSlug, parentSlug)
+    : null;
 
   const currentPrice = toNumber(product.current_price) ?? 0;
   const previousPrice = toNumber(product.previous_price);
@@ -142,10 +160,14 @@ function mapProduct(product: ProductWithCategory): CatalogProduct {
     category: categoryNode
       ? {
           id: categoryNode.id,
-          name: categoryNode.name,
+          name: subcategoryName ?? categoryNode.name,
           slug: categoryNode.slug,
           parentSlug: parentSlug ?? null,
-          parentName: parentNode?.name ?? null,
+          parentName,
+          childSlug,
+          path: parentSlug
+            ? categoryPublicPath(parentSlug, subSlug)
+            : `/categorias/${categoryNode.slug}`,
         }
       : null,
     dealLevel: scoring.level,
@@ -428,6 +450,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
     .from("categories")
     .select("*")
     .eq("is_active", true)
+    .eq("show_in_blog", true)
     .is("parent_id", null)
     .order("name", { ascending: true });
 

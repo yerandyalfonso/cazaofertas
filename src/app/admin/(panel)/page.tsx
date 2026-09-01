@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { createSupabaseServiceClient } from "@/lib/supabase";
-import { productHasMonitorableUrl } from "@/services/products";
+import { retailerLabel } from "@/lib/retailers";
+import {
+  getAdminCatalogStats,
+  getAdminClickStats,
+} from "@/services/adminDashboard";
+import { countPendingChannelNotifications } from "@/services/telegramFlush";
 
 export const dynamic = "force-dynamic";
 
@@ -18,107 +23,66 @@ type ClickRow = {
   products: { title: string; slug: string } | { title: string; slug: string }[] | null;
 };
 
-function startOfDaysAgo(days: number): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - (days - 1));
-  return d.toISOString();
-}
-
 export default async function AdminDashboardPage({
   searchParams,
 }: AdminDashboardPageProps) {
   const params = await searchParams;
   const includeTest = params.include_test === "1";
 
-  let productCount = 0;
-  let monitorable = 0;
-  let lastCheckedAt: string | null = null;
+  let catalog = null;
+  let clicks = null;
+  let pendingTelegram = 0;
   let loadError: string | null = null;
-
-  let clicks7d = 0;
-  let clicks30d = 0;
-  let testClicks7d = 0;
-  let clicksBySource: { source: string; count: number }[] = [];
-  let recentClicks: ClickRow[] = [];
   let clicksError: string | null = null;
+  let recentClicks: ClickRow[] = [];
 
   try {
-    const client = createSupabaseServiceClient();
-    const { data, error } = await client
-      .from("products")
-      .select("id, amazon_url, asin, last_checked_at, is_active")
-      .eq("is_active", true);
-
-    if (error) throw new Error(error.message);
-
-    const rows = data ?? [];
-    productCount = rows.length;
-    monitorable = rows.filter(productHasMonitorableUrl).length;
-    lastCheckedAt =
-      rows
-        .map((row) => row.last_checked_at)
-        .filter((value): value is string => Boolean(value))
-        .sort()
-        .reverse()[0] ?? null;
-
-    const since30 = startOfDaysAgo(30);
-    const since7 = startOfDaysAgo(7);
-
-    let clicksQuery = client
-      .from("affiliate_clicks")
-      .select(
-        "id, product_id, article_id, source, is_test, created_at, products(title, slug)",
-      )
-      .gte("created_at", since30)
-      .order("created_at", { ascending: false })
-      .limit(500);
-
-    if (!includeTest) {
-      clicksQuery = clicksQuery.eq("is_test", false);
-    }
-
-    const { data: clickRows, error: clickErr } = await clicksQuery;
-
-    if (clickErr) {
-      clicksError = clickErr.message;
-    } else {
-      const all = (clickRows ?? []) as ClickRow[];
-      const since7Ms = new Date(since7).getTime();
-
-      const realOrAll = includeTest ? all : all.filter((c) => !c.is_test);
-      clicks30d = realOrAll.length;
-      clicks7d = realOrAll.filter(
-        (c) => new Date(c.created_at).getTime() >= since7Ms,
-      ).length;
-      testClicks7d = all.filter(
-        (c) =>
-          c.is_test && new Date(c.created_at).getTime() >= since7Ms,
-      ).length;
-
-      const sourceMap = new Map<string, number>();
-      for (const click of realOrAll) {
-        const key = click.source || "web";
-        sourceMap.set(key, (sourceMap.get(key) ?? 0) + 1);
-      }
-      clicksBySource = [...sourceMap.entries()]
-        .map(([source, count]) => ({ source, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 8);
-
-      recentClicks = all.slice(0, 12);
-    }
+    const [catalogStats, clickStats, telegramPending] = await Promise.all([
+      getAdminCatalogStats(),
+      getAdminClickStats({ includeTest }),
+      countPendingChannelNotifications(),
+    ]);
+    catalog = catalogStats;
+    clicks = clickStats;
+    pendingTelegram = telegramPending;
   } catch (error) {
     loadError = error instanceof Error ? error.message : "Error al cargar.";
+  }
+
+  if (!loadError) {
+    try {
+      const client = createSupabaseServiceClient();
+      let recentQuery = client
+        .from("affiliate_clicks")
+        .select(
+          "id, product_id, article_id, source, is_test, created_at, products(title, slug)",
+        )
+        .order("created_at", { ascending: false })
+        .limit(12);
+
+      if (!includeTest) {
+        recentQuery = recentQuery.eq("is_test", false);
+      }
+
+      const { data: clickRows, error: clickErr } = await recentQuery;
+      if (clickErr) {
+        clicksError = clickErr.message;
+      } else {
+        recentClicks = (clickRows ?? []) as ClickRow[];
+      }
+    } catch (error) {
+      clicksError =
+        error instanceof Error ? error.message : "Error al cargar clics.";
+    }
   }
 
   return (
     <div>
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
           Panel
         </p>
-        <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
+        <h1 className="mt-2 text-4xl font-bold tracking-tight text-[var(--text)]">
           Dashboard
         </h1>
         <p className="mt-2 max-w-xl text-sm text-stone-600">
@@ -130,24 +94,77 @@ export default async function AdminDashboardPage({
         <p className="mt-8 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {loadError}
         </p>
-      ) : (
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          <StatCard label="Productos activos" value={String(productCount)} />
-          <StatCard
-            label="Con URL Amazon"
-            value={String(monitorable)}
-            hint="Listos para el scraper"
-          />
-          <StatCard
-            label="Última revisión"
-            value={
-              lastCheckedAt
-                ? new Date(lastCheckedAt).toLocaleString("es-ES")
-                : "Sin datos"
-            }
-          />
-        </div>
-      )}
+      ) : catalog ? (
+        <>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Productos activos" value={String(catalog.activeProducts)} />
+            <StatCard
+              label="Amazon monitorizable"
+              value={String(catalog.amazonMonitorable)}
+              hint="Con ASIN o URL Amazon"
+            />
+            <StatCard
+              label="Retail monitorizable"
+              value={String(catalog.retailMonitorable)}
+              hint="Miravia, Kiabi, etc."
+            />
+            <StatCard
+              label="Sin revisar"
+              value={String(catalog.neverChecked)}
+              hint="Nunca comprobados por cron"
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <StatCard
+              label="Última revisión"
+              value={
+                catalog.lastCheckedAt
+                  ? new Date(catalog.lastCheckedAt).toLocaleString("es-ES")
+                  : "Sin datos"
+              }
+            />
+            <StatCard
+              label="Telegram pendientes"
+              value={String(pendingTelegram)}
+              hint="Solo estado pending (sin fallidos)"
+            />
+          </div>
+
+          {catalog.byRetailer.length > 0 ? (
+            <div className="admin-card mt-6 max-w-xl p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+                Por tienda
+              </p>
+              <ul className="mt-3 divide-y divide-stone-100">
+                {catalog.byRetailer.map((row) => {
+                  const total = catalog.activeProducts || 1;
+                  const pct = Math.round((row.count / total) * 100);
+                  return (
+                    <li
+                      key={row.retailer}
+                      className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+                    >
+                      <span className="w-24 shrink-0 text-sm font-medium text-ink">
+                        {retailerLabel(row.retailer)}
+                      </span>
+                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-stone-100">
+                        <div
+                          className="h-full rounded-full bg-[var(--primary)]"
+                          style={{ width: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+                      <span className="w-16 shrink-0 text-right text-sm tabular-nums text-stone-600">
+                        {row.count.toLocaleString("es-ES")}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       <section className="mt-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -161,14 +178,14 @@ export default async function AdminDashboardPage({
             <p className="mt-1 max-w-lg text-sm text-stone-600">
               {includeTest
                 ? "Incluyendo clics de prueba (admin / ?test=true)."
-                : "Solo tráfico real (clics de prueba ocultos)."}
+                : "Solo tráfico real (clics de prueba ocultos). Conteos totales en base de datos."}
             </p>
           </div>
           <Link
             href={
               includeTest ? "/admin" : "/admin?include_test=1"
             }
-            className="inline-flex h-10 items-center border border-stone-400 px-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition hover:border-ink"
+            className="admin-btn admin-btn-ghost"
           >
             {includeTest ? "Ocultar pruebas" : "Mostrar pruebas"}
           </Link>
@@ -181,33 +198,33 @@ export default async function AdminDashboardPage({
             <code className="text-xs">0009_affiliate_clicks_tracking.sql</code>
             ?
           </p>
-        ) : (
+        ) : clicks ? (
           <>
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <StatCard
                 label="Clics (7 días)"
-                value={String(clicks7d)}
+                value={String(clicks.clicks7d)}
                 hint={includeTest ? "Con pruebas incluidas" : "Solo reales"}
               />
               <StatCard
                 label="Clics (30 días)"
-                value={String(clicks30d)}
+                value={String(clicks.clicks30d)}
                 hint={includeTest ? "Con pruebas incluidas" : "Solo reales"}
               />
               <StatCard
                 label="Pruebas (7 días)"
-                value={String(testClicks7d)}
+                value={String(clicks.testClicks7d)}
                 hint="is_test = true"
               />
             </div>
 
-            {clicksBySource.length > 0 ? (
-              <div className="mt-6 border border-stone-300 bg-white p-5">
+            {clicks.bySource.length > 0 ? (
+              <div className="admin-card mt-6 p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
                   Por origen (30 días)
                 </p>
                 <ul className="mt-4 space-y-2">
-                  {clicksBySource.map((row) => (
+                  {clicks.bySource.map((row) => (
                     <li
                       key={row.source}
                       className="flex items-center justify-between text-sm"
@@ -225,7 +242,7 @@ export default async function AdminDashboardPage({
             )}
 
             {recentClicks.length > 0 ? (
-              <div className="mt-6 overflow-x-auto border border-stone-300 bg-white">
+              <div className="admin-table-wrap mt-6">
                 <table className="min-w-full text-left text-sm">
                   <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
                     <tr>
@@ -282,13 +299,13 @@ export default async function AdminDashboardPage({
               </div>
             ) : null}
           </>
-        )}
+        ) : null}
       </section>
 
       <div className="mt-10 grid gap-4 md:grid-cols-3">
         <Link
           href="/admin/products"
-          className="border border-stone-300 bg-white p-6 transition hover:border-ink"
+          className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Gestión
@@ -300,7 +317,7 @@ export default async function AdminDashboardPage({
         </Link>
         <Link
           href="/admin/articles"
-          className="border border-stone-300 bg-white p-6 transition hover:border-ink"
+          className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Editorial
@@ -312,16 +329,16 @@ export default async function AdminDashboardPage({
         </Link>
         <Link
           href="/admin/cron"
-          className="border border-stone-300 bg-white p-6 transition hover:border-ink"
+          className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             Operaciones
           </p>
           <h2 className="mt-2 font-display text-2xl text-ink">
-            Monitorización / Cron
+            Monitorización y configuración
           </h2>
           <p className="mt-2 text-sm text-stone-600">
-            Lanza la revisión de precios y revisa chollos o errores.
+            Estado de crons, feeds, Telegram y ejecución manual.
           </p>
         </Link>
       </div>
@@ -339,14 +356,14 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="border border-stone-300 bg-white p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+    <div className="admin-card p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-3 font-display text-2xl tracking-tight text-ink">
+      <p className="mt-3 text-2xl font-bold tracking-tight text-[var(--text)]">
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-stone-500">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p> : null}
     </div>
   );
 }

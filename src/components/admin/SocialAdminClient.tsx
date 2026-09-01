@@ -1355,7 +1355,7 @@ export function SocialAdminClient({
               type="button"
               onClick={saveCurrentProject}
               disabled={!selected}
-              className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-ink hover:bg-stone-50 disabled:opacity-40"
+              className="admin-btn admin-btn-ghost"
             >
               <Save className="h-4 w-4" />
               Guardar
@@ -1364,7 +1364,7 @@ export function SocialAdminClient({
               type="button"
               onClick={() => void downloadPng()}
               disabled={exporting || !selected}
-              className="inline-flex h-11 items-center gap-2 bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper disabled:opacity-50"
+              className="admin-btn admin-btn-primary"
             >
               {exporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1380,7 +1380,7 @@ export function SocialAdminClient({
           <input
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
-            className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal text-ink outline-none focus:border-ink"
+            className="admin-input mt-2"
             placeholder="Ej. Oferta aspiradora Black Friday"
           />
         </label>
@@ -1393,7 +1393,7 @@ export function SocialAdminClient({
         </p>
       </header>
 
-      <section className="mt-8 space-y-5 border border-stone-300 bg-white p-5 md:p-6">
+      <section className="mt-8 space-y-5 admin-card p-5 md:p-6">
         <SocialCardStyleControls
           value={{
             layoutId,
@@ -1442,14 +1442,14 @@ export function SocialAdminClient({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Título, ASIN o marca…"
-              className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+              className="admin-input mt-2"
             />
           </label>
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
               Producto
             </p>
-            <ul className="mt-2 max-h-44 divide-y divide-stone-200 overflow-auto border border-stone-300 bg-white">
+            <ul className="admin-table-wrap mt-2 max-h-44 divide-y divide-[var(--border)]">
               {loading ? (
                 <li className="px-3 py-3 text-sm text-stone-500">Cargando…</li>
               ) : filtered.length === 0 ? (
@@ -1516,7 +1516,7 @@ export function SocialAdminClient({
             type="button"
             disabled={!selected || exporting || loading}
             onClick={() => void downloadPng()}
-            className="inline-flex h-11 items-center justify-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:cursor-not-allowed disabled:opacity-50"
+            className="admin-btn admin-btn-primary"
           >
             {exporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

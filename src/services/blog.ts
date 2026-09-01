@@ -89,6 +89,8 @@ export function isBlogBlock(value: unknown): value is BlogBlock {
         Array.isArray((value as { pros?: unknown }).pros) &&
         Array.isArray((value as { cons?: unknown }).cons)
       );
+    case "faq":
+      return Array.isArray((value as { items?: unknown }).items);
     default:
       return false;
   }

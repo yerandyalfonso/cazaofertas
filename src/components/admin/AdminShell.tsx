@@ -13,8 +13,7 @@ const NAV = [
   { href: "/admin/categories", label: "Categorías" },
   { href: "/admin/articles", label: "Artículos" },
   { href: "/admin/comments", label: "Comentarios" },
-  { href: "/admin/settings", label: "Configuración" },
-  { href: "/admin/cron", label: "Monitorización / Cron" },
+  { href: "/admin/cron", label: "Operaciones" },
   { href: "/admin/social", label: "Redes / Tarjetas" },
   { href: "/admin/carousels", label: "Carruseles" },
 ] as const;
@@ -45,7 +44,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             : item.href === "/admin/social"
               ? pathname.startsWith("/admin/social") ||
                 pathname.startsWith("/admin/videos")
-              : pathname.startsWith(item.href);
+              : item.href === "/admin/cron"
+                ? pathname.startsWith("/admin/cron") ||
+                  pathname.startsWith("/admin/settings")
+                : pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}

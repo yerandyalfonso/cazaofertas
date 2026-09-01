@@ -19,7 +19,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -37,6 +36,14 @@ import {
   type ProductRetailer,
 } from "@/lib/retailers";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import {
+  AdminPageHeader,
+  AdminRetailerBadge,
+  AdminSearchField,
+} from "@/components/admin/AdminListChrome";
+import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
+import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
+import { AdminProductsTableSkeleton } from "@/components/admin/AdminSkeleton";
 
 interface AdminProduct {
   id: string;
@@ -150,27 +157,6 @@ function freshnessMeta(lastCheckedAt: string | null): {
   };
 }
 
-function sortValue(product: AdminProduct, key: SortKey): string | number {
-  switch (key) {
-    case "title":
-      return product.title.toLocaleLowerCase("es");
-    case "asin":
-      return product.asin;
-    case "currentPrice":
-      return product.currentPrice;
-    case "referencePrice":
-      return product.referencePrice;
-    case "dealScore":
-      return product.dealScore;
-    case "category":
-      return (product.category?.name ?? "").toLocaleLowerCase("es");
-    case "lastCheckedAt":
-      return product.lastCheckedAt
-        ? new Date(product.lastCheckedAt).getTime()
-        : 0;
-  }
-}
-
 const emptyForm = {
   retailer: "amazon" as ProductRetailer,
   productUrl: "",
@@ -184,17 +170,16 @@ const emptyForm = {
   description: "",
 };
 
-const iconBtnClass =
-  "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-stone-200 bg-white text-stone-600 transition hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+const iconBtnClass = "admin-icon-btn";
 
-const toolbarFieldClass =
-  "h-10 border border-stone-300 bg-white px-3 text-sm text-ink outline-none focus:border-ink";
+const toolbarFieldClass = "admin-select w-auto";
 
 export default function ProductsAdminClient() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
@@ -225,6 +210,9 @@ export default function ProductsAdminClient() {
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const lastScrapedUrl = useRef<string>("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const nextOffsetRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const loadInFlightRef = useRef(false);
   const deferredQuery = useDeferredValue(query);
   const toast = useAdminToast();
 
@@ -234,22 +222,65 @@ export default function ProductsAdminClient() {
   );
   const formScrapeSupported = retailerScrapeSupported(form.retailer);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadingMore(false);
-    setError(null);
-    try {
-      const pageSize = 100;
-      let offset = 0;
-      let accumulated: AdminProduct[] = [];
-      let total: number | null = null;
-      let categoriesLoaded = false;
+  const PAGE_SIZE = 100;
 
-      while (true) {
-        if (offset > 0) setLoadingMore(true);
-        const response = await fetch(
-          `/api/admin/products?offset=${offset}&limit=${pageSize}`,
-        );
+  const listQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        q: deferredQuery.trim(),
+        categoryFilter,
+        retailerFilter,
+        staleFilter,
+        dealFilter,
+        sortKey,
+        sortDir,
+      }),
+    [
+      deferredQuery,
+      categoryFilter,
+      retailerFilter,
+      staleFilter,
+      dealFilter,
+      sortKey,
+      sortDir,
+    ],
+  );
+
+  const loadPage = useCallback(
+    async (reset: boolean) => {
+      if (loadInFlightRef.current) return;
+      if (!reset && !hasMoreRef.current) return;
+
+      loadInFlightRef.current = true;
+      if (reset) {
+        setLoading(true);
+        setLoadingMore(false);
+        nextOffsetRef.current = 0;
+        hasMoreRef.current = true;
+        setHasMore(true);
+        tableScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+        setProducts((prev) => (prev.length === 0 ? [] : prev));
+      } else {
+        setLoadingMore(true);
+      }
+      setError(null);
+
+      try {
+        const offset = reset ? 0 : nextOffsetRef.current;
+        const params = new URLSearchParams({
+          offset: String(offset),
+          limit: String(PAGE_SIZE),
+          sort: sortKey,
+          dir: sortDir,
+        });
+        const needle = deferredQuery.trim();
+        if (needle) params.set("q", needle);
+        if (categoryFilter) params.set("category", categoryFilter);
+        if (retailerFilter) params.set("retailer", retailerFilter);
+        if (staleFilter !== "all") params.set("stale", staleFilter);
+        if (dealFilter !== "all") params.set("deal", dealFilter);
+
+        const response = await fetch(`/api/admin/products?${params}`);
         const data = (await response.json()) as {
           ok?: boolean;
           error?: string;
@@ -265,44 +296,65 @@ export default function ProductsAdminClient() {
           return;
         }
 
-        if (!categoriesLoaded && data.categories) {
+        if (offset === 0 && data.categories) {
           setCategories(data.categories);
-          categoriesLoaded = true;
         }
         if (typeof data.total === "number") {
-          total = data.total;
           setCatalogTotal(data.total);
         }
 
-        accumulated = [...accumulated, ...(data.products ?? [])];
-        setProducts(accumulated);
-        setSelectedIds((prev) => {
-          const valid = new Set(accumulated.map((p) => p.id));
-          const next = new Set<string>();
-          for (const id of prev) {
-            if (valid.has(id)) next.add(id);
+        const batch = data.products ?? [];
+        setProducts((prev) => {
+          const next = reset ? batch : [...prev, ...batch];
+          if (reset) {
+            const valid = new Set(next.map((p) => p.id));
+            setSelectedIds((prevSelected) => {
+              const kept = new Set<string>();
+              for (const id of prevSelected) {
+                if (valid.has(id)) kept.add(id);
+              }
+              return kept;
+            });
           }
           return next;
         });
 
-        const hasMore =
-          data.hasMore === true ||
-          (total != null && accumulated.length < total);
-        if (!hasMore || (data.products?.length ?? 0) === 0) break;
-        offset += pageSize;
+        nextOffsetRef.current = offset + batch.length;
+        const more =
+          batch.length > 0 &&
+          (data.hasMore === true ||
+            (typeof data.total === "number" &&
+              nextOffsetRef.current < data.total));
+        hasMoreRef.current = more;
+        setHasMore(more);
+      } catch {
+        setError("Error de red al cargar productos.");
+        toast.error("Error de red al cargar productos.");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+        loadInFlightRef.current = false;
       }
-    } catch {
-      setError("Error de red al cargar productos.");
-      toast.error("Error de red al cargar productos.");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [toast]);
+    },
+    [
+      toast,
+      deferredQuery,
+      categoryFilter,
+      retailerFilter,
+      staleFilter,
+      dealFilter,
+      sortKey,
+      sortDir,
+    ],
+  );
+
+  const load = useCallback(() => {
+    void loadPage(true);
+  }, [loadPage]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadPage(true);
+  }, [listQueryKey, loadPage]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -320,95 +372,30 @@ export default function ProductsAdminClient() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const visibleProducts = useMemo(() => {
-    const needle = deferredQuery.trim().toLocaleLowerCase("es");
-    const filtered = products.filter((product) => {
-      if (categoryFilter && product.category?.id !== categoryFilter) {
-        return false;
-      }
-
-      if (retailerFilter && product.retailer !== retailerFilter) {
-        return false;
-      }
-
-      if (staleFilter !== "all") {
-        const hours = freshnessMeta(product.lastCheckedAt).hours;
-        if (staleFilter === "never" && hours !== null) return false;
-        if (staleFilter === "fresh" && (hours === null || hours >= 48)) {
-          return false;
-        }
-        if (staleFilter === "stale" && hours !== null && hours < 48) {
-          return false;
-        }
-      }
-
-      if (dealFilter !== "all") {
-        const isOffer =
-          product.isActive &&
-          product.availability !== "OUT_OF_STOCK" &&
-          ((product.dealLevel != null && product.dealLevel !== "NORMAL") ||
-            product.discountPercentage >= 5);
-        if (dealFilter === "offer" && !isOffer) return false;
-        if (dealFilter === "normal" && isOffer) return false;
-      }
-
-      if (!needle) return true;
-      const haystack = [
-        product.title,
-        product.asin,
-        product.externalId ?? "",
-        retailerLabel(product.retailer),
-        product.brand ?? "",
-        product.category?.name ?? "",
-        product.dealLabel,
-      ]
-        .join(" ")
-        .toLocaleLowerCase("es");
-      return haystack.includes(needle);
-    });
-
-    const sorted = [...filtered].sort((a, b) => {
-      const av = sortValue(a, sortKey);
-      const bv = sortValue(b, sortKey);
-      let cmp = 0;
-      if (typeof av === "number" && typeof bv === "number") {
-        cmp = av - bv;
-      } else {
-        cmp = String(av).localeCompare(String(bv), "es", {
-          numeric: true,
-          sensitivity: "base",
-        });
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-
-    return sorted;
-  }, [
-    products,
-    deferredQuery,
-    categoryFilter,
-    retailerFilter,
-    staleFilter,
-    dealFilter,
-    sortKey,
-    sortDir,
-  ]);
+  const refreshing = loading && products.length > 0;
 
   useEffect(() => {
     const el = tableScrollRef.current;
-    function updateVisibility() {
+    function onScroll() {
       const tableScroll = el?.scrollTop ?? 0;
       const pageScroll = window.scrollY;
       setShowScrollTop(tableScroll > 280 || pageScroll > 420);
+
+      if (!el || loadInFlightRef.current || !hasMoreRef.current) return;
+      const nearBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 280;
+      if (nearBottom) {
+        void loadPage(false);
+      }
     }
-    updateVisibility();
-    el?.addEventListener("scroll", updateVisibility, { passive: true });
-    window.addEventListener("scroll", updateVisibility, { passive: true });
+    onScroll();
+    el?.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      el?.removeEventListener("scroll", updateVisibility);
-      window.removeEventListener("scroll", updateVisibility);
+      el?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
     };
-  }, [loading, visibleProducts.length]);
+  }, [loading, products.length, loadPage]);
 
   const staleCount = useMemo(
     () =>
@@ -461,6 +448,7 @@ export default function ProductsAdminClient() {
   function clearFilters() {
     setQuery("");
     setCategoryFilter("");
+    setRetailerFilter("");
     setStaleFilter("all");
     setDealFilter("all");
   }
@@ -788,7 +776,7 @@ export default function ProductsAdminClient() {
   }
 
   function toggleSelectAllVisible() {
-    const visibleIds = visibleProducts.map((p) => p.id);
+    const visibleIds = products.map((p) => p.id);
     const allSelected =
       visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
     if (allSelected) {
@@ -932,93 +920,77 @@ export default function ProductsAdminClient() {
 
   return (
     <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col md:min-h-[calc(100dvh-5rem)]">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
-            Catálogo
-          </p>
-          <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
-            Productos
-          </h1>
-          <p className="mt-2 text-sm text-stone-600">
+      <AdminPageHeader
+        eyebrow="Catálogo"
+        title="Productos"
+        description={
+          <>
             {loading && products.length === 0
               ? "Cargando catálogo…"
-              : loadingMore
-                ? `Cargando… ${products.length}${catalogTotal != null ? ` / ${catalogTotal}` : ""} productos`
-                : `${visibleProducts.length} de ${products.length} productos${
-                    catalogTotal != null && catalogTotal !== products.length
-                      ? ` (total ${catalogTotal})`
-                      : ""
-                  }`}
+              : refreshing
+                ? `Actualizando listado…${
+                    catalogTotal != null ? ` · ${catalogTotal} en total` : ""
+                  }`
+                : loadingMore
+                  ? `${products.length}${
+                      catalogTotal != null ? ` / ${catalogTotal}` : ""
+                    } · cargando más…`
+                  : `${products.length}${
+                      catalogTotal != null ? ` de ${catalogTotal}` : ""
+                    } productos${hasMore ? " · scroll para más" : ""}`}
             {!loading && staleCount > 0 ? (
               <span className="text-rose-700">
                 {" "}
                 · {staleCount} sin revisar (&gt;48 h)
               </span>
             ) : null}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            title="Recargar listado"
-            className="inline-flex h-11 items-center gap-2 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.14em] text-stone-700 transition hover:border-ink hover:text-ink disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              aria-hidden
-            />
-            Recargar
-          </button>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex h-11 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Nuevo producto
-          </button>
-        </div>
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={loading}
+              title="Recargar listado"
+              className="admin-btn admin-btn-ghost"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                aria-hidden
+              />
+              Recargar
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="admin-btn admin-btn-primary"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Nuevo producto
+            </button>
+          </>
+        }
+      />
 
       {message ? (
-        <p className="mt-4 border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+        <p className="mt-4 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--primary-soft)] px-4 py-3 text-sm text-[var(--primary)]">
           {message}
         </p>
       ) : null}
       {error ? (
-        <p className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <p className="mt-4 rounded-[var(--radius-sm)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-col gap-3 border border-stone-300 bg-white p-4 md:flex-row md:flex-wrap md:items-center">
-        <label className="relative min-w-[220px] flex-1">
-          <span className="sr-only">Buscar productos</span>
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
-            aria-hidden
-          />
-          <input
-            ref={searchInputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar título, ID, marca… (/)"
-            className={`${toolbarFieldClass} w-full pl-9 pr-9`}
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-stone-400 hover:text-ink"
-              aria-label="Limpiar búsqueda"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          ) : null}
-        </label>
+      <div className="admin-toolbar">
+        <AdminSearchField
+          value={query}
+          onChange={setQuery}
+          placeholder="Buscar título, ID, marca… (/)"
+          inputRef={searchInputRef}
+        />
 
         <select
           value={categoryFilter}
@@ -1079,7 +1051,7 @@ export default function ProductsAdminClient() {
           <button
             type="button"
             onClick={clearFilters}
-            className="h-10 px-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 hover:text-ink"
+            className="admin-btn admin-btn-ghost"
           >
             Limpiar filtros
           </button>
@@ -1090,7 +1062,7 @@ export default function ProductsAdminClient() {
             type="button"
             disabled={batchDeleting}
             onClick={() => void onBatchDelete()}
-            className="inline-flex h-10 items-center gap-2 border border-rose-300 bg-rose-50 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-rose-800 transition hover:border-rose-500 disabled:opacity-50"
+            className="admin-btn admin-btn-danger"
           >
             {batchDeleting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1102,26 +1074,20 @@ export default function ProductsAdminClient() {
         ) : null}
       </div>
 
-      {viewingProduct ? (
-        <section className="mt-8 border border-stone-300 bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
-                Consulta BD
-              </p>
-              <h2 className="mt-1 font-display text-2xl leading-tight text-ink">
-                {viewingProduct.title}
-              </h2>
-              <p className="mt-1 font-mono text-xs text-stone-500">
-                {viewingProduct.id}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+      <AdminSidePanel
+        open={Boolean(viewingProduct)}
+        onClose={() => setViewingProduct(null)}
+        eyebrow="Consulta BD"
+        title={viewingProduct?.title ?? ""}
+        size="xl"
+        headerActions={
+          viewingProduct ? (
+            <>
               <a
                 href={`/producto/${viewingProduct.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-9 items-center border border-stone-300 px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-700 hover:border-ink hover:text-ink"
+                className="admin-btn admin-btn-ghost h-9 px-3 text-[10px]"
               >
                 Ver en web
               </a>
@@ -1135,7 +1101,7 @@ export default function ProductsAdminClient() {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-9 items-center bg-ink px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-paper hover:bg-teal-900"
+                className="admin-btn admin-btn-primary h-9 px-3 text-[10px]"
               >
                 {retailerBuyCtaLabel(viewingProduct.retailer)}
               </a>
@@ -1144,230 +1110,303 @@ export default function ProductsAdminClient() {
                 onClick={() => {
                   openEdit(viewingProduct);
                 }}
-                className="inline-flex h-9 items-center border border-stone-300 px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-700 hover:border-ink"
+                className="admin-btn admin-btn-ghost h-9 px-3 text-[10px]"
               >
                 Editar
               </button>
-              <button
-                type="button"
-                onClick={() => setViewingProduct(null)}
-                className="inline-flex h-9 w-9 items-center justify-center border border-stone-300 text-stone-500 hover:text-ink"
-                aria-label="Cerrar detalle"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-6 lg:flex-row">
-            <div className="relative h-40 w-40 shrink-0 overflow-hidden bg-stone-200 sm:h-48 sm:w-48">
-              {viewingProduct.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={viewingProduct.imageUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-stone-400">
-                  Sin imagen
+            </>
+          ) : null
+        }
+      >
+        {viewingProduct ? (
+          <>
+            <div className="admin-detail-hero">
+              <div className="admin-detail-hero__image">
+                {viewingProduct.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={viewingProduct.imageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-[var(--text-muted)]">
+                    Sin imagen
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap gap-1.5">
+                  <AdminRetailerBadge retailer={viewingProduct.retailer} />
+                  {viewingProduct.discountPercentage > 0 ? (
+                    <span className="admin-badge">
+                      −{Math.round(viewingProduct.discountPercentage)}%
+                    </span>
+                  ) : null}
+                  <span className="admin-badge admin-badge--muted">
+                    {Math.round(viewingProduct.dealScore)} · {viewingProduct.dealLabel}
+                  </span>
+                  {productStatusBadges(viewingProduct).map((badge) => (
+                    <span
+                      key={badge.key}
+                      className={`inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${badge.className}`}
+                    >
+                      {badge.label}
+                    </span>
+                  ))}
                 </div>
-              )}
+                <p className="mt-3 text-2xl font-bold tracking-tight text-[var(--text)]">
+                  {viewingProduct.currentPrice.toFixed(2)} €
+                  {viewingProduct.previousPrice != null ? (
+                    <span className="ml-2 text-base font-medium text-[var(--text-muted)] line-through">
+                      {viewingProduct.previousPrice.toFixed(2)} €
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  {viewingProduct.brand ?? "Sin marca"}
+                  {viewingProduct.category?.name
+                    ? ` · ${viewingProduct.category.name}`
+                    : ""}
+                </p>
+                <p className="mt-2 font-mono text-[11px] text-[var(--text-muted)]">
+                  {viewingProduct.externalId ?? viewingProduct.asin}
+                </p>
+              </div>
             </div>
 
-            <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-              {(
-                [
-                  ["Tienda", retailerLabel(viewingProduct.retailer)],
+            <section className="admin-detail-section">
+              <h3>Identificación</h3>
+              <dl className="admin-detail-grid">
+                {(
                   [
-                    "ID",
-                    viewingProduct.externalId ?? viewingProduct.asin,
-                  ],
-                  ["Código interno", viewingProduct.asin],
-                  ["Slug", viewingProduct.slug],
-                  ["Marca", viewingProduct.brand ?? "—"],
-                  ["Categoría", viewingProduct.category?.name ?? "—"],
+                    ["Tienda", retailerLabel(viewingProduct.retailer)],
+                    ["ASIN / ID", viewingProduct.asin],
+                    ["Externo", viewingProduct.externalId ?? "—"],
+                    ["Slug", viewingProduct.slug],
+                    ["Marca", viewingProduct.brand ?? "—"],
+                    ["Categoría", viewingProduct.category?.name ?? "—"],
+                    ["UUID", viewingProduct.id],
+                  ] as Array<[string, string]>
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd className={label === "UUID" || label === "Slug" ? "admin-detail-muted" : undefined}>
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="admin-detail-section">
+              <h3>Precios</h3>
+              <dl className="admin-detail-grid">
+                {(
                   [
-                    "Precio actual",
-                    `${viewingProduct.currentPrice.toFixed(2)} €`,
-                  ],
+                    ["Actual", `${viewingProduct.currentPrice.toFixed(2)} €`],
+                    [
+                      "Anterior",
+                      viewingProduct.previousPrice != null
+                        ? `${viewingProduct.previousPrice.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Mínimo",
+                      viewingProduct.lowestPrice != null
+                        ? `${viewingProduct.lowestPrice.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Máximo",
+                      viewingProduct.highestPrice != null
+                        ? `${viewingProduct.highestPrice.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Media 30d",
+                      viewingProduct.averagePrice30d != null
+                        ? `${viewingProduct.averagePrice30d.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Media 90d",
+                      viewingProduct.averagePrice90d != null
+                        ? `${viewingProduct.averagePrice90d.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Descuento",
+                      viewingProduct.discountPercentage > 0
+                        ? `−${Math.round(viewingProduct.discountPercentage)}%`
+                        : "—",
+                    ],
+                    [
+                      "Score",
+                      `${Math.round(viewingProduct.dealScore)} · ${viewingProduct.dealLabel}`,
+                    ],
+                    ["Nivel", viewingProduct.dealLevel ?? "—"],
+                    ["Moneda", viewingProduct.currency ?? "EUR"],
+                  ] as Array<[string, string]>
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="admin-detail-section">
+              <h3>Estado</h3>
+              <dl className="admin-detail-grid">
+                {(
                   [
-                    "Precio anterior",
-                    viewingProduct.previousPrice != null
-                      ? `${viewingProduct.previousPrice.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Mínimo",
-                    viewingProduct.lowestPrice != null
-                      ? `${viewingProduct.lowestPrice.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Máximo",
-                    viewingProduct.highestPrice != null
-                      ? `${viewingProduct.highestPrice.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Media 30d",
-                    viewingProduct.averagePrice30d != null
-                      ? `${viewingProduct.averagePrice30d.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Media 90d",
-                    viewingProduct.averagePrice90d != null
-                      ? `${viewingProduct.averagePrice90d.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Descuento",
-                    viewingProduct.discountPercentage > 0
-                      ? `−${Math.round(viewingProduct.discountPercentage)}%`
-                      : "—",
-                  ],
-                  [
-                    "Score",
-                    `${Math.round(viewingProduct.dealScore)} · ${viewingProduct.dealLabel}`,
-                  ],
-                  ["Nivel", viewingProduct.dealLevel ?? "—"],
-                  ["Disponibilidad", viewingProduct.availabilityLabel ?? availabilityLabel(viewingProduct.availability)],
-                  [
-                    "Agotado desde",
-                    viewingProduct.outOfStockAt
-                      ? new Date(viewingProduct.outOfStockAt).toLocaleString(
-                          "es-ES",
-                        )
-                      : "—",
-                  ],
-                  ["Moneda", viewingProduct.currency ?? "EUR"],
-                  ["Activo", viewingProduct.isActive ? "Sí" : "No"],
-                  ["Destacado", viewingProduct.isFeatured ? "Sí" : "No"],
-                  [
-                    "Última revisión",
-                    viewingProduct.lastCheckedAt
-                      ? new Date(viewingProduct.lastCheckedAt).toLocaleString(
-                          "es-ES",
-                        )
-                      : "—",
-                  ],
-                  [
-                    "Último Telegram",
-                    viewingProduct.lastTelegramNotifiedAt
-                      ? new Date(
-                          viewingProduct.lastTelegramNotifiedAt,
-                        ).toLocaleString("es-ES")
-                      : "—",
-                  ],
-                  [
-                    "Precio notificado",
-                    viewingProduct.lastTelegramNotifiedPrice != null
-                      ? `${viewingProduct.lastTelegramNotifiedPrice.toFixed(2)} €`
-                      : "—",
-                  ],
-                  [
-                    "Score notificado",
-                    viewingProduct.lastTelegramNotifiedScore != null
-                      ? String(Math.round(viewingProduct.lastTelegramNotifiedScore))
-                      : "—",
-                  ],
-                  [
-                    "Creado",
-                    viewingProduct.createdAt
-                      ? new Date(viewingProduct.createdAt).toLocaleString("es-ES")
-                      : "—",
-                  ],
-                  [
-                    "Actualizado",
-                    viewingProduct.updatedAt
-                      ? new Date(viewingProduct.updatedAt).toLocaleString("es-ES")
-                      : "—",
-                  ],
-                ] as Array<[string, string]>
-              ).map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                    {label}
-                  </dt>
-                  <dd className="mt-0.5 break-all font-medium text-ink">
-                    {value}
-                  </dd>
+                    [
+                      "Disponibilidad",
+                      viewingProduct.availabilityLabel ??
+                        availabilityLabel(viewingProduct.availability),
+                    ],
+                    [
+                      "Agotado desde",
+                      viewingProduct.outOfStockAt
+                        ? new Date(viewingProduct.outOfStockAt).toLocaleString("es-ES")
+                        : "—",
+                    ],
+                    ["Activo", viewingProduct.isActive ? "Sí" : "No"],
+                    ["Destacado", viewingProduct.isFeatured ? "Sí" : "No"],
+                    [
+                      "Última revisión",
+                      viewingProduct.lastCheckedAt
+                        ? new Date(viewingProduct.lastCheckedAt).toLocaleString("es-ES")
+                        : "—",
+                    ],
+                    [
+                      "Último Telegram",
+                      viewingProduct.lastTelegramNotifiedAt
+                        ? new Date(viewingProduct.lastTelegramNotifiedAt).toLocaleString("es-ES")
+                        : "—",
+                    ],
+                    [
+                      "Precio notificado",
+                      viewingProduct.lastTelegramNotifiedPrice != null
+                        ? `${viewingProduct.lastTelegramNotifiedPrice.toFixed(2)} €`
+                        : "—",
+                    ],
+                    [
+                      "Score notificado",
+                      viewingProduct.lastTelegramNotifiedScore != null
+                        ? String(Math.round(viewingProduct.lastTelegramNotifiedScore))
+                        : "—",
+                    ],
+                    [
+                      "Creado",
+                      viewingProduct.createdAt
+                        ? new Date(viewingProduct.createdAt).toLocaleString("es-ES")
+                        : "—",
+                    ],
+                    [
+                      "Actualizado",
+                      viewingProduct.updatedAt
+                        ? new Date(viewingProduct.updatedAt).toLocaleString("es-ES")
+                        : "—",
+                    ],
+                  ] as Array<[string, string]>
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="admin-detail-section">
+              <h3>Enlaces</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    URL producto
+                  </p>
+                  <p className="admin-detail-muted mt-1">
+                    {viewingProduct.productUrl || viewingProduct.amazonUrl || "—"}
+                  </p>
                 </div>
-              ))}
-            </dl>
-          </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Affiliate
+                  </p>
+                  <p className="admin-detail-muted mt-1">
+                    {viewingProduct.affiliateUrl || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Imagen
+                  </p>
+                  <p className="admin-detail-muted mt-1">
+                    {viewingProduct.imageUrl || "—"}
+                  </p>
+                </div>
+              </div>
+            </section>
 
-          <div className="mt-6 grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-2">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                URL del producto
-              </p>
-              <p className="mt-1 break-all text-sm text-ink">
-                {viewingProduct.productUrl || viewingProduct.amazonUrl || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Affiliate URL
-              </p>
-              <p className="mt-1 break-all text-sm text-ink">
-                {viewingProduct.affiliateUrl || "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Image URL
-              </p>
-              <p className="mt-1 break-all text-sm text-ink">
-                {viewingProduct.imageUrl || "—"}
-              </p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-                Descripción
-              </p>
+            <section className="admin-detail-section">
+              <h3>Descripción</h3>
               {(() => {
-                const parts = splitProductDescription(
-                  viewingProduct.description,
-                );
+                const parts = splitProductDescription(viewingProduct.description);
                 if (parts.length === 0) {
                   return (
-                    <p className="mt-1 text-sm text-stone-400">
-                      Sin descripción
-                    </p>
+                    <p className="text-sm text-[var(--text-muted)]">Sin descripción</p>
                   );
                 }
                 return (
-                  <ul className="mt-2 space-y-2 text-sm leading-relaxed text-stone-700">
+                  <ul className="space-y-2 text-sm leading-relaxed text-[var(--text-muted)]">
                     {parts.map((part, index) => (
                       <li key={`${index}-${part.slice(0, 24)}`}>• {part}</li>
                     ))}
                   </ul>
                 );
               })()}
-            </div>
-          </div>
-        </section>
-      ) : null}
+            </section>
+          </>
+        ) : null}
+      </AdminSidePanel>
 
-      {open ? (
-        <section className="mt-8 border border-stone-300 bg-white p-6">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-display text-2xl text-ink">
-              {editingAsin ? "Editar producto" : "Nuevo producto"}
-            </h2>
+      <AdminSidePanel
+        open={open}
+        onClose={() => setOpen(false)}
+        eyebrow={editingAsin ? "Editar" : "Alta"}
+        title={editingAsin ? "Editar producto" : "Nuevo producto"}
+        size="xl"
+        footer={
+          <>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="text-sm text-stone-500 hover:text-ink"
+              className="admin-btn admin-btn-ghost"
             >
-              Cerrar
+              Cancelar
             </button>
-          </div>
-          <form
+            <button
+              type="submit"
+              form="admin-product-form"
+              disabled={saving}
+              className="admin-btn admin-btn-primary"
+            >
+              {saving
+                ? "Guardando…"
+                : editingAsin
+                  ? "Guardar cambios"
+                  : "Guardar en Supabase"}
+            </button>
+          </>
+        }
+      >
+<form
+            id="admin-product-form"
             onSubmit={(event) => void onSave(event)}
-            className="mt-6 grid gap-4 md:grid-cols-2"
+            className="grid gap-4 md:grid-cols-2"
           >
             <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
               <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -1375,7 +1414,7 @@ export default function ProductsAdminClient() {
                 <select
                   value={form.retailer}
                   onChange={(event) => onRetailerChange(event.target.value)}
-                  className="mt-2 h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                  className="admin-input mt-2"
                 >
                   {PRODUCT_RETAILERS.map((retailer) => (
                     <option key={retailer} value={retailer}>
@@ -1400,7 +1439,7 @@ export default function ProductsAdminClient() {
                   placeholder={
                     form.retailer === "amazon" ? "B0XXXXXXXXXX" : "Opcional si está en la URL"
                   }
-                  className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                  className="admin-input mt-2"
                 />
               </label>
             </div>
@@ -1413,7 +1452,7 @@ export default function ProductsAdminClient() {
                   onChange={(event) => onUrlChange(event.target.value)}
                   onBlur={() => void scrapeFromUrl(false)}
                   placeholder={formRetailerDef.urlPlaceholder}
-                  className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                  className="admin-input mt-2"
                 />
               </label>
               {formScrapeSupported ? (
@@ -1448,7 +1487,7 @@ export default function ProductsAdminClient() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, title: event.target.value }))
                 }
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
 
@@ -1468,7 +1507,7 @@ export default function ProductsAdminClient() {
                     setShowNewCategory(false);
                     setForm((prev) => ({ ...prev, categoryId: value }));
                   }}
-                  className="h-11 w-full border border-stone-300 bg-white px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                  className="admin-input"
                 >
                   <option value="">Sin categoría</option>
                   {categories.map((category) => (
@@ -1499,7 +1538,7 @@ export default function ProductsAdminClient() {
                     disabled={creatingCategory}
                     onClick={() => void createCategory()}
                     title="Crear categoría"
-                    className="inline-flex h-11 shrink-0 items-center gap-1.5 bg-ink px-3 text-xs font-semibold uppercase tracking-[0.12em] text-paper disabled:opacity-60"
+                    className="admin-btn admin-btn-primary shrink-0"
                   >
                     {creatingCategory ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1519,7 +1558,7 @@ export default function ProductsAdminClient() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, brand: event.target.value }))
                 }
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
             <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -1536,7 +1575,7 @@ export default function ProductsAdminClient() {
                     referencePrice: event.target.value,
                   }))
                 }
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
             <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -1552,7 +1591,7 @@ export default function ProductsAdminClient() {
                     currentPrice: event.target.value,
                   }))
                 }
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
             <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
@@ -1566,7 +1605,7 @@ export default function ProductsAdminClient() {
                   }))
                 }
                 placeholder="https://static.carrefour.es/..."
-                className="mt-2 h-11 w-full border border-stone-300 px-3 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
+                className="admin-input mt-2"
               />
             </label>
             {form.imageUrl.trim() ? (
@@ -1600,48 +1639,38 @@ export default function ProductsAdminClient() {
                 </span>
               </p>
             ) : null}
-            <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="h-11 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-11 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 disabled:opacity-60"
-              >
-                {saving
-                  ? "Guardando…"
-                  : editingAsin
-                    ? "Guardar cambios"
-                    : "Guardar en Supabase"}
-              </button>
-            </div>
           </form>
-        </section>
-      ) : null}
+      </AdminSidePanel>
 
       <div
         ref={tableScrollRef}
-        className="mt-4 min-h-0 flex-1 overflow-auto border border-stone-300 bg-white"
+        className="admin-table-wrap admin-table-wrap--fill mt-4 min-h-0 flex-1"
       >
-        <table className="w-full min-w-[72rem] text-left text-sm">
+        <table className="admin-products-table w-full text-left text-sm">
+          <colgroup>
+            <col className="col-check" />
+            <col className="col-title" />
+            <col className="col-store" />
+            <col className="col-price" />
+            <col className="col-reference" />
+            <col className="col-score" />
+            <col className="col-category" />
+            <col className="col-checked" />
+            <col className="col-actions" />
+          </colgroup>
           <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
               <th className="w-10 px-3 py-3">
                 <input
                   type="checkbox"
                   checked={
-                    visibleProducts.length > 0 &&
-                    visibleProducts.every((p) => selectedIds.has(p.id))
+                    products.length > 0 &&
+                    products.every((p) => selectedIds.has(p.id))
                   }
                   onChange={toggleSelectAllVisible}
-                  disabled={loading || visibleProducts.length === 0}
+                  disabled={loading || products.length === 0}
                   aria-label="Seleccionar todos los productos visibles"
-                  className="h-4 w-4 accent-ink"
+                  className="h-4 w-4 accent-[var(--primary)]"
                 />
               </th>
               <th className="px-4 py-3">
@@ -1670,34 +1699,30 @@ export default function ProductsAdminClient() {
               </th>
             </tr>
           </thead>
-          <tbody>
-            {loading ? (
+          <tbody className={refreshing ? "is-reloading" : undefined}>
+            {loading && products.length === 0 ? (
+              <AdminProductsTableSkeleton rows={12} />
+            ) : !loading && products.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-stone-500">
-                  Cargando…
-                </td>
-              </tr>
-            ) : products.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-stone-500">
-                  No hay productos todavía. Añade el primero con «Nuevo producto».
-                </td>
-              </tr>
-            ) : visibleProducts.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-stone-500">
-                  Ningún producto coincide con la búsqueda o los filtros.{" "}
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="font-medium text-teal-800 underline"
-                  >
-                    Limpiar filtros
-                  </button>
+                  {hasActiveFilters
+                    ? (
+                        <>
+                          Ningún producto coincide con la búsqueda o los filtros.{" "}
+                          <button
+                            type="button"
+                            onClick={clearFilters}
+                            className="font-medium text-teal-800 underline"
+                          >
+                            Limpiar filtros
+                          </button>
+                        </>
+                      )
+                    : "No hay productos todavía. Añade el primero con «Nuevo producto»."}
                 </td>
               </tr>
             ) : (
-              visibleProducts.map((product) => (
+              products.map((product) => (
                 <tr
                   key={product.id}
                   className="border-t border-stone-100 align-middle hover:bg-stone-50/80"
@@ -1708,11 +1733,11 @@ export default function ProductsAdminClient() {
                       checked={selectedIds.has(product.id)}
                       onChange={() => toggleSelect(product.id)}
                       aria-label={`Seleccionar ${product.title}`}
-                      className="h-4 w-4 accent-ink"
+                      className="h-4 w-4 accent-[var(--primary)]"
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex min-w-[280px] max-w-xl items-start gap-3">
+                    <div className="flex items-start gap-3">
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden bg-stone-200">
                         {product.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1759,10 +1784,8 @@ export default function ProductsAdminClient() {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <p className="text-xs font-semibold text-stone-700">
-                      {retailerLabel(product.retailer)}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[11px] text-stone-500">
+                    <AdminRetailerBadge retailer={product.retailer} />
+                    <p className="mt-1 font-mono text-[11px] text-[var(--text-muted)]">
                       {product.externalId ?? product.asin}
                     </p>
                   </td>
@@ -1813,8 +1836,8 @@ export default function ProductsAdminClient() {
                       );
                     })()}
                   </td>
-                  <td className="sticky right-0 z-10 bg-white px-4 py-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.1)]">
-                    <div className="flex flex-nowrap items-center gap-1.5">
+                  <td className="sticky right-0 z-10 bg-white px-3 py-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.1)]">
+                    <div className="admin-row-actions">
                       <button
                         type="button"
                         title="Ver datos en BD"
@@ -1827,70 +1850,73 @@ export default function ProductsAdminClient() {
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                      <a
-                        href={buildTrackedAffiliatePath({
-                          productId: product.id,
-                          source: "admin",
-                          test: true,
-                        })}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Ver en ${retailerLabel(product.retailer)} (clic de prueba)`}
-                        aria-label={`Ver en ${retailerLabel(product.retailer)} (clic de prueba)`}
-                        className={iconBtnClass}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        title="Editar producto"
-                        aria-label="Editar producto"
-                        onClick={() => openEdit(product)}
-                        className={iconBtnClass}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        title={
-                          product.retailer === "amazon"
-                            ? "Revisar precio ahora"
-                            : "Revisar precio solo disponible para Amazon"
-                        }
-                        aria-label="Revisar precio ahora"
-                        disabled={
-                          updatingAsin === product.asin ||
-                          product.retailer !== "amazon"
-                        }
-                        onClick={() => void onUpdatePrice(product)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-teal-800 bg-teal-50 px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-teal-900 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {updatingAsin === product.asin ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        )}
-                        Revisar
-                      </button>
-                      <button
-                        type="button"
-                        title="Eliminar"
-                        aria-label="Eliminar"
-                        disabled={deletingId === product.id}
-                        onClick={() => void onDelete(product)}
-                        className={`${iconBtnClass} hover:border-rose-600 hover:text-rose-700`}
-                      >
-                        {deletingId === product.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                      </button>
+                      <AdminRowMenu
+                        label={`Acciones de ${product.title}`}
+                        items={[
+                          {
+                            key: "edit",
+                            label: "Editar producto",
+                            icon: <Pencil className="h-4 w-4" />,
+                            onSelect: () => openEdit(product),
+                          },
+                          {
+                            key: "store",
+                            label: `Abrir en ${retailerLabel(product.retailer)}`,
+                            icon: <ExternalLink className="h-4 w-4" />,
+                            onSelect: () => {
+                              window.open(
+                                buildTrackedAffiliatePath({
+                                  productId: product.id,
+                                  source: "admin",
+                                  test: true,
+                                }),
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            },
+                          },
+                          {
+                            key: "price",
+                            label: "Revisar precio",
+                            icon: <RefreshCw className="h-4 w-4" />,
+                            disabled: product.retailer !== "amazon",
+                            loading: updatingAsin === product.asin,
+                            onSelect: () => void onUpdatePrice(product),
+                          },
+                          {
+                            key: "delete",
+                            label: "Eliminar",
+                            icon: <Trash2 className="h-4 w-4" />,
+                            tone: "danger",
+                            loading: deletingId === product.id,
+                            onSelect: () => void onDelete(product),
+                          },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
               ))
             )}
+            {loadingMore ? (
+              <tr className="admin-products-table__load-more">
+                <td colSpan={9}>
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Cargando más productos…
+                  </span>
+                </td>
+              </tr>
+            ) : null}
+            {!loading && !loadingMore && products.length > 0 && !hasMore ? (
+              <tr className="admin-products-table__load-more">
+                <td colSpan={9}>
+                  {catalogTotal != null
+                    ? `Fin del listado · ${catalogTotal} productos`
+                    : "Fin del listado"}
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -1902,7 +1928,7 @@ export default function ProductsAdminClient() {
             tableScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
-          className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center border border-stone-300 bg-ink text-paper shadow-lg transition hover:bg-teal-900 md:bottom-8 md:right-8"
+          className="admin-btn admin-btn-primary fixed bottom-5 right-5 z-40 h-12 w-12 rounded-full p-0 shadow-lg md:bottom-8 md:right-8"
           title="Volver arriba"
           aria-label="Volver arriba"
         >

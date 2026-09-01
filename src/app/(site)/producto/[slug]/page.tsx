@@ -89,26 +89,35 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       ? product.previousPrice - product.currentPrice
       : 0;
   const descriptionParts = splitProductDescription(product.description);
+  const category = product.category;
+  const breadcrumbItems = [
+    { name: "Inicio", path: "/" },
+    { name: "Ofertas", path: "/ofertas" },
+    ...(category?.parentSlug && category.parentName
+      ? [
+          {
+            name: category.parentName,
+            path: `/categorias/${category.parentSlug}`,
+          },
+        ]
+      : []),
+    ...(category?.parentSlug && category.childSlug && category.name
+      ? [
+          {
+            name: category.name,
+            path: category.path,
+          },
+        ]
+      : category
+        ? [{ name: category.name, path: category.path }]
+        : []),
+    { name: product.title, path: `/producto/${product.slug}` },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10 md:px-8 md:py-14">
       <JsonLd
-        data={[
-          productJsonLd(product),
-          breadcrumbJsonLd([
-            { name: "Inicio", path: "/" },
-            { name: "Ofertas", path: "/ofertas" },
-            ...(product.category
-              ? [
-                  {
-                    name: product.category.name,
-                    path: `/categorias/${product.category.slug}`,
-                  },
-                ]
-              : []),
-            { name: product.title, path: `/producto/${product.slug}` },
-          ]),
-        ]}
+        data={[productJsonLd(product), breadcrumbJsonLd(breadcrumbItems)]}
       />
       <nav className="mb-8 text-sm text-stone-500" aria-label="Migas de pan">
         <Link href="/" className="hover:text-ink">
@@ -118,14 +127,29 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         <Link href="/ofertas" className="hover:text-ink">
           Catálogo
         </Link>
-        {product.category ? (
+        {category?.parentSlug && category.parentName ? (
           <>
             <span className="mx-2">/</span>
             <Link
-              href={`/categorias/${product.category.slug}`}
+              href={`/categorias/${category.parentSlug}`}
               className="hover:text-ink"
             >
-              {product.category.name}
+              {category.parentName}
+            </Link>
+          </>
+        ) : null}
+        {category?.parentSlug && category.childSlug && category.name ? (
+          <>
+            <span className="mx-2">/</span>
+            <Link href={category.path} className="hover:text-ink">
+              {category.name}
+            </Link>
+          </>
+        ) : category ? (
+          <>
+            <span className="mx-2">/</span>
+            <Link href={category.path} className="hover:text-ink">
+              {category.name}
             </Link>
           </>
         ) : null}

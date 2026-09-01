@@ -22,6 +22,11 @@ export type BlogBlock =
       pros: string[];
       cons: string[];
       title?: string;
+    }
+  | {
+      type: "faq";
+      title?: string;
+      items: Array<{ question: string; answer: string }>;
     };
 
 export interface BlogPost {

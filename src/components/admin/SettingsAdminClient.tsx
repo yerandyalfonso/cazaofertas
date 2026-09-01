@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { formatFeedUrlsText } from "@/lib/feed-urls";
 import type { AppSettings } from "@/services/appSettings";
 
 type SettingsForm = {
@@ -11,17 +13,24 @@ type SettingsForm = {
   kiabiTelegramMinScore: string;
   telegramBatchHours: string;
   telegramFlushRescheduleMinutes: string;
+  telegramFlushLimit: string;
   amazonAssociateTag: string;
   amazonFlashInsertLimit: string;
+  amazonFlashFeedUrls: string;
+  amazonDepartmentFeedsPerRun: string;
   miraviaDealsEnabled: boolean;
   miraviaMinDiscountPercent: string;
   miraviaDiscoveryMaxItems: string;
   miraviaFlashLimit: string;
   miraviaFlashUpdateLimit: string;
+  miraviaFeedUrls: string;
+  miraviaFeedsPerRun: string;
   kiabiDealsEnabled: boolean;
   kiabiMinDiscountPercent: string;
   kiabiDiscoveryMaxItems: string;
   kiabiNewProductsOnly: boolean;
+  kiabiFeedUrls: string;
+  kiabiFeedsPerRun: string;
 };
 
 function settingsToForm(settings: AppSettings): SettingsForm {
@@ -33,40 +42,28 @@ function settingsToForm(settings: AppSettings): SettingsForm {
     telegramFlushRescheduleMinutes: String(
       settings.telegramFlushRescheduleMinutes,
     ),
+    telegramFlushLimit: String(settings.telegramFlushLimit),
     amazonAssociateTag: settings.amazonAssociateTag,
     amazonFlashInsertLimit: String(settings.amazonFlashInsertLimit),
+    amazonFlashFeedUrls: formatFeedUrlsText(settings.amazonFlashFeedUrls),
+    amazonDepartmentFeedsPerRun: String(settings.amazonDepartmentFeedsPerRun),
     miraviaDealsEnabled: settings.miraviaDealsEnabled,
     miraviaMinDiscountPercent: String(settings.miraviaMinDiscountPercent),
     miraviaDiscoveryMaxItems: String(settings.miraviaDiscoveryMaxItems),
     miraviaFlashLimit: String(settings.miraviaFlashLimit),
     miraviaFlashUpdateLimit: String(settings.miraviaFlashUpdateLimit),
+    miraviaFeedUrls: formatFeedUrlsText(settings.miraviaFeedUrls),
+    miraviaFeedsPerRun: String(settings.miraviaFeedsPerRun),
     kiabiDealsEnabled: settings.kiabiDealsEnabled,
     kiabiMinDiscountPercent: String(settings.kiabiMinDiscountPercent),
     kiabiDiscoveryMaxItems: String(settings.kiabiDiscoveryMaxItems),
     kiabiNewProductsOnly: settings.kiabiNewProductsOnly,
+    kiabiFeedUrls: formatFeedUrlsText(settings.kiabiFeedUrls),
+    kiabiFeedsPerRun: String(settings.kiabiFeedsPerRun),
   };
 }
 
-function FieldLabel({
-  children,
-  hint,
-}: {
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-      {children}
-      {hint ? (
-        <span className="mt-1 block font-normal normal-case tracking-normal text-stone-400">
-          {hint}
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-export function SettingsAdminClient() {
+export function SettingsAdminClient({ embedded = false }: { embedded?: boolean } = {}) {
   const toast = useAdminToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,17 +116,24 @@ export function SettingsAdminClient() {
           telegramFlushRescheduleMinutes: Number(
             form.telegramFlushRescheduleMinutes,
           ),
+          telegramFlushLimit: Number(form.telegramFlushLimit),
           amazonAssociateTag: form.amazonAssociateTag,
           amazonFlashInsertLimit: Number(form.amazonFlashInsertLimit),
+          amazonFlashFeedUrls: form.amazonFlashFeedUrls,
+          amazonDepartmentFeedsPerRun: Number(form.amazonDepartmentFeedsPerRun),
           miraviaDealsEnabled: form.miraviaDealsEnabled,
           miraviaMinDiscountPercent: Number(form.miraviaMinDiscountPercent),
           miraviaDiscoveryMaxItems: Number(form.miraviaDiscoveryMaxItems),
           miraviaFlashLimit: Number(form.miraviaFlashLimit),
           miraviaFlashUpdateLimit: Number(form.miraviaFlashUpdateLimit),
+          miraviaFeedUrls: form.miraviaFeedUrls,
+          miraviaFeedsPerRun: Number(form.miraviaFeedsPerRun),
           kiabiDealsEnabled: form.kiabiDealsEnabled,
           kiabiMinDiscountPercent: Number(form.kiabiMinDiscountPercent),
           kiabiDiscoveryMaxItems: Number(form.kiabiDiscoveryMaxItems),
           kiabiNewProductsOnly: form.kiabiNewProductsOnly,
+          kiabiFeedUrls: form.kiabiFeedUrls,
+          kiabiFeedsPerRun: Number(form.kiabiFeedsPerRun),
         }),
       });
       const data = (await response.json()) as {
@@ -162,48 +166,54 @@ export function SettingsAdminClient() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
-          Ajustes
+      {!embedded ? (
+        <header>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+            Ajustes
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-ink">Configuración</h1>
+          <p className="mt-2 max-w-2xl text-sm text-stone-600">
+            Valores operativos del sitio y los crons. Tienen prioridad sobre{" "}
+            <code className="text-xs">.env.local</code> cuando los guardas aquí.
+            {source === "env" ? (
+              <>
+                {" "}
+                Ahora mismo se usan valores de entorno hasta el primer guardado.
+              </>
+            ) : null}
+          </p>
+          <p className="mt-2 text-sm text-stone-500">
+            Envío manual y cola Telegram:{" "}
+            <Link href="/admin/cron?tab=monitor" className="text-teal-800 underline">
+              Resumen operaciones
+            </Link>
+          </p>
+        </header>
+      ) : (
+        <p className="text-sm text-stone-600">
+          Los valores guardados aquí tienen prioridad sobre{" "}
+          <code className="text-xs">.env.local</code>.
+          {source === "env" ? " Hasta el primer guardado se usan variables de entorno." : null}
         </p>
-        <h1 className="mt-2 font-display text-3xl text-ink">Configuración</h1>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Valores operativos del sitio y los crons. Tienen prioridad sobre{" "}
-          <code className="text-xs">.env.local</code> cuando los guardas aquí.
-          {source === "env" ? (
-            <>
-              {" "}
-              Ahora mismo se usan valores de entorno hasta el primer guardado.
-            </>
-          ) : null}
-        </p>
-        <p className="mt-2 text-sm text-stone-500">
-          Envío manual y cola Telegram:{" "}
-          <Link href="/admin/cron" className="text-teal-800 underline">
-            Monitorización / Cron
-          </Link>
-        </p>
-      </header>
+      )}
 
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Telegram — criterios</h2>
         <p className="mt-1 text-sm text-stone-600">
           Score mínimo para encolar ofertas al grupo/canal según tienda.
         </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <FieldLabel hint="Amazon y resto de retailers">Amazon</FieldLabel>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+          <AdminField label="Amazon" hint="Amazon y resto de retailers">
             <input
               type="number"
               min="0"
               max="100"
               value={form.telegramMinScore}
               onChange={(e) => patch("telegramMinScore", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel hint="Descuentos ~15–25%">Miravia</FieldLabel>
+          </AdminField>
+          <AdminField label="Miravia" hint="Descuentos ~15–25%">
             <input
               type="number"
               min="0"
@@ -212,22 +222,20 @@ export function SettingsAdminClient() {
               onChange={(e) =>
                 patch("miraviaTelegramMinScore", e.target.value)
               }
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel>Kiabi</FieldLabel>
+          </AdminField>
+          <AdminField label="Kiabi" hint="Moda y hogar">
             <input
               type="number"
               min="0"
               max="100"
               value={form.kiabiTelegramMinScore}
               onChange={(e) => patch("kiabiTelegramMinScore", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel hint="Intervalo entre lotes">Lote cada (horas)</FieldLabel>
+          </AdminField>
+          <AdminField label="Lote cada (horas)" hint="Intervalo entre lotes">
             <input
               type="number"
               min="1"
@@ -235,13 +243,13 @@ export function SettingsAdminClient() {
               step="0.5"
               value={form.telegramBatchHours}
               onChange={(e) => patch("telegramBatchHours", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel hint="Si quedan pendientes tras un lote">
-              Reintento (min)
-            </FieldLabel>
+          </AdminField>
+          <AdminField
+            label="Reintento (min)"
+            hint="Si quedan pendientes tras un lote"
+          >
             <input
               type="number"
               min="5"
@@ -250,40 +258,131 @@ export function SettingsAdminClient() {
               onChange={(e) =>
                 patch("telegramFlushRescheduleMinutes", e.target.value)
               }
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
+          </AdminField>
+          <AdminField
+            label="Tamaño lote Telegram"
+            hint="Máx. mensajes por lote al grupo"
+          >
+            <input
+              type="number"
+              min="5"
+              max="80"
+              value={form.telegramFlushLimit}
+              onChange={(e) => patch("telegramFlushLimit", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
+        </div>
+      </section>
+
+      <section className="admin-card p-6">
+        <h2 className="font-display text-2xl text-ink">Feeds de descubrimiento</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Una URL por línea. En cada pasada del cron se consultan solo unas
+          pocas (rotación automática cada ~3 min). La lista por defecto incluye
+          Gold Box, departamentos Amazon, Miravia y Kiabi; puedes editarla o
+          añadir más.
+        </p>
+        <div className="mt-5 space-y-6">
+          <AdminField
+            label="Feeds Amazon flash"
+            hint="Gold Box / departamentos Amazon"
+          >
+            <textarea
+              rows={5}
+              value={form.amazonFlashFeedUrls}
+              onChange={(e) => patch("amazonFlashFeedUrls", e.target.value)}
+              placeholder="https://www.amazon.es/gp/goldbox"
+              className="admin-input w-full font-mono text-xs"
+            />
+          </AdminField>
+          <AdminField
+            label="Feeds Amazon / pasada"
+            hint="Cuántas URLs Amazon por pasada"
+            className="max-w-xs"
+          >
+            <input
+              type="number"
+              min="1"
+              max="8"
+              value={form.amazonDepartmentFeedsPerRun}
+              onChange={(e) =>
+                patch("amazonDepartmentFeedsPerRun", e.target.value)
+              }
+              className="admin-input w-full"
+            />
+          </AdminField>
+          <AdminField label="Feeds Miravia" hint="Páginas de ofertas Miravia">
+            <textarea
+              rows={4}
+              value={form.miraviaFeedUrls}
+              onChange={(e) => patch("miraviaFeedUrls", e.target.value)}
+              placeholder="https://www.miravia.es/flashsale/home"
+              className="admin-input w-full font-mono text-xs"
+            />
+          </AdminField>
+          <AdminField label="Feeds Miravia / pasada" className="max-w-xs">
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={form.miraviaFeedsPerRun}
+              onChange={(e) => patch("miraviaFeedsPerRun", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
+          <AdminField label="Feeds Kiabi" hint="Listados promocionales Kiabi">
+            <textarea
+              rows={3}
+              value={form.kiabiFeedUrls}
+              onChange={(e) => patch("kiabiFeedUrls", e.target.value)}
+              placeholder="https://www.kiabi.es/promociones_464410"
+              className="admin-input w-full font-mono text-xs"
+            />
+          </AdminField>
+          <AdminField label="Feeds Kiabi / pasada" className="max-w-xs">
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={form.kiabiFeedsPerRun}
+              onChange={(e) => patch("kiabiFeedsPerRun", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
         </div>
       </section>
 
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Amazon</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div>
-            <FieldLabel hint="Tag de afiliado en enlaces generados">
-              Associate tag
-            </FieldLabel>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+          <AdminField
+            label="Associate tag"
+            hint="Tag de afiliado en enlaces generados"
+          >
             <input
               type="text"
               value={form.amazonAssociateTag}
               onChange={(e) => patch("amazonAssociateTag", e.target.value)}
               placeholder="cazaoferta-21"
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel hint="Por pasada del cron flash">
-              Máx. inserciones flash
-            </FieldLabel>
+          </AdminField>
+          <AdminField
+            label="Máx. inserciones flash"
+            hint="Por pasada del cron flash"
+          >
             <input
               type="number"
               min="1"
               max="20"
               value={form.amazonFlashInsertLimit}
               onChange={(e) => patch("amazonFlashInsertLimit", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
+          </AdminField>
         </div>
       </section>
 
@@ -298,9 +397,8 @@ export function SettingsAdminClient() {
           />
           Cron flash Miravia activo
         </label>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <FieldLabel>Descuento mín. (%)</FieldLabel>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminField label="Descuento mín. (%)">
             <input
               type="number"
               min="1"
@@ -309,11 +407,10 @@ export function SettingsAdminClient() {
               onChange={(e) =>
                 patch("miraviaMinDiscountPercent", e.target.value)
               }
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel>Discovery máx.</FieldLabel>
+          </AdminField>
+          <AdminField label="Discovery máx.">
             <input
               type="number"
               min="10"
@@ -322,22 +419,20 @@ export function SettingsAdminClient() {
               onChange={(e) =>
                 patch("miraviaDiscoveryMaxItems", e.target.value)
               }
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel>Insertar / pasada</FieldLabel>
+          </AdminField>
+          <AdminField label="Insertar / pasada">
             <input
               type="number"
               min="1"
               max="5"
               value={form.miraviaFlashLimit}
               onChange={(e) => patch("miraviaFlashLimit", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel>Actualizar / pasada</FieldLabel>
+          </AdminField>
+          <AdminField label="Actualizar / pasada">
             <input
               type="number"
               min="1"
@@ -346,9 +441,9 @@ export function SettingsAdminClient() {
               onChange={(e) =>
                 patch("miraviaFlashUpdateLimit", e.target.value)
               }
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
+          </AdminField>
         </div>
       </section>
 
@@ -372,29 +467,27 @@ export function SettingsAdminClient() {
           />
           Solo productos nuevos (salvo bajadas en listado)
         </label>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div>
-            <FieldLabel>Descuento mín. (%)</FieldLabel>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+          <AdminField label="Descuento mín. (%)">
             <input
               type="number"
               min="1"
               max="90"
               value={form.kiabiMinDiscountPercent}
               onChange={(e) => patch("kiabiMinDiscountPercent", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
-          <div>
-            <FieldLabel>Discovery máx.</FieldLabel>
+          </AdminField>
+          <AdminField label="Discovery máx.">
             <input
               type="number"
               min="10"
               max="300"
               value={form.kiabiDiscoveryMaxItems}
               onChange={(e) => patch("kiabiDiscoveryMaxItems", e.target.value)}
-              className="admin-input mt-2 w-full"
+              className="admin-input w-full"
             />
-          </div>
+          </AdminField>
         </div>
       </section>
 
