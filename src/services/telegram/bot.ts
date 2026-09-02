@@ -88,6 +88,8 @@ export interface TelegramUpdate {
 interface TelegramApiResponse<T> {
   ok: boolean;
   description?: string;
+  error_code?: number;
+  parameters?: { retry_after?: number };
   result?: T;
 }
 
@@ -101,30 +103,65 @@ export function isTelegramChannelConfigured(): boolean {
   return isTelegramConfigured() && Boolean(process.env.TELEGRAM_CHANNEL_ID?.trim());
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterSeconds(description: string | undefined): number | null {
+  if (!description) return null;
+  const match = description.match(/retry after (\d+)/i);
+  if (!match?.[1]) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
 async function callTelegramApi<T>(
   method: string,
   body: Record<string, unknown>,
+  options?: { maxRetries?: number },
 ): Promise<T> {
   const { TELEGRAM_BOT_TOKEN } = getTelegramEnv();
-  const response = await fetch(
-    `${TELEGRAM_API_BASE}/bot${TELEGRAM_BOT_TOKEN}/${method}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  const maxRetries = options?.maxRetries ?? 4;
 
-  const payload = (await response.json()) as TelegramApiResponse<T>;
-
-  if (!response.ok || !payload.ok || payload.result === undefined) {
-    throw new Error(
-      payload.description ??
-        `Telegram API error en ${method} (${response.status})`,
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const response = await fetch(
+      `${TELEGRAM_API_BASE}/bot${TELEGRAM_BOT_TOKEN}/${method}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
     );
+
+    const payload = (await response.json()) as TelegramApiResponse<T>;
+
+    if (payload.ok && payload.result !== undefined) {
+      return payload.result;
+    }
+
+    const description =
+      payload.description ??
+      `Telegram API error en ${method} (${response.status})`;
+    const retryAfter =
+      payload.parameters?.retry_after ??
+      parseRetryAfterSeconds(description) ??
+      (payload.error_code === 429 || /too many requests/i.test(description)
+        ? 5
+        : null);
+
+    if (retryAfter != null && attempt < maxRetries) {
+      const waitMs = Math.min(60_000, (retryAfter + 1) * 1000);
+      console.warn(
+        `[telegram] ${method} rate-limited; esperando ${Math.ceil(waitMs / 1000)}s (intento ${attempt + 1}/${maxRetries}).`,
+      );
+      await sleep(waitMs);
+      continue;
+    }
+
+    throw new Error(description);
   }
 
-  return payload.result;
+  throw new Error(`Telegram API error en ${method} tras reintentos`);
 }
 
 export async function sendTelegramMessage(options: {
@@ -571,20 +608,53 @@ export async function sendDealAlertMessage(options: {
         messageThreadId,
       });
     } catch (error) {
-      console.warn(
-        "[telegram] sendPhoto falló; se envía solo texto.",
-        error instanceof Error ? error.message : error,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      // Si el tema no existe, reintentar sin thread (no gastar rate-limit en bucle).
+      if (/message thread not found/i.test(message) && messageThreadId != null) {
+        try {
+          return await sendTelegramPhoto({
+            chatId: options.chatId,
+            photoUrl,
+            caption: buildDealAlertCaption(options.deal, { includeCopyLinks }),
+            replyMarkup,
+            messageThreadId: null,
+          });
+        } catch (retryError) {
+          console.warn(
+            "[telegram] sendPhoto sin thread falló; se envía solo texto.",
+            retryError instanceof Error ? retryError.message : retryError,
+          );
+        }
+      } else {
+        console.warn(
+          "[telegram] sendPhoto falló; se envía solo texto.",
+          message,
+        );
+      }
     }
   }
 
-  return sendTelegramMessage({
-    chatId: options.chatId,
-    text: buildDealAlertText(options.deal, { includeCopyLinks }),
-    disableWebPagePreview: true,
-    replyMarkup,
-    messageThreadId,
-  });
+  try {
+    return await sendTelegramMessage({
+      chatId: options.chatId,
+      text: buildDealAlertText(options.deal, { includeCopyLinks }),
+      disableWebPagePreview: true,
+      replyMarkup,
+      messageThreadId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/message thread not found/i.test(message) && messageThreadId != null) {
+      return sendTelegramMessage({
+        chatId: options.chatId,
+        text: buildDealAlertText(options.deal, { includeCopyLinks }),
+        disableWebPagePreview: true,
+        replyMarkup,
+        messageThreadId: null,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

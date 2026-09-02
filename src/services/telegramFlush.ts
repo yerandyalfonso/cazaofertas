@@ -14,7 +14,7 @@ import { dealScoringService } from "@/services/deal-scoring";
 import { sendChannelDealAlert } from "@/services/telegram/bot";
 import { DealLevel, ProductAvailability } from "@/types";
 
-const SEND_DELAY_MS = 700;
+const SEND_DELAY_MS = 1_200;
 
 export interface TelegramFlushResult {
   ok: true;
@@ -192,11 +192,15 @@ export async function flushPendingChannelNotifications(options?: {
   const pendingBefore = queue.queued;
 
   if (pendingBefore === 0) {
+    // Marca el intervalo cumplido aunque la cola esté vacía, para no reintentar cada 10 min.
+    if (!options?.force) {
+      await persistTelegramFlushAt(finishedAt);
+    }
     return {
       ok: true,
       skipped: true,
       reason: "Toca lote pero no hay nada en cola.",
-      nextFlushAt,
+      nextFlushAt: nextFlushIso(finishedAt, batchHours),
       resumeAt: null,
       batchHours,
       pendingBefore: 0,
@@ -210,10 +214,11 @@ export async function flushPendingChannelNotifications(options?: {
     };
   }
 
-  const { data: pending, error: pendingError } = await client
+  // Priorizar pending: los failed antiguos no deben comerse todo el cupo del lote.
+  const { data: pendingRows, error: pendingError } = await client
     .from("channel_notifications")
-    .select("id, product_id, created_at, old_price, new_price")
-    .in("status", ["pending", "failed"])
+    .select("id, product_id, created_at, old_price, new_price, status")
+    .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(limit);
 
@@ -221,7 +226,29 @@ export async function flushPendingChannelNotifications(options?: {
     throw new Error(pendingError.message);
   }
 
-  const rows = pending ?? [];
+  const remainingSlots = Math.max(0, limit - (pendingRows?.length ?? 0));
+  const { data: failedRows, error: failedError } =
+    remainingSlots > 0
+      ? await client
+          .from("channel_notifications")
+          .select("id, product_id, created_at, old_price, new_price, status")
+          .eq("status", "failed")
+          .order("created_at", { ascending: true })
+          .limit(remainingSlots)
+      : { data: [] as Array<{
+          id: string;
+          product_id: string;
+          created_at: string;
+          old_price: number | null;
+          new_price: number | null;
+          status: string;
+        }>, error: null };
+
+  if (failedError) {
+    throw new Error(failedError.message);
+  }
+
+  const rows = [...(pendingRows ?? []), ...(failedRows ?? [])];
   let sent = 0;
   let skippedExpired = 0;
   let skippedLowScore = 0;
@@ -384,13 +411,19 @@ export async function flushPendingChannelNotifications(options?: {
 
   const remainingPending = await countQueuedChannelNotifications();
 
-  await persistTelegramFlushAt(finishedAt);
+  // Solo avanza el reloj del lote si hubo envíos reales, se vació la cola, o es force.
+  // Si todo falla, el próximo check-prices (~10 min) reintenta en lugar de esperar N horas.
+  const shouldAdvanceClock =
+    Boolean(options?.force) || sent > 0 || remainingPending === 0;
+  if (shouldAdvanceClock) {
+    await persistTelegramFlushAt(finishedAt);
+  }
 
   return {
     ok: true,
     skipped: false,
     nextFlushAt: nextFlushIso(
-      sent > 0 || options?.force ? finishedAt : lastFlush,
+      shouldAdvanceClock ? finishedAt : lastFlush,
       batchHours,
     ),
     resumeAt: null,
