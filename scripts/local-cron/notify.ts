@@ -267,8 +267,9 @@ export async function reviewKiabiDealsResult(
       job,
       headline: "Kiabi desactivado",
       lines: [
-        "KIABI_DEALS_ENABLED no está en 1/true/on.",
-        "Añádelo a .env.local y reinicia el cron.",
+        "Kiabi está apagado en Ajustes (app_settings.kiabi_deals_enabled).",
+        "Actívalo en Admin → Ajustes → Kiabi, o pon kiabi_deals_enabled=true en Supabase.",
+        "KIABI_DEALS_ENABLED en .env.local solo aplica si la fila de BD no define el valor.",
       ],
     });
     return;
