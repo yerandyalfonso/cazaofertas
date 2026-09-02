@@ -42,14 +42,40 @@ function isKiabiDataDomeError(message: string): boolean {
   return /403|datadome|anti-bot|bloqueó/i.test(message);
 }
 
-function slugify(value: string): string {
-  return value
+function slugifyTitleWithId(title: string, externalId: string): string {
+  const base = title
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
+    .slice(0, 60);
+  const id = externalId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `${base || "producto"}-${id}`;
+}
+
+const CATALOG_PAGE_SIZE = 1000;
+
+async function loadKiabiCatalog(
+  client: TypedSupabaseClient,
+): Promise<CatalogRow[]> {
+  const rows: CatalogRow[] = [];
+  for (let offset = 0; ; offset += CATALOG_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("products")
+      .select(
+        "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id",
+      )
+      .eq("retailer", "kiabi")
+      .range(offset, offset + CATALOG_PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(`No se pudo leer catálogo Kiabi: ${error.message}`);
+    }
+    const page = (data ?? []) as CatalogRow[];
+    rows.push(...page);
+    if (page.length < CATALOG_PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -310,21 +336,15 @@ export async function runKiabiDealsCheck(options?: {
     }
   }
 
-  const { data: catalogRows, error: catalogError } = await client
-    .from("products")
-    .select(
-      "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id",
-    )
-    .eq("retailer", "kiabi");
-
-  if (catalogError) {
-    throw new Error(`No se pudo leer catálogo Kiabi: ${catalogError.message}`);
-  }
+  const catalogRows = await loadKiabiCatalog(client);
 
   const catalogByExternalId = new Map(
-    ((catalogRows ?? []) as CatalogRow[])
+    catalogRows
       .filter((row) => row.external_id)
       .map((row) => [row.external_id!.toUpperCase(), row] as const),
+  );
+  const catalogByAsin = new Map(
+    catalogRows.map((row) => [row.asin.toUpperCase(), row] as const),
   );
 
   const newCandidates: KiabiDiscoveredItem[] = [];
@@ -334,7 +354,10 @@ export async function runKiabiDealsCheck(options?: {
   const newOnly = newProductsOnly;
 
   for (const item of discovery.items) {
-    const existing = catalogByExternalId.get(item.externalId.toUpperCase());
+    const syntheticAsin = syntheticAsinForRetailer("kiabi", item.externalId);
+    const existing =
+      catalogByExternalId.get(item.externalId.toUpperCase()) ??
+      catalogByAsin.get(syntheticAsin.toUpperCase());
     if (!existing) {
       newCandidates.push(item);
       continue;
@@ -417,7 +440,7 @@ export async function runKiabiDealsCheck(options?: {
       });
 
       if (!existing) {
-        const slug = slugify(`${title}-${quote.externalId}`);
+        const slug = slugifyTitleWithId(title, quote.externalId);
         const insertRow = {
           retailer: "kiabi" as const,
           external_id: quote.externalId,
@@ -451,7 +474,31 @@ export async function runKiabiDealsCheck(options?: {
           .single();
 
         if (insertError) {
-          throw new Error(insertError.message);
+          const isDuplicate =
+            /duplicate key|products_slug_key|products_asin_key/i.test(
+              insertError.message,
+            );
+          if (!isDuplicate) throw new Error(insertError.message);
+
+          const { data: existingRow } = await client
+            .from("products")
+            .select("id, slug")
+            .eq("asin", syntheticAsin)
+            .maybeSingle();
+          if (!existingRow) throw new Error(insertError.message);
+
+          catalogByExternalId.set(quote.externalId.toUpperCase(), {
+            ...(insertRow as unknown as CatalogRow),
+            id: existingRow.id,
+            slug: existingRow.slug,
+          });
+          catalogByAsin.set(syntheticAsin.toUpperCase(), {
+            ...(insertRow as unknown as CatalogRow),
+            id: existingRow.id,
+            slug: existingRow.slug,
+          });
+          skippedExisting += 1;
+          continue;
         }
 
         await client.from("price_history").insert({
@@ -462,6 +509,10 @@ export async function runKiabiDealsCheck(options?: {
 
         inserted += 1;
         catalogByExternalId.set(quote.externalId.toUpperCase(), {
+          ...(insertRow as unknown as CatalogRow),
+          id: insertedRow.id,
+        });
+        catalogByAsin.set(syntheticAsin.toUpperCase(), {
           ...(insertRow as unknown as CatalogRow),
           id: insertedRow.id,
         });

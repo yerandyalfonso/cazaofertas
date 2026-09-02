@@ -22,14 +22,42 @@ function miraviaTelegramMinScoreFromSettings(
   return settings.miraviaTelegramMinScore;
 }
 
-function slugify(value: string): string {
-  return value
+/** Slug estable: el externalId siempre queda al final (no se trunca). */
+function slugifyTitleWithId(title: string, externalId: string): string {
+  const base = title
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
+    .slice(0, 60);
+  const id = externalId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `${base || "producto"}-${id}`;
+}
+
+const CATALOG_PAGE_SIZE = 1000;
+
+async function loadMiraviaCatalog(
+  client: TypedSupabaseClient,
+): Promise<CatalogRow[]> {
+  const rows: CatalogRow[] = [];
+  for (let offset = 0; ; offset += CATALOG_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("products")
+      .select(
+        "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
+      )
+      .eq("retailer", "miravia")
+      .range(offset, offset + CATALOG_PAGE_SIZE - 1);
+
+    if (error) {
+      throw new Error(`No se pudo leer catálogo Miravia: ${error.message}`);
+    }
+    const page = (data ?? []) as CatalogRow[];
+    rows.push(...page);
+    if (page.length < CATALOG_PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 function computeDiscount(current: number, reference: number | null): number {
@@ -197,23 +225,15 @@ export async function runMiraviaDealsCheck(options?: {
         delayMs: 600,
       });
 
-  const { data: catalogRows, error: catalogError } = await client
-    .from("products")
-    .select(
-      "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
-    )
-    .eq("retailer", "miravia");
-
-  if (catalogError) {
-    throw new Error(
-      `No se pudo leer catálogo Miravia: ${catalogError.message}`,
-    );
-  }
+  const catalogRows = await loadMiraviaCatalog(client);
 
   const catalogByExternalId = new Map(
-    ((catalogRows ?? []) as CatalogRow[])
+    catalogRows
       .filter((row) => row.external_id)
       .map((row) => [row.external_id!, row] as const),
+  );
+  const catalogByAsin = new Map(
+    catalogRows.map((row) => [row.asin.toUpperCase(), row] as const),
   );
 
   function resolveDealPrices(item: MiraviaDiscoveredItem): {
@@ -248,10 +268,17 @@ export async function runMiraviaDealsCheck(options?: {
   let skippedExistingUnchanged = 0;
 
   for (const item of discovery.items) {
-    const existing = catalogByExternalId.get(item.externalId);
+    const syntheticAsin = syntheticAsinForRetailer("miravia", item.externalId);
+    const existing =
+      catalogByExternalId.get(item.externalId) ??
+      catalogByAsin.get(syntheticAsin.toUpperCase());
     if (!existing) {
       newCandidates.push(item);
       continue;
+    }
+    // Mantener índices sincronizados si se encontró solo por ASIN.
+    if (item.externalId && !catalogByExternalId.has(item.externalId)) {
+      catalogByExternalId.set(item.externalId, existing);
     }
     const prices = resolveDealPrices(item);
     if (!prices) {
@@ -319,7 +346,7 @@ export async function runMiraviaDealsCheck(options?: {
       });
 
       const now = new Date().toISOString();
-      const slug = slugify(`${title}-${item.externalId}`);
+      const slug = slugifyTitleWithId(title, item.externalId);
       const insertRow = {
         retailer: "miravia" as const,
         external_id: item.externalId,
@@ -345,29 +372,167 @@ export async function runMiraviaDealsCheck(options?: {
         updated_at: now,
       };
 
-      const { data: insertedRow, error: insertError } = await client
+      let insertedRow: { id: string; slug: string } | null = null;
+      const { data: created, error: insertError } = await client
         .from("products")
         .insert(insertRow)
         .select("id, slug")
         .single();
 
       if (insertError) {
-        throw new Error(insertError.message);
+        const isDuplicate =
+          /duplicate key|products_slug_key|products_asin_key/i.test(
+            insertError.message,
+          );
+        if (!isDuplicate) throw new Error(insertError.message);
+
+        // Ya existe (catálogo incompleto, slug viejo truncado, etc.): reutilizar.
+        const { data: byAsin } = await client
+          .from("products")
+          .select(
+            "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
+          )
+          .eq("asin", syntheticAsin)
+          .maybeSingle();
+        const { data: byExternal } = byAsin
+          ? { data: null }
+          : await client
+              .from("products")
+              .select(
+                "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
+              )
+              .eq("external_id", item.externalId)
+              .eq("retailer", "miravia")
+              .maybeSingle();
+        const { data: bySlug } =
+          byAsin || byExternal
+            ? { data: null }
+            : await client
+                .from("products")
+                .select(
+                  "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
+                )
+                .eq("slug", slug)
+                .maybeSingle();
+
+        const existingRow = byAsin ?? byExternal ?? bySlug;
+        if (!existingRow) {
+          throw new Error(insertError.message);
+        }
+
+        const { error: repairError } = await client
+          .from("products")
+          .update({
+            external_id: item.externalId,
+            asin: syntheticAsin,
+            title,
+            // Solo cambiar slug si el existente no es el nuestro o ya es el nuevo.
+            ...(existingRow.slug === slug ||
+            existingRow.asin === syntheticAsin ||
+            existingRow.external_id === item.externalId
+              ? { slug }
+              : {}),
+            product_url: productUrl,
+            amazon_url: productUrl,
+            affiliate_url: productUrl,
+            current_price: price,
+            previous_price: listPrice,
+            discount_percentage: discount,
+            lowest_price: roundMoney(
+              Math.min(toNumber(existingRow.lowest_price) ?? price, price),
+            ),
+            highest_price: roundMoney(
+              Math.max(
+                toNumber(existingRow.highest_price) ?? price,
+                price,
+                listPrice,
+              ),
+            ),
+            image_url: item.imageUrlHint ?? existingRow.image_url,
+            category_id: categoryMeta.categoryId ?? existingRow.category_id,
+            availability: ProductAvailability.IN_STOCK,
+            is_active: true,
+            last_checked_at: now,
+            updated_at: now,
+          })
+          .eq("id", existingRow.id);
+
+        if (repairError) {
+          // Si el slug nuevo choca, reintentar sin cambiar slug.
+          if (/products_slug_key|duplicate key/i.test(repairError.message)) {
+            const { error: retryError } = await client
+              .from("products")
+              .update({
+                external_id: item.externalId,
+                asin: syntheticAsin,
+                title,
+                product_url: productUrl,
+                amazon_url: productUrl,
+                affiliate_url: productUrl,
+                current_price: price,
+                previous_price: listPrice,
+                discount_percentage: discount,
+                lowest_price: roundMoney(
+                  Math.min(toNumber(existingRow.lowest_price) ?? price, price),
+                ),
+                highest_price: roundMoney(
+                  Math.max(
+                    toNumber(existingRow.highest_price) ?? price,
+                    price,
+                    listPrice,
+                  ),
+                ),
+                image_url: item.imageUrlHint ?? existingRow.image_url,
+                category_id: categoryMeta.categoryId ?? existingRow.category_id,
+                availability: ProductAvailability.IN_STOCK,
+                is_active: true,
+                last_checked_at: now,
+                updated_at: now,
+              })
+              .eq("id", existingRow.id);
+            if (retryError) throw new Error(retryError.message);
+          } else {
+            throw new Error(repairError.message);
+          }
+        }
+
+        insertedRow = {
+          id: existingRow.id,
+          slug: existingRow.slug === slug ? slug : existingRow.slug,
+        };
+        catalogByExternalId.set(item.externalId, {
+          ...(existingRow as CatalogRow),
+          ...insertRow,
+          id: existingRow.id,
+          slug: insertedRow.slug,
+        });
+        catalogByAsin.set(syntheticAsin.toUpperCase(), {
+          ...(existingRow as CatalogRow),
+          ...insertRow,
+          id: existingRow.id,
+          slug: insertedRow.slug,
+        });
+        updated += 1;
+      } else {
+        insertedRow = created;
+        inserted += 1;
+        catalogByExternalId.set(item.externalId, {
+          ...(insertRow as unknown as CatalogRow),
+          id: insertedRow.id,
+        });
+        catalogByAsin.set(syntheticAsin.toUpperCase(), {
+          ...(insertRow as unknown as CatalogRow),
+          id: insertedRow.id,
+        });
+
+        await client.from("price_history").insert({
+          product_id: insertedRow.id,
+          price,
+          source: "miravia",
+        });
       }
 
-      await client.from("price_history").insert({
-        product_id: insertedRow.id,
-        price,
-        source: "miravia",
-      });
-
-      inserted += 1;
-      catalogByExternalId.set(item.externalId, {
-        ...(insertRow as unknown as CatalogRow),
-        id: insertedRow.id,
-      });
-
-      if (shouldNotify) {
+      if (shouldNotify && insertedRow) {
         const channelMinScore = miraviaTelegramMinScore;
         const affiliateUrl = resolveProductBuyUrl(insertRow);
 
