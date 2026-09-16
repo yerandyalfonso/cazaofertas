@@ -4,14 +4,15 @@ import {
   type AmazonCategoryInferenceInput,
 } from "@/lib/product-category-inference";
 import {
-  DEFAULT_SUBCATEGORY_BY_PARENT,
-  GENERAL_CHILD_SLUG,
   parseSubcategorySlug,
   resolveCategoryDisplayMeta,
   resolveParentSlug,
+  DEFAULT_SUBCATEGORY_BY_PARENT,
+  GENERAL_CHILD_SLUG,
 } from "@/lib/category-taxonomy";
 import type { SiteCategorySlug } from "@/lib/site-categories";
 import type { TypedSupabaseClient } from "@/lib/supabase";
+import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 
 export type { SiteCategorySlug };
 
@@ -78,6 +79,7 @@ export async function resolveProductCategoryId(
   client: TypedSupabaseClient,
   input: AmazonCategoryInferenceInput & { categorySlug?: string | null },
 ): Promise<string | null> {
+  await ensureCategoryKeywordRulesLoaded();
   const subSlug = normalizeCategorySlugForStorage(
     input.categorySlug ?? inferProductSubcategorySlug(input),
   );

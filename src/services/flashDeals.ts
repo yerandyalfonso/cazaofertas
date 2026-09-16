@@ -9,6 +9,7 @@ import {
 import { inferProductSubcategorySlug } from "@/lib/product-category-inference";
 import { roundMoney } from "@/lib/money";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
+import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import {
   discoverFlashDealListings,
   type DiscoveredListingItem,
@@ -166,21 +167,29 @@ export interface FlashDealsRunResult {
   errors: Array<{ asin: string; message: string }>;
 }
 
-interface CatalogRow {
-  id: string;
-  asin: string;
-  title: string;
-  slug: string;
-  amazon_url: string;
-  affiliate_url: string | null;
-  current_price: number | string;
-  previous_price: number | string | null;
-  lowest_price: number | string | null;
-  highest_price: number | string | null;
-  brand: string | null;
-  image_url: string | null;
-  description: string | null;
-  category_id: string | null;
+const ASIN_LOOKUP_CHUNK = 100;
+
+/** Solo comprueba existencia: no descarga el catálogo completo (egress). */
+async function fetchExistingAsins(
+  client: TypedSupabaseClient,
+  asins: string[],
+): Promise<Set<string>> {
+  const existing = new Set<string>();
+  const unique = [...new Set(asins.map((asin) => asin.toUpperCase()).filter(Boolean))];
+  for (let offset = 0; offset < unique.length; offset += ASIN_LOOKUP_CHUNK) {
+    const chunk = unique.slice(offset, offset + ASIN_LOOKUP_CHUNK);
+    const { data, error } = await client
+      .from("products")
+      .select("asin")
+      .in("asin", chunk);
+    if (error) {
+      throw new Error(`No se pudo comprobar ASINs existentes: ${error.message}`);
+    }
+    for (const row of data ?? []) {
+      if (row.asin) existing.add(String(row.asin).toUpperCase());
+    }
+  }
+  return existing;
 }
 
 /**
@@ -205,6 +214,7 @@ export async function runFlashDealsCheck(options?: {
   delayMs?: number;
 }): Promise<FlashDealsRunResult> {
   const client = createSupabaseServiceClient();
+  await ensureCategoryKeywordRulesLoaded();
   const appSettings = await getAppSettings();
   const limit =
     options?.limit && options.limit > 0
@@ -225,28 +235,17 @@ export async function runFlashDealsCheck(options?: {
     allowSimulatedFallback: options?.allowSimulatedFallback ?? true,
   });
 
-  const { data: catalogRows, error: catalogError } = await client
-    .from("products")
-    .select(
-      "id, asin, title, slug, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id",
-    );
-
-  if (catalogError) {
-    throw new Error(`No se pudo leer el catálogo: ${catalogError.message}`);
-  }
-
-  const catalogByAsin = new Map(
-    ((catalogRows ?? []) as CatalogRow[]).map(
-      (row) => [row.asin.toUpperCase(), row] as const,
-    ),
+  const discovered = discovery.items;
+  const catalogByAsin = await fetchExistingAsins(
+    client,
+    discovered.map((item) => item.asin),
   );
 
-  const discovered = discovery.items;
   const newCandidates: DiscoveredListingItem[] = [];
   let existingAsins = 0;
 
   for (const item of discovered) {
-    if (catalogByAsin.has(item.asin)) {
+    if (catalogByAsin.has(item.asin.toUpperCase())) {
       existingAsins += 1;
     } else {
       newCandidates.push(item);
@@ -284,7 +283,7 @@ export async function runFlashDealsCheck(options?: {
     const item = queue[index]!;
     catalogScanned += 1;
     // Defensa: ASIN indexado entre discovery y este paso → lo deja check-prices.
-    if (catalogByAsin.has(item.asin)) {
+    if (catalogByAsin.has(item.asin.toUpperCase())) {
       unchanged += 1;
       continue;
     }
@@ -478,22 +477,7 @@ export async function runFlashDealsCheck(options?: {
         source: "amazon",
       });
 
-      catalogByAsin.set(item.asin, {
-        id: insertedRow.id,
-        asin: insertedRow.asin,
-        title: insertedRow.title,
-        slug: insertedRow.slug ?? slug,
-        amazon_url: amazonUrl,
-        affiliate_url: null,
-        current_price: price,
-        previous_price: reference,
-        lowest_price: price,
-        highest_price: Math.max(price, reference),
-        brand,
-        image_url: imageUrl,
-        description,
-        category_id: categoryMeta.categoryId,
-      });
+      catalogByAsin.add(item.asin.toUpperCase());
 
       inserted += 1;
       newLows += 1;

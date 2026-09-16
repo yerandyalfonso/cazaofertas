@@ -11,6 +11,7 @@ loadEnv({ path: resolve(process.cwd(), ".env") });
 type LocalCronJob =
   | "check-prices"
   | "flash-deals"
+  | "miravia-deals"
   | "user-alerts"
   | "kiabi-deals"
   | "telegram-flush"
@@ -19,6 +20,7 @@ type LocalCronJob =
 const JOBS: LocalCronJob[] = [
   "check-prices",
   "flash-deals",
+  "miravia-deals",
   "user-alerts",
   "kiabi-deals",
   "telegram-flush",
@@ -65,11 +67,13 @@ async function runCheckPrices(): Promise<void> {
 
 async function runFlashDeals(): Promise<void> {
   const { runFlashDealsCheck } = await import("@/services/flashDeals");
-  const { runMiraviaDealsCheck } = await import("@/services/miraviaDeals");
   const { maybePauseAfterAmazonErrors } = await import("@/services/cronControl");
   const { getAppSettings } = await import("@/services/appSettings");
 
   const appSettings = await getAppSettings();
+  const includeMiravia =
+    process.env.CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA === "1" ||
+    process.env.CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA === "true";
 
   const result = await runFlashDealsCheck({
     limit: appSettings.amazonFlashInsertLimit,
@@ -79,11 +83,18 @@ async function runFlashDeals(): Promise<void> {
     delayMs: 2_500,
   });
 
-  const miravia = await runMiraviaDealsCheck({
-    limit: appSettings.miraviaFlashLimit,
-    updateLimit: appSettings.miraviaFlashUpdateLimit,
-    notify: true,
-  });
+  let miravia: Awaited<
+    ReturnType<typeof import("@/services/miraviaDeals").runMiraviaDealsCheck>
+  > | null = null;
+
+  if (includeMiravia) {
+    const { runMiraviaDealsCheck } = await import("@/services/miraviaDeals");
+    miravia = await runMiraviaDealsCheck({
+      limit: appSettings.miraviaFlashLimit,
+      updateLimit: appSettings.miraviaFlashUpdateLimit,
+      notify: true,
+    });
+  }
 
   const processed =
     (result.inserted ?? 0) +
@@ -98,7 +109,7 @@ async function runFlashDeals(): Promise<void> {
 
   const payload = {
     ...result,
-    miravia,
+    ...(miravia ? { miravia } : {}),
     pause: {
       activated: pause.paused,
       denials: pause.denials,
@@ -109,6 +120,51 @@ async function runFlashDeals(): Promise<void> {
 
   const { reviewFlashDealsResult } = await import("./notify");
   await reviewFlashDealsResult(payload);
+}
+
+async function runMiraviaDeals(): Promise<void> {
+  const { runMiraviaDealsCheck } = await import("@/services/miraviaDeals");
+  const { getAppSettings } = await import("@/services/appSettings");
+  const { reviewFlashDealsResult } = await import("./notify");
+
+  const appSettings = await getAppSettings();
+  const miravia = await runMiraviaDealsCheck({
+    limit: appSettings.miraviaFlashLimit,
+    updateLimit: appSettings.miraviaFlashUpdateLimit,
+    notify: true,
+  });
+
+  console.log(JSON.stringify({ miravia }, null, 2));
+  await reviewFlashDealsResult({
+    ok: true,
+    finishedAt: miravia.finishedAt,
+    focus: "discovery-insert",
+    discovery: {
+      feedsFetched: miravia.discovery.feedsFetched,
+      candidates: miravia.discovery.candidates,
+      newAsins: 0,
+      existingAsins: miravia.skippedExisting,
+      usedSimulation: false,
+      feedErrors: miravia.discovery.feedErrors,
+    },
+    catalogScanned: miravia.processed,
+    flashDealsDetected: miravia.inserted + miravia.updated,
+    inserted: miravia.inserted,
+    updated: miravia.updated,
+    unchanged: miravia.skippedExisting,
+    newLows: 0,
+    channelNotificationsSent: miravia.channelNotificationsSent,
+    channelNotificationsSkipped: miravia.channelNotificationsSkipped,
+    channelNotificationsQueued: miravia.channelNotificationsQueued,
+    skippedCooldown: 0,
+    skippedNoPrice: miravia.skippedNoDiscount,
+    products: [],
+    errors: miravia.errors.map((error) => ({
+      asin: error.externalId,
+      message: error.message,
+    })),
+    miravia,
+  });
 }
 
 async function runUserAlerts(): Promise<void> {
@@ -168,6 +224,9 @@ async function main(): Promise<void> {
       break;
     case "flash-deals":
       await runFlashDeals();
+      break;
+    case "miravia-deals":
+      await runMiraviaDeals();
       break;
     case "user-alerts":
       await runUserAlerts();

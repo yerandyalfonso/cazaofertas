@@ -125,10 +125,17 @@ async function graphPost(
     return { ok: false, error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.", tokenExpired: false };
   }
 
+  // Graph API es más fiable con form-urlencoded que con JSON (caption/message a veces se ignora).
+  const form = new URLSearchParams();
+  form.set("access_token", token);
+  for (const [key, value] of Object.entries(body)) {
+    form.set(key, String(value));
+  }
+
   const response = await fetch(graphUrl(path), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, access_token: token }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
     signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
   });
 
@@ -145,6 +152,42 @@ async function graphPost(
 
   const id = payload.id ?? payload.post_id ?? null;
   return { ok: true, id };
+}
+
+/**
+ * Sube la imagen sin publicarla y crea un post en el muro con texto + adjunto.
+ * Evita el bug de Páginas nuevas: /photos con caption deja posts vacíos en el feed
+ * (la foto sí entra al álbum).
+ */
+async function postFeedWithPhoto(options: {
+  pageId: string;
+  message: string;
+  imageUrl: string;
+}): Promise<
+  | { ok: true; id: string | null }
+  | { ok: false; error: string; tokenExpired: boolean }
+> {
+  const upload = await graphPost(`/${encodeURIComponent(options.pageId)}/photos`, {
+    url: options.imageUrl,
+    published: false,
+    temporary: true,
+  });
+  if (!upload.ok) {
+    return upload;
+  }
+  if (!upload.id) {
+    return {
+      ok: false,
+      error: "Facebook no devolvió id de foto al subir la imagen.",
+      tokenExpired: false,
+    };
+  }
+
+  return graphPost(`/${encodeURIComponent(options.pageId)}/feed`, {
+    message: options.message,
+    // Form field: attached_media[0] = {"media_fbid":"..."}
+    "attached_media[0]": JSON.stringify({ media_fbid: upload.id }),
+  });
 }
 
 export function buildFacebookDealMessage(deal: DealCandidate): string {
@@ -229,29 +272,33 @@ export async function postDealToFacebookPage(
       };
     }
 
-    const message = buildFacebookDealMessage(deal);
+    const message = buildFacebookDealMessage(deal).trim();
+    if (!message) {
+      return {
+        ok: false,
+        skipped: false,
+        error: "Mensaje de Facebook vacío; no se publica.",
+      };
+    }
+
     const imageUrl = deal.imageUrl?.trim();
     const canUsePhoto = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
 
     if (canUsePhoto && imageUrl) {
-      const photo = await graphPost(`/${encodeURIComponent(pageId)}/photos`, {
-        url: imageUrl,
-        caption: message,
-        published: true,
-      });
-      if (photo.ok) {
-        return { ok: true, skipped: false, postId: photo.id ?? undefined };
+      const withPhoto = await postFeedWithPhoto({ pageId, message, imageUrl });
+      if (withPhoto.ok) {
+        return { ok: true, skipped: false, postId: withPhoto.id ?? undefined };
       }
       console.warn(
-        "[facebook] Foto falló; se publica solo texto en /feed.",
-        photo.error,
+        "[facebook] Foto+feed falló; se publica solo texto en /feed.",
+        withPhoto.error,
       );
-      if (photo.tokenExpired) {
-        console.error("[facebook]", photo.error);
+      if (withPhoto.tokenExpired) {
+        console.error("[facebook]", withPhoto.error);
         return {
           ok: false,
           skipped: false,
-          error: photo.error,
+          error: withPhoto.error,
           tokenExpired: true,
         };
       }

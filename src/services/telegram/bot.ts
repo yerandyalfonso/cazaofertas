@@ -670,7 +670,10 @@ export async function sendChannelDealAlert(
   if (!channelId) {
     throw new Error("Falta TELEGRAM_CHANNEL_ID en el entorno.");
   }
-  const messageThreadId = resolveTelegramTopicId(deal.categorySlug);
+  const messageThreadId = resolveTelegramTopicId(
+    deal.categorySlug,
+    deal.parentCategorySlug,
+  );
   const groupMessage = await sendDealAlertMessage({
     chatId: channelId,
     deal,

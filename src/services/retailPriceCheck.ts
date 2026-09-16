@@ -54,26 +54,83 @@ export async function runRetailPriceCheck(options?: {
     ?.map((asin) => asin.trim().toUpperCase())
     .filter(Boolean);
 
+  const RETAIL_SELECT =
+    "id, asin, retailer, product_url, amazon_url, title, brand, image_url, current_price, previous_price, lowest_price, highest_price, availability, out_of_stock_at, is_active, last_checked_at";
+
   const limitRaw = options?.limit;
   const limit =
     Number.isFinite(limitRaw) && (limitRaw as number) > 0
       ? Math.min(20, limitRaw as number)
       : 4;
 
-  const { data: products, error } = await client
-    .from("products")
-    .select(
-      "id, asin, retailer, product_url, amazon_url, title, brand, image_url, description, current_price, previous_price, lowest_price, highest_price, availability, out_of_stock_at, is_active, last_checked_at",
-    )
-    .eq("is_active", true);
+  type RetailRow = {
+    id: string;
+    asin: string;
+    retailer: string;
+    product_url: string | null;
+    amazon_url: string;
+    title: string;
+    brand: string | null;
+    image_url: string | null;
+    current_price: number | string;
+    previous_price: number | string | null;
+    lowest_price: number | string | null;
+    highest_price: number | string | null;
+    availability: string | null;
+    out_of_stock_at: string | null;
+    is_active: boolean;
+    last_checked_at: string | null;
+  };
 
-  if (error) {
-    throw new Error(`No se pudieron leer productos retail: ${error.message}`);
-  }
+  let monitorable: RetailRow[] = [];
 
-  const monitorable = (products ?? [])
-    .filter(productHasRetailMonitorableUrl)
-    .sort((a, b) => {
+  if (requested?.length) {
+    const { data, error } = await client
+      .from("products")
+      .select(RETAIL_SELECT)
+      .eq("is_active", true)
+      .in("asin", requested.slice(0, 50));
+    if (error) {
+      throw new Error(`No se pudieron leer productos retail: ${error.message}`);
+    }
+    monitorable = ((data ?? []) as RetailRow[])
+      .filter((row) => productHasRetailMonitorableUrl(row))
+      .sort((a, b) => {
+        const aChecked = a.last_checked_at
+          ? new Date(a.last_checked_at).getTime()
+          : 0;
+        const bChecked = b.last_checked_at
+          ? new Date(b.last_checked_at).getTime()
+          : 0;
+        return aChecked - bChecked;
+      });
+  } else {
+    const pageSize = Math.min(100, Math.max(limit * 20, 40));
+    let offset = 0;
+    while (monitorable.length < limit && offset < 2_000) {
+      const { data, error } = await client
+        .from("products")
+        .select(RETAIL_SELECT)
+        .eq("is_active", true)
+        .in("retailer", ["miravia", "kiabi", "carrefour"])
+        .order("last_checked_at", { ascending: true, nullsFirst: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) {
+        throw new Error(
+          `No se pudieron leer productos retail: ${error.message}`,
+        );
+      }
+      const page = (data ?? []) as RetailRow[];
+      if (page.length === 0) break;
+      for (const row of page) {
+        if (!productHasRetailMonitorableUrl(row)) continue;
+        monitorable.push(row);
+        if (monitorable.length >= limit) break;
+      }
+      offset += pageSize;
+      if (page.length < pageSize) break;
+    }
+    monitorable.sort((a, b) => {
       const aChecked = a.last_checked_at
         ? new Date(a.last_checked_at).getTime()
         : 0;
@@ -82,14 +139,9 @@ export async function runRetailPriceCheck(options?: {
         : 0;
       return aChecked - bChecked;
     });
+  }
 
-  const queue = (
-    requested?.length
-      ? monitorable.filter((product) =>
-          requested.includes(product.asin.toUpperCase()),
-        )
-      : monitorable
-  ).slice(0, limit);
+  const queue = monitorable.slice(0, limit);
 
   const stats = {
     processed: 0,

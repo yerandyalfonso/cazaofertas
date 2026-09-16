@@ -1,15 +1,20 @@
 import {
+  GENERAL_CHILD_SLUG,
   PRODUCT_SUBCATEGORIES,
+  subcategoryLookupKey,
   telegramTopicSlugForCategory,
   type BlogCategorySlug,
 } from "@/lib/category-taxonomy";
 
 /**
  * Temas del grupo Telegram (message_thread_id).
- * Clave = slug de subcategoría o categoría padre.
+ * Clave = slug de padre, subcategoría (hogar-cocina) o lookup (moda-general).
  *
  * Enlaces del grupo: https://t.me/c/4351769316/{threadId}
  * Chat id del grupo: -1004351769316
+ *
+ * Importante: tras 0029 el slug BD `general` se repite bajo varios padres.
+ * Nunca indexar solo `"general"` — usar padre o clave `padre-general`.
  */
 export const DEFAULT_TELEGRAM_TOPIC_BY_SLUG: Record<string, number> = {
   tecnologia: 5,
@@ -29,15 +34,20 @@ export const DEFAULT_TELEGRAM_TOPIC_BY_SLUG: Record<string, number> = {
   otros: 231,
 };
 
-/** Hereda el topic del padre para cada subcategoría (salvo «otros-*» → otros). */
+/** Hereda el topic del padre para cada subcategoría (clave de lookup). */
 for (const sub of PRODUCT_SUBCATEGORIES) {
-  if (DEFAULT_TELEGRAM_TOPIC_BY_SLUG[sub.slug]) continue;
+  const lookupKey = subcategoryLookupKey(sub);
+  if (DEFAULT_TELEGRAM_TOPIC_BY_SLUG[lookupKey]) continue;
   const topicSlug =
     sub.telegramTopicSlug ??
     (sub.parentSlug === "otros" ? "otros" : sub.parentSlug);
   const threadId = DEFAULT_TELEGRAM_TOPIC_BY_SLUG[topicSlug];
   if (threadId != null) {
-    DEFAULT_TELEGRAM_TOPIC_BY_SLUG[sub.slug] = threadId;
+    DEFAULT_TELEGRAM_TOPIC_BY_SLUG[lookupKey] = threadId;
+    // También indexar el slug compuesto legacy si difiere (p. ej. hogar-cocina).
+    if (sub.slug !== GENERAL_CHILD_SLUG && sub.slug !== lookupKey) {
+      DEFAULT_TELEGRAM_TOPIC_BY_SLUG[sub.slug] ??= threadId;
+    }
   }
 }
 
@@ -55,6 +65,9 @@ export function parseTelegramTopicMap(
   for (const [slug, threadId] of Object.entries(DEFAULT_TELEGRAM_TOPIC_BY_SLUG)) {
     map.set(slug, threadId);
   }
+  // Nunca tratar "general" como tema único (ambigüedad entre padres).
+  map.delete(GENERAL_CHILD_SLUG);
+
   const extra = raw?.trim();
   if (!extra) return map;
 
@@ -66,6 +79,7 @@ export function parseTelegramTopicMap(
     const slug = slugRaw?.trim().toLowerCase();
     const threadId = Number(idRaw?.trim());
     if (!slug || !Number.isFinite(threadId) || threadId <= 0) continue;
+    if (slug === GENERAL_CHILD_SLUG) continue;
     map.set(slug, threadId);
   }
   return map;
@@ -81,24 +95,38 @@ export function getTelegramTopicOtros(): number {
 }
 
 /**
- * Resuelve el tema por slug de subcategoría (o padre legacy).
+ * Resuelve el tema por slug de subcategoría + padre (obligatorio si slug = general).
  * Sin match → tema «Otros» (nunca el General del foro).
  */
 export function resolveTelegramTopicId(
   categorySlug: string | null | undefined,
+  parentSlug?: string | null,
 ): number | null {
   const map = parseTelegramTopicMap(process.env.TELEGRAM_TOPIC_MAP);
-  const slug = categorySlug?.trim().toLowerCase();
-  if (slug && map.has(slug)) {
+  const slug = categorySlug?.trim().toLowerCase() || null;
+  const parent = parentSlug?.trim().toLowerCase() || null;
+
+  // 1) Lookup compuesto (moda-general) o subcategoría concreta (hogar-cocina).
+  if (slug === GENERAL_CHILD_SLUG && parent) {
+    const composite = `${parent}-${GENERAL_CHILD_SLUG}`;
+    if (map.has(composite)) return map.get(composite)!;
+    if (map.has(parent)) return map.get(parent)!;
+  } else if (slug && slug !== GENERAL_CHILD_SLUG && map.has(slug)) {
     return map.get(slug)!;
   }
 
-  const topicSlug = telegramTopicSlugForCategory(slug);
+  // 2) Tema del padre vía taxonomía (con parent explícito).
+  const topicSlug = telegramTopicSlugForCategory(slug, parent);
   if (topicSlug === "otros") {
     return getTelegramTopicOtros();
   }
   if (map.has(topicSlug)) {
     return map.get(topicSlug)!;
+  }
+
+  // 3) Padre directo si vino en el deal.
+  if (parent && map.has(parent)) {
+    return map.get(parent)!;
   }
 
   return getTelegramTopicOtros();

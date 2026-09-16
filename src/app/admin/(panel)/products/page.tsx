@@ -29,6 +29,7 @@ import {
   detectRetailerFromUrl,
   getRetailerDefinition,
   isProductRetailer,
+  normalizeRetailer,
   PRODUCT_RETAILERS,
   retailerBuyCtaLabel,
   retailerLabel,
@@ -880,9 +881,10 @@ export default function ProductsAdminClient() {
         toast.error(message);
       } else {
         const quote = data.quotes?.find((item) => item.asin === product.asin);
+        const store = retailerLabel(product.retailer);
         const message = quote
           ? quote.unavailable || quote.price === null
-            ? `${product.asin}: agotado en Amazon (sin precio)`
+            ? `${product.asin}: agotado en ${store} (sin precio)`
             : `${product.asin}: ${quote.price.toFixed(2)} €` +
               (quote.listPrice != null
                 ? ` (ref. ${quote.listPrice.toFixed(2)} €)`
@@ -1879,7 +1881,9 @@ export default function ProductsAdminClient() {
                             key: "price",
                             label: "Revisar precio",
                             icon: <RefreshCw className="h-4 w-4" />,
-                            disabled: product.retailer !== "amazon",
+                            disabled: !retailerScrapeSupported(
+                              normalizeRetailer(product.retailer),
+                            ),
                             loading: updatingAsin === product.asin,
                             onSelect: () => void onUpdatePrice(product),
                           },

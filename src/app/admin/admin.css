@@ -113,6 +113,7 @@
   background: var(--surface);
   padding: 0 0.9rem;
   color: var(--text);
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 400;
   letter-spacing: normal;
@@ -132,9 +133,19 @@
 
 .admin-shell textarea.admin-input {
   height: auto;
-  min-height: 4.5rem;
+  min-height: 2.75rem;
+  max-height: none;
   padding: 0.7rem 0.9rem;
   line-height: 1.45;
+  resize: vertical;
+}
+
+.admin-shell textarea.admin-input.admin-input--lg {
+  min-height: 14rem;
+}
+
+.admin-shell textarea.admin-input.admin-input--md {
+  min-height: 11rem;
 }
 
 .admin-shell .admin-field {

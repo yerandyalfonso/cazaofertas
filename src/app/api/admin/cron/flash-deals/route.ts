@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
     });
 
     const miravia =
-      body.miravia === false
-        ? null
-        : await runMiraviaDealsCheck({
+      body.miravia === true
+        ? await runMiraviaDealsCheck({
             notify: body.notify ?? true,
-          });
+          })
+        : null;
 
     return NextResponse.json({ ...result, miravia });
   } catch (error) {

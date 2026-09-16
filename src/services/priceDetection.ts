@@ -270,6 +270,11 @@ function mediaBackfillPatch(
   return patch;
 }
 
+const PRICE_PRODUCT_SELECT =
+  "id, asin, title, slug, brand, image_url, description, retailer, amazon_url, affiliate_url, product_url, current_price, previous_price, lowest_price, highest_price, discount_percentage, category_id, availability, out_of_stock_at, is_active, deal_expires_at, categories(id, slug, name, parent:parent_id(id, slug, name))";
+
+const ASIN_LOOKUP_CHUNK = 100;
+
 export async function runPriceDetection(
   options: RunPriceDetectionOptions = {},
 ): Promise<PriceDetectionStats> {
@@ -279,30 +284,55 @@ export async function runPriceDetection(
   const shouldNotify = options.notify ?? true;
   const telegramMinScore = await resolveTelegramMinScore();
 
-  const { data: products, error: productsError } = await client
-    .from("products")
-    .select("*, categories(id, slug, name, parent:parent_id(id, slug, name))")
-    .eq("is_active", true);
-
-  if (productsError) {
-    throw new Error(`No se pudieron leer productos: ${productsError.message}`);
-  }
-
   const allowList = options.asinAllowList
-    ? new Set(options.asinAllowList.map((asin) => asin.toUpperCase()))
+    ? [...new Set(options.asinAllowList.map((asin) => asin.toUpperCase()).filter(Boolean))]
     : null;
 
-  const activeProducts = ((products ?? []) as ProductWithCategory[]).filter(
-    (product) => {
-      if (options.onlyWithAmazonUrl && !productHasMonitorableUrl(product)) {
-        return false;
+  let products: ProductWithCategory[] = [];
+
+  if (allowList && allowList.length > 0) {
+    const byId = new Map<string, ProductWithCategory>();
+    for (let offset = 0; offset < allowList.length; offset += ASIN_LOOKUP_CHUNK) {
+      const chunk = allowList.slice(offset, offset + ASIN_LOOKUP_CHUNK);
+      const { data, error } = await client
+        .from("products")
+        .select(PRICE_PRODUCT_SELECT)
+        .eq("is_active", true)
+        .in("asin", chunk);
+      if (error) {
+        throw new Error(`No se pudieron leer productos: ${error.message}`);
       }
-      if (allowList && !allowList.has(product.asin.toUpperCase())) {
-        return false;
+      for (const row of (data ?? []) as ProductWithCategory[]) {
+        byId.set(row.id, row);
       }
-      return true;
-    },
-  );
+    }
+    products = [...byId.values()];
+  } else {
+    // Sin allow-list (tests/mock): ventana acotada, nunca el catálogo entero.
+    const { data, error: productsError } = await client
+      .from("products")
+      .select(PRICE_PRODUCT_SELECT)
+      .eq("is_active", true)
+      .order("last_checked_at", { ascending: true, nullsFirst: true })
+      .limit(Math.min(Math.max(batchSize * 4, 25), 100));
+
+    if (productsError) {
+      throw new Error(`No se pudieron leer productos: ${productsError.message}`);
+    }
+    products = (data ?? []) as ProductWithCategory[];
+  }
+
+  const allowSet = allowList ? new Set(allowList) : null;
+
+  const activeProducts = products.filter((product) => {
+    if (options.onlyWithAmazonUrl && !productHasMonitorableUrl(product)) {
+      return false;
+    }
+    if (allowSet && !allowSet.has(product.asin.toUpperCase())) {
+      return false;
+    }
+    return true;
+  });
   const provider =
     options.provider ??
     new MockPriceProvider({

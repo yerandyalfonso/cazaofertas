@@ -85,19 +85,16 @@ export default async function HomePage() {
                         className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                         sizes="(max-width: 1024px) 100vw, 65vw"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent" />
-                      <div className="absolute inset-x-0 bottom-0 p-5 md:p-8">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
-                          {lead.category} · {lead.readingTime}
-                        </p>
-                        <h2 className="mt-3 max-w-2xl font-display text-3xl leading-tight tracking-tight text-paper md:text-5xl">
-                          {lead.title}
-                        </h2>
-                        <p className="mt-3 max-w-xl text-sm leading-relaxed text-stone-200 md:text-base">
-                          {lead.excerpt}
-                        </p>
-                      </div>
                     </div>
+                    <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+                      {lead.category} · {lead.readingTime}
+                    </p>
+                    <h2 className="mt-3 max-w-3xl font-display text-3xl leading-tight tracking-tight text-ink transition group-hover:text-teal-900 md:text-4xl">
+                      {lead.title}
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600 md:text-base">
+                      {lead.excerpt}
+                    </p>
                   </Link>
 
                   <div className="mt-10 grid gap-8 sm:grid-cols-2">

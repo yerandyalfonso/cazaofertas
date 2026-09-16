@@ -5,14 +5,13 @@ import {
   Check,
   EyeOff,
   ExternalLink,
-  Loader2,
   MessageSquare,
   RefreshCw,
   Trash2,
 } from "lucide-react";
 import {
   AdminPageHeader,
-  AdminSearchField,
+  AdminSearchToolbar,
 } from "@/components/admin/AdminListChrome";
 import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeleton";
@@ -36,12 +35,12 @@ interface AdminComment {
 
 type StatusFilter = "all" | ArticleCommentStatus;
 
-function statusBadge(status: ArticleCommentStatus) {
+function statusBadgeClass(status: ArticleCommentStatus) {
   switch (status) {
     case "approved":
-      return "border-teal-200 bg-teal-50 text-teal-900";
+      return "";
     case "hidden":
-      return "border-stone-300 bg-stone-100 text-stone-600";
+      return "admin-badge--muted";
     default:
       return "border-amber-200 bg-amber-50 text-amber-900";
   }
@@ -56,6 +55,16 @@ function statusLabel(status: ArticleCommentStatus) {
     default:
       return "Pendiente";
   }
+}
+
+function formatShortDate(value: string) {
+  return new Date(value).toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function CommentsAdminClient() {
@@ -196,12 +205,11 @@ export default function CommentsAdminClient() {
         }
       />
 
-      <div className="admin-toolbar">
-        <AdminSearchField
-          value={query}
-          onChange={setQuery}
-          placeholder="Buscar autor, email o texto…"
-        />
+      <AdminSearchToolbar
+        value={query}
+        onChange={setQuery}
+        placeholder="Buscar autor, email o texto…"
+      >
         <select
           value={statusFilter}
           onChange={(event) =>
@@ -215,18 +223,18 @@ export default function CommentsAdminClient() {
           <option value="approved">Publicados</option>
           <option value="hidden">Ocultos</option>
         </select>
-      </div>
+      </AdminSearchToolbar>
 
-      <div className="admin-table-wrap admin-table-wrap--fill mt-4 min-h-0 flex-1">
+      <div className="admin-table-wrap mt-4">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-muted)] text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
             <tr>
-              <th className="px-4 py-3">Autor</th>
-              <th className="px-4 py-3">Artículo</th>
+              <th className="w-[16%] px-4 py-3">Autor</th>
+              <th className="w-[22%] px-4 py-3">Artículo</th>
               <th className="px-4 py-3">Comentario</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3">Fecha</th>
-              <th className="px-4 py-3">Acciones</th>
+              <th className="w-[7.5rem] px-4 py-3">Estado</th>
+              <th className="w-[9rem] px-4 py-3">Fecha</th>
+              <th className="w-[7.5rem] px-3 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -234,7 +242,10 @@ export default function CommentsAdminClient() {
               <AdminTableSkeleton rows={10} cols={6} />
             ) : comments.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-stone-500">
+                <td
+                  colSpan={6}
+                  className="px-4 py-10 text-center text-[var(--text-muted)]"
+                >
                   No hay comentarios con estos filtros.
                 </td>
               </tr>
@@ -242,61 +253,71 @@ export default function CommentsAdminClient() {
               comments.map((comment) => (
                 <tr
                   key={comment.id}
-                  className="border-t border-stone-100 align-top hover:bg-stone-50/80"
+                  className="border-t border-[var(--border)] align-middle hover:bg-[var(--surface-muted)]/60"
                 >
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{comment.authorName}</p>
+                    <p className="font-medium leading-snug text-[var(--text)]">
+                      {comment.authorName}
+                    </p>
                     {comment.authorEmail ? (
-                      <p className="mt-1 text-xs text-stone-500">
+                      <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
                         {comment.authorEmail}
-                        {comment.notifyOnReply ? " · aviso activo" : ""}
+                      </p>
+                    ) : null}
+                    {comment.notifyOnReply ? (
+                      <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                        Aviso activo
                       </p>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="line-clamp-2 text-stone-700">
+                    <p className="line-clamp-2 leading-snug text-[var(--text)]">
                       {comment.article?.title ?? "—"}
                     </p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="line-clamp-3 text-stone-700">{comment.body}</p>
+                    <p className="line-clamp-2 leading-snug text-[var(--text-muted)]">
+                      {comment.body}
+                    </p>
                     {comment.adminReply ? (
-                      <p className="mt-2 line-clamp-2 text-xs text-teal-800">
+                      <p className="mt-1 line-clamp-1 text-xs text-teal-800">
                         Respuesta: {comment.adminReply}
                       </p>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${statusBadge(comment.status)}`}
+                      className={`admin-badge ${statusBadgeClass(comment.status)}`}
                     >
                       {statusLabel(comment.status)}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500">
-                    {new Date(comment.createdAt).toLocaleString("es-ES")}
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-muted)]">
+                    {formatShortDate(comment.createdAt)}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
+                  <td className="px-3 py-3 text-right">
+                    <div className="inline-flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => openComment(comment)}
-                        className="admin-btn admin-btn-ghost h-8 px-2 text-[10px]"
+                        className="admin-icon-btn"
+                        title="Responder"
                       >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        Responder
+                        <MessageSquare className="h-4 w-4" />
                       </button>
                       {comment.status !== "approved" ? (
                         <button
                           type="button"
                           disabled={saving}
                           onClick={() =>
-                            void patchComment(comment.id, { status: "approved" })
+                            void patchComment(comment.id, {
+                              status: "approved",
+                            })
                           }
-                          className="admin-btn admin-btn-ghost h-8 px-2 text-[10px]"
+                          className="admin-icon-btn"
+                          title="Aprobar"
                         >
-                          <Check className="h-3.5 w-3.5" />
-                          Aprobar
+                          <Check className="h-4 w-4" />
                         </button>
                       ) : null}
                       {comment.status !== "hidden" ? (
@@ -306,19 +327,20 @@ export default function CommentsAdminClient() {
                           onClick={() =>
                             void patchComment(comment.id, { status: "hidden" })
                           }
-                          className="admin-btn admin-btn-ghost h-8 px-2 text-[10px]"
+                          className="admin-icon-btn"
+                          title="Ocultar"
                         >
-                          <EyeOff className="h-3.5 w-3.5" />
-                          Ocultar
+                          <EyeOff className="h-4 w-4" />
                         </button>
                       ) : null}
                       <button
                         type="button"
                         disabled={saving}
                         onClick={() => void onDelete(comment)}
-                        className="admin-btn admin-btn-ghost h-8 px-2 text-[10px] hover:border-rose-600 hover:text-rose-700"
+                        className="admin-icon-btn hover:border-rose-600 hover:text-rose-700"
+                        title="Eliminar"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -363,27 +385,33 @@ export default function CommentsAdminClient() {
         }
       >
         {selected ? (
-          <div className="space-y-5">
-            <div className="admin-detail-section">
-              <h3>Comentario</h3>
-              <p className="text-sm leading-relaxed text-stone-700">
+          <div className="flex flex-col gap-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Comentario
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text)]">
                 {selected.body}
               </p>
-              <p className="mt-2 text-xs text-stone-500">
-                {new Date(selected.createdAt).toLocaleString("es-ES")}
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                {formatShortDate(selected.createdAt)}
                 {selected.authorEmail ? ` · ${selected.authorEmail}` : ""}
               </p>
             </div>
 
             {selected.article ? (
-              <div className="admin-detail-section">
-                <h3>Artículo</h3>
-                <p className="font-medium text-ink">{selected.article.title}</p>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Artículo
+                </p>
+                <p className="mt-2 font-medium text-[var(--text)]">
+                  {selected.article.title}
+                </p>
                 <a
                   href={`/blog/${selected.article.slug}#comentarios`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="admin-btn admin-btn-ghost mt-3 h-9 px-3 text-[10px]"
+                  className="admin-btn admin-btn-ghost mt-3"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   Ver en web
@@ -391,17 +419,19 @@ export default function CommentsAdminClient() {
               </div>
             ) : null}
 
-            <div className="admin-detail-section">
-              <h3>Respuesta del admin</h3>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Respuesta del admin
+              </p>
               <textarea
                 value={replyDraft}
                 onChange={(event) => setReplyDraft(event.target.value)}
-                rows={6}
+                rows={5}
                 maxLength={2000}
                 placeholder="Escribe la respuesta que verá el lector…"
-                className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm outline-none focus:border-ink"
+                className="admin-input mt-2 min-h-[8rem] resize-y"
               />
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
                 Al publicar, el comentario queda aprobado y la respuesta aparece
                 en el artículo.
                 {selected.notifyOnReply && selected.authorEmail

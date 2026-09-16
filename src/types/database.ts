@@ -673,6 +673,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      category_keywords: {
+        Row: {
+          id: string;
+          category_id: string;
+          keywords: string[];
+          breadcrumb_patterns: string[];
+          is_active: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          keywords?: string[];
+          breadcrumb_patterns?: string[];
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          keywords?: string[];
+          breadcrumb_patterns?: string[];
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "category_keywords_category_id_fkey";
+            columns: ["category_id"];
+            isOneToOne: true;
+            referencedRelation: "categories";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       app_settings: {
         Row: {
           id: string;
@@ -788,3 +829,5 @@ export type ArticleRow = Database["public"]["Tables"]["articles"]["Row"];
 export type ArticleProductRow =
   Database["public"]["Tables"]["article_products"]["Row"];
 export type CouponRow = Database["public"]["Tables"]["coupons"]["Row"];
+export type CategoryKeywordRow =
+  Database["public"]["Tables"]["category_keywords"]["Row"];

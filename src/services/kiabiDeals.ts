@@ -54,28 +54,64 @@ function slugifyTitleWithId(title: string, externalId: string): string {
   return `${base || "producto"}-${id}`;
 }
 
-const CATALOG_PAGE_SIZE = 1000;
+const CATALOG_SELECT =
+  "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id";
+const CATALOG_LOOKUP_CHUNK = 100;
 
-async function loadKiabiCatalog(
+/** Solo filas de los IDs descubiertos (evita descargar todo el catálogo Kiabi). */
+async function loadKiabiCatalogForItems(
   client: TypedSupabaseClient,
+  items: KiabiDiscoveredItem[],
 ): Promise<CatalogRow[]> {
-  const rows: CatalogRow[] = [];
-  for (let offset = 0; ; offset += CATALOG_PAGE_SIZE) {
+  if (items.length === 0) return [];
+
+  const byId = new Map<string, CatalogRow>();
+  const externalIds = [
+    ...new Set(
+      items
+        .map((item) => item.externalId?.trim())
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const asins = [
+    ...new Set(
+      items.map((item) =>
+        syntheticAsinForRetailer("kiabi", item.externalId).toUpperCase(),
+      ),
+    ),
+  ];
+
+  for (let offset = 0; offset < externalIds.length; offset += CATALOG_LOOKUP_CHUNK) {
+    const chunk = externalIds.slice(offset, offset + CATALOG_LOOKUP_CHUNK);
     const { data, error } = await client
       .from("products")
-      .select(
-        "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, description, category_id",
-      )
+      .select(CATALOG_SELECT)
       .eq("retailer", "kiabi")
-      .range(offset, offset + CATALOG_PAGE_SIZE - 1);
+      .in("external_id", chunk);
     if (error) {
       throw new Error(`No se pudo leer catálogo Kiabi: ${error.message}`);
     }
-    const page = (data ?? []) as CatalogRow[];
-    rows.push(...page);
-    if (page.length < CATALOG_PAGE_SIZE) break;
+    for (const row of (data ?? []) as CatalogRow[]) {
+      byId.set(row.id, row);
+    }
   }
-  return rows;
+
+  for (let offset = 0; offset < asins.length; offset += CATALOG_LOOKUP_CHUNK) {
+    const chunk = asins.slice(offset, offset + CATALOG_LOOKUP_CHUNK);
+    const { data, error } = await client
+      .from("products")
+      .select(CATALOG_SELECT)
+      .eq("retailer", "kiabi")
+      .in("asin", chunk);
+    if (error) {
+      throw new Error(`No se pudo leer catálogo Kiabi: ${error.message}`);
+    }
+    for (const row of (data ?? []) as CatalogRow[]) {
+      byId.set(row.id, row);
+    }
+  }
+
+  return [...byId.values()];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -336,7 +372,7 @@ export async function runKiabiDealsCheck(options?: {
     }
   }
 
-  const catalogRows = await loadKiabiCatalog(client);
+  const catalogRows = await loadKiabiCatalogForItems(client, discovery.items);
 
   const catalogByExternalId = new Map(
     catalogRows

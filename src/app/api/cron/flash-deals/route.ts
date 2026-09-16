@@ -16,7 +16,7 @@ export const maxDuration = 300;
  * Cron discovery-first de Ofertas Flash (Amazon + Miravia misma pasada).
  * Respeta pausa preventiva ante denegaciones Amazon.
  *
- * Query: ?limit=&feeds=url1,url2&asins=B0...,B0...&simulate=0&force=1&miravia=0
+ * Query: ?limit=&feeds=url1,url2&asins=B0...,B0...&simulate=0&force=1&miravia=1
  */
 export async function GET(request: NextRequest) {
   try {
@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
       : undefined;
     const allowSimulatedFallback =
       request.nextUrl.searchParams.get("simulate") !== "0";
-    const runMiravia = request.nextUrl.searchParams.get("miravia") !== "0";
+    // Miravia va en cron propio; solo si ?miravia=1
+    const runMiravia = request.nextUrl.searchParams.get("miravia") === "1";
 
     const result = await runFlashDealsCheck({
       limit,
@@ -122,11 +123,11 @@ export async function POST(request: NextRequest) {
     });
 
     const miravia =
-      body.miravia === false
-        ? null
-        : await runMiraviaDealsCheck({
+      body.miravia === true
+        ? await runMiraviaDealsCheck({
             notify: body.notify ?? true,
-          });
+          })
+        : null;
 
     const processed =
       (result.inserted ?? 0) +

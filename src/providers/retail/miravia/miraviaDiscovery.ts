@@ -27,11 +27,18 @@ function parseEuroLabel(raw: string | null | undefined): number | null {
   return Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
 }
 
-function centsToEuro(raw: string | null | undefined): number | null {
+/**
+ * Precios en clickTrackInfo de Miravia/Lazada:
+ * - enteros → céntimos (1999 → 19.99 €)
+ * - con decimal → ya en euros (19.99 → 19.99 €)
+ */
+function trackPriceToEuro(raw: string | null | undefined): number | null {
   if (!raw?.trim()) return null;
-  const cents = Number(raw.trim());
-  if (!Number.isFinite(cents) || cents <= 0) return null;
-  return roundMoney(cents / 100);
+  const trimmed = raw.trim().replace(",", ".");
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (trimmed.includes(".")) return roundMoney(value);
+  return roundMoney(value / 100);
 }
 
 function parseDiscountPercent(raw: string | null | undefined): number | null {
@@ -156,27 +163,21 @@ export function parseMiraviaFlashHtml(
     if (titleHint && titleHint.length < 4) continue;
 
     const priceHint =
-      centsToEuro(track.saleCents) ||
+      trackPriceToEuro(track.saleCents) ||
       parseEuroLabel(extractJsonString(blob, "rec_sale_price")) ||
       parseEuroLabel(extractJsonString(blob, "itemDiscountPrice"));
 
     let listPriceHint =
-      centsToEuro(track.listCents) ||
+      trackPriceToEuro(track.listCents) ||
       parseEuroLabel(extractJsonString(blob, "itemPrice"));
 
+    // No inventar lista desde el badge %: suele inflar el “antes”.
     if (
       priceHint != null &&
       listPriceHint != null &&
       listPriceHint <= priceHint
     ) {
-      const discount = parseDiscountPercent(
-        extractJsonString(blob, "itemDiscount"),
-      );
-      if (discount != null && discount > 0 && discount < 95) {
-        listPriceHint = roundMoney(priceHint / (1 - discount / 100));
-      } else {
-        listPriceHint = null;
-      }
+      listPriceHint = null;
     }
 
     const imageUrlHint =
@@ -222,8 +223,8 @@ export function parseMiraviaFlashHtml(
         skuId,
         productUrl,
         titleHint,
-        priceHint: centsToEuro(track.saleCents) ?? undefined,
-        listPriceHint: centsToEuro(track.listCents) ?? undefined,
+        priceHint: trackPriceToEuro(track.saleCents) ?? undefined,
+        listPriceHint: trackPriceToEuro(track.listCents) ?? undefined,
         discountHint:
           parseDiscountPercent(extractJsonString(blob, "itemDiscount")) ?? null,
         imageUrlHint:
@@ -343,10 +344,8 @@ export async function discoverMiraviaDeals(options?: {
 
   const items = [...merged.values()]
     .filter((item) => {
-      if (item.priceHint == null) return false;
-      if (item.listPriceHint == null || item.listPriceHint <= item.priceHint) {
-        return (item.discountHint ?? 0) >= minDiscount;
-      }
+      if (item.priceHint == null || item.listPriceHint == null) return false;
+      if (item.listPriceHint <= item.priceHint) return false;
       const discount =
         ((item.listPriceHint - item.priceHint) / item.listPriceHint) * 100;
       return discount >= minDiscount;
@@ -423,11 +422,11 @@ export async function scrapeMiraviaProductPage(
       /* keep raw */
     }
     if (!decoded.includes(`item_id:${externalIdFromInput}`)) continue;
-    const saleCents = decoded.match(/item_discount_price:(\d+)/)?.[1];
-    const listCents = decoded.match(/item_price:(\d+)/)?.[1];
+    const saleCents = decoded.match(/item_discount_price:([\d.]+)/)?.[1];
+    const listCents = decoded.match(/item_price:([\d.]+)/)?.[1];
     skuId = decoded.match(/sku_id:(\d+)/)?.[1] ?? skuId;
-    sale = centsToEuro(saleCents);
-    list = centsToEuro(listCents);
+    sale = trackPriceToEuro(saleCents);
+    list = trackPriceToEuro(listCents);
     if (sale != null) break;
   }
 

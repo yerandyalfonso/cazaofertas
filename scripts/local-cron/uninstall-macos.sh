@@ -7,6 +7,7 @@ DOMAIN="gui/$(id -u)"
 for label in \
   com.cazaofertas.cron.check-prices \
   com.cazaofertas.cron.flash-deals \
+  com.cazaofertas.cron.miravia-deals \
   com.cazaofertas.cron.user-alerts \
   com.cazaofertas.cron.kiabi-deals \
   com.cazaofertas.cron.coupons-discover \

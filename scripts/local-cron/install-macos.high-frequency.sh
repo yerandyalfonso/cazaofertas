@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# Instala LaunchAgents de macOS para cron local (scrape desde tu Mac).
+# Perfil ALTA FRECUENCIA (config anterior a la optimización de egress Supabase).
+# Flash cada 3 min e incluye Miravia en la misma pasada.
+#
+# Uso:
+#   npm run cron:local:install:high-freq
+#   bash scripts/local-cron/install-macos.high-frequency.sh
+#
+# Para volver al perfil bajo egress:
+#   npm run cron:local:install
+#
+# Ver: scripts/local-cron/schedules.md
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -19,6 +29,7 @@ write_plist() {
   local job="$2"
   local interval="${3:-}"
   local times="${4:-}"
+  local extra_env="${5:-}"
   local plist_path="$AGENTS_DIR/${label}.plist"
 
   {
@@ -40,6 +51,19 @@ write_plist() {
   <dict>
     <key>CAZAOFERTAS_CRON_LOG_DIR</key>
     <string>${LOG_DIR}</string>
+EOF
+
+    if [[ -n "$extra_env" ]]; then
+      # extra_env: KEY=VALUE KEY2=VALUE2
+      for pair in $extra_env; do
+        key="${pair%%=*}"
+        value="${pair#*=}"
+        echo "    <key>${key}</key>"
+        echo "    <string>${value}</string>"
+      done
+    fi
+
+    cat <<EOF
   </dict>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/${job}-launchd.out.log</string>
@@ -93,51 +117,47 @@ load_agent() {
   launchctl enable "$DOMAIN/$label" 2>/dev/null || true
 }
 
-echo "CazaOfertas — instalando cron local"
+remove_agent() {
+  local label="$1"
+  unload_if_loaded "$label"
+  rm -f "$AGENTS_DIR/${label}.plist"
+}
+
+echo "CazaOfertas — instalando cron local (perfil ALTA FRECUENCIA / legacy)"
 echo "Repo: $REPO_ROOT"
 echo "Logs: $LOG_DIR"
+echo "AVISO: sube el egress de Supabase (flash cada 3 min + Miravia en flash)."
 echo
 
 write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20 *:30 *:40 *:50"
-# Flash Amazon: cada 10 min (antes 3 min; reduce egress Supabase).
-write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "600" ""
-# Miravia aparte: cada 30 min (ya no va dentro de flash).
-write_plist "com.cazaofertas.cron.miravia-deals" "miravia-deals" "1800" ""
+# Config anterior: flash cada 180 s e incluye Miravia en la misma pasada.
+write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "180" "" \
+  "CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=1"
 write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 write_plist "com.cazaofertas.cron.coupons-discover" "coupons-discover" "" "10:00 18:00"
+
+# En este perfil Miravia va dentro de flash; quitar el agente separado.
+remove_agent "com.cazaofertas.cron.miravia-deals"
 
 echo
 echo "Cargando LaunchAgents..."
 load_agent "com.cazaofertas.cron.check-prices"
 load_agent "com.cazaofertas.cron.flash-deals"
-load_agent "com.cazaofertas.cron.miravia-deals"
 load_agent "com.cazaofertas.cron.user-alerts"
 load_agent "com.cazaofertas.cron.kiabi-deals"
 load_agent "com.cazaofertas.cron.coupons-discover"
 
 echo
-echo "Listo. Horarios (hora local del Mac):"
-echo "  • flash-deals:   cada 10 min · Amazon discovery (encola Telegram)"
-echo "  • miravia-deals: cada 30 min · Miravia discovery"
-echo "  • check-prices:  cada 10 min · precios + lote Telegram si toca"
-echo "  • user-alerts:   08:15 y 20:15 (1 min entre alertas)"
-echo "  • kiabi-deals:   09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1)"
-echo "  • coupons:       10:00 y 18:00"
-echo "  • telegram:      lote al grupo según intervalo admin (default 4 h)"
+echo "Listo. Horarios (perfil alta frecuencia):"
+echo "  • flash-deals:  cada 3 min · Amazon + Miravia en la misma pasada"
+echo "  • check-prices: cada 10 min · precios + lote Telegram si toca"
+echo "  • user-alerts:  08:15 y 20:15"
+echo "  • kiabi-deals:  09:30 y 18:30"
+echo "  • coupons:      10:00 y 18:00"
+echo "  • miravia-deals: desactivado (va dentro de flash)"
 echo
-echo "Prueba manual:"
-echo "  cd \"$REPO_ROOT\" && npm run cron:local:flash"
-echo "  cd \"$REPO_ROOT\" && npm run cron:local:miravia"
-echo "  cd \"$REPO_ROOT\" && npm run cron:local:prices"
-echo "  cd \"$REPO_ROOT\" && npm run coupons:discover"
+echo "Volver al perfil bajo egress:"
+echo "  npm run cron:local:install"
 echo
-echo "Ver logs:"
-echo "  tail -f \"$LOG_DIR/flash-deals.log\""
-echo "  tail -f \"$LOG_DIR/miravia-deals.log\""
-echo "  tail -f \"$LOG_DIR/check-prices.log\""
-echo "  tail -f \"$LOG_DIR/coupons-discover.log\""
-echo
-echo "IMPORTANTE: reinstala con este script para aplicar intervalos nuevos."
-echo "Perfil alta frecuencia (legacy): npm run cron:local:install:high-freq"
-echo "Ver: scripts/local-cron/schedules.md"
+echo "Documentación: scripts/local-cron/schedules.md"

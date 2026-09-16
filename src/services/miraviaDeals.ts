@@ -7,8 +7,10 @@ import {
 } from "@/lib/retailers";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import { getAppSettings, resolveMiraviaFeedUrlsForRun } from "@/services/appSettings";
+import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import {
   discoverMiraviaDeals,
+  scrapeMiraviaProductPage,
   type MiraviaDiscoveredItem,
 } from "@/providers/retail/miravia";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -35,29 +37,64 @@ function slugifyTitleWithId(title: string, externalId: string): string {
   return `${base || "producto"}-${id}`;
 }
 
-const CATALOG_PAGE_SIZE = 1000;
+const CATALOG_SELECT =
+  "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id";
+const CATALOG_LOOKUP_CHUNK = 100;
 
-async function loadMiraviaCatalog(
+/** Solo filas de los IDs descubiertos (evita descargar todo el catálogo Miravia). */
+async function loadMiraviaCatalogForItems(
   client: TypedSupabaseClient,
+  items: MiraviaDiscoveredItem[],
 ): Promise<CatalogRow[]> {
-  const rows: CatalogRow[] = [];
-  for (let offset = 0; ; offset += CATALOG_PAGE_SIZE) {
+  if (items.length === 0) return [];
+
+  const byId = new Map<string, CatalogRow>();
+  const externalIds = [
+    ...new Set(
+      items
+        .map((item) => item.externalId?.trim())
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const asins = [
+    ...new Set(
+      externalIds.map((id) =>
+        syntheticAsinForRetailer("miravia", id).toUpperCase(),
+      ),
+    ),
+  ];
+
+  for (let offset = 0; offset < externalIds.length; offset += CATALOG_LOOKUP_CHUNK) {
+    const chunk = externalIds.slice(offset, offset + CATALOG_LOOKUP_CHUNK);
     const { data, error } = await client
       .from("products")
-      .select(
-        "id, asin, external_id, retailer, title, slug, product_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, highest_price, brand, image_url, category_id",
-      )
+      .select(CATALOG_SELECT)
       .eq("retailer", "miravia")
-      .range(offset, offset + CATALOG_PAGE_SIZE - 1);
-
+      .in("external_id", chunk);
     if (error) {
       throw new Error(`No se pudo leer catálogo Miravia: ${error.message}`);
     }
-    const page = (data ?? []) as CatalogRow[];
-    rows.push(...page);
-    if (page.length < CATALOG_PAGE_SIZE) break;
+    for (const row of (data ?? []) as CatalogRow[]) {
+      byId.set(row.id, row);
+    }
   }
-  return rows;
+
+  for (let offset = 0; offset < asins.length; offset += CATALOG_LOOKUP_CHUNK) {
+    const chunk = asins.slice(offset, offset + CATALOG_LOOKUP_CHUNK);
+    const { data, error } = await client
+      .from("products")
+      .select(CATALOG_SELECT)
+      .eq("retailer", "miravia")
+      .in("asin", chunk);
+    if (error) {
+      throw new Error(`No se pudo leer catálogo Miravia: ${error.message}`);
+    }
+    for (const row of (data ?? []) as CatalogRow[]) {
+      byId.set(row.id, row);
+    }
+  }
+
+  return [...byId.values()];
 }
 
 function computeDiscount(current: number, reference: number | null): number {
@@ -164,7 +201,7 @@ async function maybeNotifyMiraviaDeal(
 
 /**
  * Descubre ofertas flash de Miravia e inserta novedades en catálogo.
- * Pensado para correr junto al cron flash de Amazon (cada ~3 min).
+ * Preferible en cron propio (p. ej. cada 30–60 min), no en cada pasada Amazon.
  */
 export async function runMiraviaDealsCheck(options?: {
   /** Máximo de productos *nuevos* a insertar. */
@@ -198,6 +235,7 @@ export async function runMiraviaDealsCheck(options?: {
   }
 
   const client = createSupabaseServiceClient();
+  await ensureCategoryKeywordRulesLoaded();
   const insertLimit =
     options?.limit && options.limit > 0
       ? options.limit
@@ -225,7 +263,7 @@ export async function runMiraviaDealsCheck(options?: {
         delayMs: 600,
       });
 
-  const catalogRows = await loadMiraviaCatalog(client);
+  const catalogRows = await loadMiraviaCatalogForItems(client, discovery.items);
 
   const catalogByExternalId = new Map(
     catalogRows
@@ -243,17 +281,12 @@ export async function runMiraviaDealsCheck(options?: {
   } | null {
     if (item.priceHint == null) return null;
     const price = roundMoney(item.priceHint);
-    let listPrice =
+    const listPrice =
       item.listPriceHint != null && item.listPriceHint > price
         ? roundMoney(item.listPriceHint)
         : null;
-    let discount = computeDiscount(price, listPrice);
-    if (discount < minDiscount && (item.discountHint ?? 0) >= minDiscount) {
-      discount = roundMoney(item.discountHint!);
-      if (listPrice == null) {
-        listPrice = roundMoney(price / (1 - discount / 100));
-      }
-    }
+    const discount = computeDiscount(price, listPrice);
+    // Solo aceptar descuento real precio/lista; no inventar lista desde badge %.
     if (discount < minDiscount || listPrice == null || listPrice <= price) {
       return null;
     }
@@ -326,7 +359,27 @@ export async function runMiraviaDealsCheck(options?: {
         skippedNoDiscount += 1;
         continue;
       }
-      const { price, listPrice, discount } = prices;
+      let { price, listPrice, discount } = prices;
+
+      // Verificar ficha: el feed a veces trae céntimos/badge mal parseados.
+      try {
+        const quote = await scrapeMiraviaProductPage(item.productUrl, {
+          timeoutMs: 14_000,
+        });
+        if (quote.price != null && quote.price > 0) {
+          price = roundMoney(quote.price);
+          if (quote.listPrice != null && quote.listPrice > price) {
+            listPrice = roundMoney(quote.listPrice);
+          }
+          discount = computeDiscount(price, listPrice);
+          if (discount < minDiscount || listPrice <= price) {
+            skippedNoDiscount += 1;
+            continue;
+          }
+        }
+      } catch {
+        /* mantener precios del feed */
+      }
 
       const title =
         item.titleHint?.trim() || `Producto Miravia ${item.externalId}`;
