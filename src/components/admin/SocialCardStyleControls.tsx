@@ -8,13 +8,16 @@ import type {
   SocialCardImageFit,
   SocialCardLayoutId,
   SocialCardStyleId,
+  PulseThemeId,
 } from "@/lib/social-card-projects";
+import { PULSE_THEME_IDS, PULSE_THEMES } from "@/lib/pulse-themes";
 
 export interface SocialCardStyleFields {
   layoutId: SocialCardLayoutId;
   formatId: SocialCardFormatId;
   styleId: SocialCardStyleId;
   colorTone: number;
+  pulseThemeId: PulseThemeId;
   imageFit: SocialCardImageFit;
   imagePadX: number;
   imagePadY: number;
@@ -267,6 +270,39 @@ export function SocialCardStyleControls({
             />
           ))}
         </div>
+        {value.layoutId === "pulse" ? (
+          <div className="mt-4 space-y-3 border border-stone-200 bg-stone-50/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Color de fondo YIR
+            </p>
+            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              {PULSE_THEME_IDS.map((id) => {
+                const theme = PULSE_THEMES[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onChange({ pulseThemeId: id })}
+                    className={`flex flex-col items-center gap-2 border px-2 py-3 text-xs font-medium transition ${
+                      value.pulseThemeId === id
+                        ? "border-ink bg-white shadow-sm"
+                        : "border-stone-200 bg-white/60 hover:border-stone-300"
+                    }`}
+                  >
+                    <span
+                      className="h-8 w-8 rounded-full border border-black/10"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.fallback}, ${theme.discountBg})`,
+                      }}
+                      aria-hidden
+                    />
+                    {theme.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {value.layoutId === "float" ? (
           <div className="mt-4 grid gap-3 border border-stone-200 bg-stone-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <p className="sm:col-span-2 lg:col-span-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">

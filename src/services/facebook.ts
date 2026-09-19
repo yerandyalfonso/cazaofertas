@@ -7,6 +7,7 @@ import {
 } from "@/lib/env";
 import { formatEuro } from "@/lib/money";
 import { renderSocialPulsePng } from "@/lib/render-social-pulse-card";
+import { pulseThemeForCategory } from "@/lib/pulse-category-theme";
 import { absoluteUrl } from "@/lib/site";
 import type { DealCandidate } from "@/services/alertMatching";
 import { DealLevel } from "@/types";
@@ -356,14 +357,19 @@ export async function postDealToFacebookPage(
       };
     }
 
-    // 1) Plantilla Alerta YIR (PNG) — prioridad para el lote Telegram → Facebook.
+    // 1) Plantilla Alerta YIR (PNG) — color por categoría padre.
     try {
+      const themeId = pulseThemeForCategory(
+        deal.parentCategorySlug,
+        deal.categorySlug,
+      );
       const png = await renderSocialPulsePng({
         title: deal.title,
         imageUrl: deal.imageUrl,
         currentPrice: deal.currentPrice,
         previousPrice: deal.previousPrice,
         discountPercentage: deal.discountPercentage,
+        pulseThemeId: themeId,
       });
       const withTemplate = await postFeedWithPngBuffer({
         pageId,

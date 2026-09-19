@@ -1,6 +1,18 @@
 import { ImageResponse } from "next/og";
 import { formatEuro } from "@/lib/money";
-import { adaptivePriceMetrics } from "@/lib/social-pulse-metrics";
+import {
+  buildPulseBackgroundSvg,
+  getPulseTheme,
+  PULSE_SVG_PALETTES,
+  type PulseThemeId,
+} from "@/lib/pulse-themes";
+import {
+  adaptivePriceMetrics,
+  PULSE_DISCOUNT_BADGE,
+  PULSE_PRICE_BADGE,
+  PULSE_STRIKE_BADGE,
+  pulseScale,
+} from "@/lib/social-pulse-metrics";
 
 export interface SocialPulseRenderInput {
   title?: string | null;
@@ -10,6 +22,7 @@ export interface SocialPulseRenderInput {
   discountPercentage: number;
   /** Lienzo cuadrado por defecto (feed/IG). */
   size?: number;
+  pulseThemeId?: PulseThemeId;
 }
 
 function resolveDiscount(input: SocialPulseRenderInput): number {
@@ -31,14 +44,22 @@ function resolveDiscount(input: SocialPulseRenderInput): number {
   return 0;
 }
 
+function pulseBackgroundDataUrl(themeId: PulseThemeId): string {
+  const svg = buildPulseBackgroundSvg(PULSE_SVG_PALETTES[themeId]);
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 /**
- * Renderiza la plantilla Alerta YIR (naranja) a PNG con next/og (Satori).
+ * Renderiza la plantilla Alerta YIR a PNG con next/og (Satori).
  * Compatible con Node (cron local) y runtime serverless.
+ * Facebook: sin padding de imagen (cover a sangre).
  */
 export async function renderSocialPulsePng(
   input: SocialPulseRenderInput,
 ): Promise<Buffer> {
   const size = input.size ?? 1080;
+  const k = pulseScale(size);
+  const theme = getPulseTheme(input.pulseThemeId);
   const discount = resolveDiscount(input);
   const previous =
     input.previousPrice != null && input.previousPrice > input.currentPrice
@@ -48,10 +69,11 @@ export async function renderSocialPulsePng(
   const previousText = previous != null ? formatEuro(previous) : null;
   const metrics = adaptivePriceMetrics(priceText, size);
 
-  const frameInset = Math.round(size * 0.07);
-  const frameRadius = Math.round(size * 0.055);
+  const frameInset = Math.round(size * 0.11);
+  const frameRadius = Math.round(size * 0.045);
   const imageUrl = input.imageUrl?.trim() || null;
   const canUseImage = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
+  const bgDataUrl = pulseBackgroundDataUrl(theme.id);
 
   const response = new ImageResponse(
     (
@@ -62,41 +84,45 @@ export async function renderSocialPulsePng(
           display: "flex",
           position: "relative",
           overflow: "hidden",
-          background:
-            "linear-gradient(145deg, #ff8a1f 0%, #ff6b00 38%, #ff9500 72%, #ffb020 100%)",
+          backgroundColor: theme.fallback,
           fontFamily:
             'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         }}
       >
-        {/* Diagonal highlight */}
-        <div
+        {/* Fondo YIR temático */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse/Satori */}
+        <img
+          src={bgDataUrl}
+          alt=""
+          width={size}
+          height={size}
           style={{
             position: "absolute",
             inset: 0,
+            width: size,
+            height: size,
+            objectFit: "cover",
             display: "flex",
-            background:
-              "linear-gradient(125deg, transparent 42%, rgba(255,255,255,0.12) 42.5%, rgba(255,255,255,0.12) 48%, transparent 48.5%)",
           }}
         />
 
-        {/* Product frame */}
+        {/* Marco producto — Facebook: sin padding, cover a sangre */}
         <div
           style={{
             position: "absolute",
             top: frameInset,
             left: frameInset,
             right: frameInset,
-            bottom: Math.round(frameInset * 1.15),
+            bottom: Math.round(frameInset * 1.05),
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             borderRadius: frameRadius,
-            background: "#f3f4f6",
-            border: "10px solid #2a2a2a",
-            boxShadow: "0 0 0 6px rgba(255,255,255,0.95), 0 28px 60px rgba(0,0,0,0.28)",
+            background: "#ffffff",
+            boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
             transform: "rotate(-2.5deg)",
             overflow: "hidden",
-            padding: Math.round(size * 0.03),
+            padding: 0,
           }}
         >
           {canUseImage && imageUrl ? (
@@ -109,7 +135,7 @@ export async function renderSocialPulsePng(
               style={{
                 width: "100%",
                 height: "100%",
-                objectFit: "contain",
+                objectFit: "cover",
                 display: "flex",
               }}
             />
@@ -126,96 +152,107 @@ export async function renderSocialPulsePng(
           )}
         </div>
 
-        {/* Discount badge */}
+        {/* Badge descuento % (completamente redondo) */}
         {discount > 0 ? (
           <div
             style={{
               position: "absolute",
-              top: Math.round(size * 0.055),
-              left: Math.round(size * 0.055),
+              top: Math.round(size * 0.07),
+              left: Math.round(size * 0.06),
               display: "flex",
               alignItems: "center",
-              background: "#e85d04",
+              justifyContent: "center",
+              width: PULSE_DISCOUNT_BADGE.width * k,
+              padding: `${PULSE_DISCOUNT_BADGE.padY * k}px ${PULSE_DISCOUNT_BADGE.padX * k}px`,
+              borderRadius: PULSE_DISCOUNT_BADGE.radius,
+              background: theme.discountBg,
+              boxShadow: PULSE_DISCOUNT_BADGE.shadow,
               color: "#ffffff",
               fontWeight: 800,
-              fontSize: Math.round(size * 0.055),
+              fontSize: PULSE_DISCOUNT_BADGE.font * k,
               lineHeight: 1,
-              padding: `${Math.round(size * 0.018)}px ${Math.round(size * 0.032)}px`,
-              borderRadius: 999,
-              boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
             }}
           >
             −{discount}%
           </div>
         ) : null}
 
-        {/* Adaptive price block (bottom-right wedge via skew) */}
+        {/* Badges precio docked derecha */}
         <div
           style={{
             position: "absolute",
             right: 0,
-            bottom: Math.round(size * 0.04),
+            bottom: Math.round(size * 0.085),
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
-            maxWidth: Math.round(size * 0.72),
+            gap: 10 * k,
+            maxWidth: Math.round(size * 0.78),
           }}
         >
+          {previousText ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                height: PULSE_STRIKE_BADGE.height * k,
+                padding: `${PULSE_STRIKE_BADGE.padTop * k}px ${PULSE_STRIKE_BADGE.padRight * k}px ${PULSE_STRIKE_BADGE.padBottom * k}px ${PULSE_STRIKE_BADGE.padLeft * k}px`,
+                borderRadius: "4999.5px 0 0 4999.5px",
+                background: theme.priceGradient,
+                boxShadow: PULSE_STRIKE_BADGE.shadow,
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  position: "relative",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  fontSize: metrics.strike,
+                  lineHeight: 1,
+                }}
+              >
+                {previousText}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "-4%",
+                    right: "-4%",
+                    top: "50%",
+                    height: Math.max(2.5, 3.5 * k),
+                    background: theme.strikeLine,
+                    transform: "translateY(-50%) rotate(-18deg)",
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              background:
-                "linear-gradient(105deg, #ff9f1a 0%, #ff7a00 55%, #ff6200 100%)",
-              transform: "skewX(-12deg)",
-              paddingTop: metrics.padY,
-              paddingBottom: metrics.padY,
-              paddingLeft: metrics.padX + Math.round(size * 0.04),
-              paddingRight: metrics.padX,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.22)",
-              minWidth: Math.min(
-                size * 0.42,
-                Math.max(size * 0.28, metrics.main * 3.2),
-              ),
+              alignItems: "center",
+              justifyContent: "flex-end",
+              height: PULSE_PRICE_BADGE.height * k,
+              padding: `${PULSE_PRICE_BADGE.padTop * k}px ${PULSE_PRICE_BADGE.padRight * k}px ${PULSE_PRICE_BADGE.padBottom * k}px ${PULSE_PRICE_BADGE.padLeft * k}px`,
+              borderRadius: "9999px 0 0 9999px",
+              background: theme.priceGradient,
+              boxShadow: PULSE_PRICE_BADGE.shadow,
             }}
           >
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                transform: "skewX(12deg)",
+                color: "#ffffff",
+                fontWeight: 800,
+                fontSize: metrics.main,
+                lineHeight: 1,
               }}
             >
-              {previousText ? (
-                <div
-                  style={{
-                    display: "flex",
-                    fontWeight: 700,
-                    textDecoration: "line-through",
-                    fontSize: metrics.strike,
-                    color: "rgba(180, 70, 0, 0.55)",
-                    lineHeight: 1,
-                    marginBottom: Math.round(metrics.strike * 0.15),
-                  }}
-                >
-                  {previousText}
-                </div>
-              ) : null}
-              <div
-                style={{
-                  display: "flex",
-                  fontWeight: 800,
-                  color: "#ffffff",
-                  fontSize: metrics.main,
-                  lineHeight: 0.95,
-                  letterSpacing: "-0.02em",
-                  textShadow: "0 2px 0 rgba(0,0,0,0.12)",
-                }}
-              >
-                {priceText}
-              </div>
+              {priceText}
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ import {
   getSocialCardProject,
   projectFromSnapshot,
   upsertSocialCardProject,
+  type PulseThemeId,
 } from "@/lib/social-card-projects";
 
 interface SocialProduct {
@@ -620,6 +621,7 @@ export function SocialAdminClient({
   const [layoutId, setLayoutId] = useState<LayoutId>("minimal");
   const [styleId, setStyleId] = useState<StyleId>("sunset");
   const [colorTone, setColorTone] = useState(PRESET_TONE.sunset);
+  const [pulseThemeId, setPulseThemeId] = useState<PulseThemeId>("amber");
   const [imageFit, setImageFit] = useState<ImageFit>("contain");
   const [imagePadX, setImagePadX] = useState(40);
   const [imagePadY, setImagePadY] = useState(40);
@@ -649,6 +651,7 @@ export function SocialAdminClient({
       layoutId,
       styleId,
       colorTone,
+      pulseThemeId,
       imageFit,
       imagePadX,
       imagePadY,
@@ -669,6 +672,7 @@ export function SocialAdminClient({
       layoutId,
       styleId,
       colorTone,
+      pulseThemeId,
       imageFit,
       imagePadX,
       imagePadY,
@@ -693,6 +697,7 @@ export function SocialAdminClient({
       setLayoutId(project.layoutId);
       setStyleId(project.styleId);
       setColorTone(project.colorTone);
+      setPulseThemeId(project.pulseThemeId ?? "amber");
       setImageFit(project.imageFit);
       setImagePadX(project.imagePadX);
       setImagePadY(project.imagePadY);
@@ -765,6 +770,7 @@ export function SocialAdminClient({
     setLayoutId("minimal");
     setStyleId("sunset");
     setColorTone(PRESET_TONE.sunset);
+    setPulseThemeId("amber");
     setImageFit("contain");
     setImagePadX(40);
     setImagePadY(40);
@@ -796,6 +802,7 @@ export function SocialAdminClient({
     textPadX,
     textPadY,
     colorTone,
+    pulseThemeId,
     currentProjectId,
     editorReady,
     formatId,
@@ -1317,6 +1324,10 @@ export function SocialAdminClient({
             product={selected}
             width={format.width}
             height={format.height}
+            imageFit={imageFit}
+            imagePadX={imagePadX}
+            imagePadY={imagePadY}
+            pulseThemeId={pulseThemeId}
           />
         ) : null;
       case "float":
@@ -1413,6 +1424,7 @@ export function SocialAdminClient({
             formatId,
             styleId,
             colorTone,
+            pulseThemeId,
             imageFit,
             imagePadX,
             imagePadY,
@@ -1436,6 +1448,8 @@ export function SocialAdminClient({
             if (patch.formatId !== undefined) setFormatId(patch.formatId);
             if (patch.styleId !== undefined) setStyleId(patch.styleId);
             if (patch.colorTone !== undefined) setColorTone(patch.colorTone);
+            if (patch.pulseThemeId !== undefined)
+              setPulseThemeId(patch.pulseThemeId);
             if (patch.imageFit !== undefined) setImageFit(patch.imageFit);
             if (patch.imagePadX !== undefined) setImagePadX(patch.imagePadX);
             if (patch.imagePadY !== undefined) setImagePadY(patch.imagePadY);

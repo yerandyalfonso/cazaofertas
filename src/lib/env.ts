@@ -36,6 +36,7 @@ const serverEnvSchema = publicEnvSchema.extend({
   FACEBOOK_PAGE_ID: z.string().optional(),
   FACEBOOK_PAGE_ACCESS_TOKEN: z.string().optional(),
   FACEBOOK_GRAPH_API_VERSION: z.string().optional(),
+  INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -93,6 +94,7 @@ export function getServerEnv(): ServerEnv {
     FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID,
     FACEBOOK_PAGE_ACCESS_TOKEN: process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
     FACEBOOK_GRAPH_API_VERSION: process.env.FACEBOOK_GRAPH_API_VERSION,
+    INSTAGRAM_BUSINESS_ACCOUNT_ID: process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID,
   });
 }
 
@@ -151,6 +153,18 @@ export function isFacebookPageConfigured(): boolean {
   return Boolean(getFacebookPageId() && getFacebookPageAccessToken());
 }
 
+/** IG User ID (Instagram Business / Creator vinculado a la Página). */
+export function getInstagramBusinessAccountId(): string | null {
+  const raw = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID?.trim();
+  return raw || null;
+}
+
+export function isInstagramPublishingConfigured(): boolean {
+  return Boolean(
+    getInstagramBusinessAccountId() && getFacebookPageAccessToken(),
+  );
+}
+
 export function getEnvStatus() {
   return {
     supabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
@@ -165,5 +179,8 @@ export function getEnvStatus() {
     telegramWebhookSecret: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
     facebookPageId: Boolean(process.env.FACEBOOK_PAGE_ID),
     facebookPageAccessToken: Boolean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
+    instagramBusinessAccountId: Boolean(
+      process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID,
+    ),
   };
 }

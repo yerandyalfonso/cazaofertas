@@ -23,6 +23,7 @@ export interface SocialCardPreviewStyle {
   formatId: SocialCardFormatId;
   layoutId: SocialCardLayoutId;
   colorTone: number;
+  pulseThemeId?: import("@/lib/pulse-themes").PulseThemeId;
   imageFit: SocialCardImageFit;
   imagePadX: number;
   imagePadY: number;
@@ -395,6 +396,10 @@ export function SocialCardPreview({
           product={product}
           width={format.width}
           height={format.height}
+          imageFit={style.imageFit}
+          imagePadX={style.imagePadX}
+          imagePadY={style.imagePadY}
+          pulseThemeId={style.pulseThemeId ?? "amber"}
         />
       );
     }

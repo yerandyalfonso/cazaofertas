@@ -10,6 +10,7 @@ import {
   getTelegramPublicChannelId,
 } from "@/lib/env";
 import { postDealToFacebookPage } from "@/services/facebook";
+import { postDealToInstagram } from "@/services/instagram";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { telegramAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
@@ -700,6 +701,14 @@ export async function sendChannelDealAlert(
   const facebook = await postDealToFacebookPage(deal);
   if (!facebook.ok && !facebook.skipped) {
     console.warn("[facebook]", facebook.error ?? "No se pudo publicar en Facebook.");
+  }
+
+  const instagram = await postDealToInstagram(deal);
+  if (!instagram.ok && !instagram.skipped) {
+    console.warn(
+      "[instagram]",
+      instagram.error ?? "No se pudo publicar en Instagram.",
+    );
   }
 
   return groupMessage;

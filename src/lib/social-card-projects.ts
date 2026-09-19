@@ -1,3 +1,10 @@
+import {
+  getPulseTheme,
+  type PulseThemeId,
+} from "@/lib/pulse-themes";
+
+export type { PulseThemeId };
+
 const STORAGE_KEY = "cazaofertas.social-card.projects.v1";
 
 export type SocialCardFormatId = "square" | "story" | "landscape" | "classic";
@@ -27,6 +34,8 @@ export interface SocialCardProject {
   layoutId: SocialCardLayoutId;
   styleId: SocialCardStyleId;
   colorTone: number;
+  /** Paleta del fondo Alerta YIR. */
+  pulseThemeId: PulseThemeId;
   imageFit: SocialCardImageFit;
   imagePadX: number;
   imagePadY: number;
@@ -76,6 +85,9 @@ function normalizeProject(raw: Partial<SocialCardProject> & { id?: string; name?
     layoutId: normalizeLayoutId(raw.layoutId),
     styleId: (raw.styleId as SocialCardStyleId) ?? "sunset",
     colorTone: typeof raw.colorTone === "number" ? raw.colorTone : 58,
+    pulseThemeId: getPulseTheme(
+      typeof raw.pulseThemeId === "string" ? raw.pulseThemeId : "amber",
+    ).id,
     imageFit: (raw.imageFit as SocialCardImageFit) ?? "contain",
     imagePadX: typeof raw.imagePadX === "number" ? raw.imagePadX : 40,
     imagePadY: typeof raw.imagePadY === "number" ? raw.imagePadY : 40,
@@ -153,6 +165,7 @@ export function createEmptySocialCardProject(
     layoutId: "minimal",
     styleId: "sunset",
     colorTone: 58,
+    pulseThemeId: "amber",
     imageFit: "contain",
     imagePadX: 40,
     imagePadY: 40,
@@ -188,6 +201,7 @@ export interface SocialCardProjectSnapshot {
   layoutId: SocialCardLayoutId;
   styleId: SocialCardStyleId;
   colorTone: number;
+  pulseThemeId?: PulseThemeId;
   imageFit: SocialCardImageFit;
   imagePadX: number;
   imagePadY: number;
@@ -219,6 +233,7 @@ export function projectFromSnapshot(
     layoutId: normalizeLayoutId(snapshot.layoutId),
     styleId: snapshot.styleId,
     colorTone: snapshot.colorTone,
+    pulseThemeId: getPulseTheme(snapshot.pulseThemeId).id,
     imageFit: snapshot.imageFit,
     imagePadX: snapshot.imagePadX,
     imagePadY: snapshot.imagePadY,
