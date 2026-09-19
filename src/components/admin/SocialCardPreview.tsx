@@ -7,6 +7,7 @@ import type {
   SocialCardImageFit,
   SocialCardLayoutId,
 } from "@/lib/social-card-projects";
+import { SocialPulseTemplate } from "@/components/admin/SocialPulseTemplate";
 
 export interface SocialCardPreviewProduct {
   id: string;
@@ -388,6 +389,16 @@ export function SocialCardPreview({
   );
 
   const cardInner = (() => {
+    if (style.layoutId === "pulse") {
+      return (
+        <SocialPulseTemplate
+          product={product}
+          width={format.width}
+          height={format.height}
+        />
+      );
+    }
+
     if (style.layoutId === "banner") {
       return cardShell({
         children: (
@@ -490,6 +501,26 @@ export function SocialCardPreview({
     });
   })();
 
+  // Plantilla pulse pinta el lienzo completo (sin padding ni card shell).
+  if (style.layoutId === "pulse") {
+    return (
+      <div
+        ref={cardRef}
+        data-product-id={product.id}
+        className="relative"
+        style={{
+          width: format.width,
+          height: format.height,
+          transform: scale !== 1 ? `scale(${scale})` : undefined,
+          transformOrigin: "top left",
+          overflow: "hidden",
+        }}
+      >
+        {cardInner}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={cardRef}
@@ -513,8 +544,6 @@ export function SocialCardPreview({
         className="relative z-[1] h-full w-full"
         style={{
           padding: pad,
-          // En flotante dejamos que el marco inclinado salga un poco del card
-          // sin cortarse contra el lienzo (el overflow del canvas sigue limpio).
           overflow: style.layoutId === "float" ? "visible" : "hidden",
         }}
       >

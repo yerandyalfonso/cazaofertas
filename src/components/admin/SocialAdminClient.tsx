@@ -7,6 +7,7 @@ import { toPng } from "html-to-image";
 import { Download, Loader2, Save } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { SocialCardStyleControls } from "@/components/admin/SocialCardStyleControls";
+import { SocialPulseTemplate } from "@/components/admin/SocialPulseTemplate";
 import { formatEuro } from "@/lib/money";
 import {
   formatSocialProjectDate,
@@ -35,7 +36,7 @@ interface SocialProduct {
 type FormatId = "square" | "story" | "landscape" | "classic";
 type StyleId = "cream" | "border" | "pastel" | "sunset";
 /** Layout de la tarjeta light. `minimal` = diseño actual (por defecto). */
-type LayoutId = "minimal" | "float" | "banner" | "seal";
+type LayoutId = "minimal" | "float" | "banner" | "seal" | "pulse";
 type ImageFit =
   | "contain"
   | "cover"
@@ -59,7 +60,7 @@ const FORMATS: ExportFormat[] = [
     id: "square",
     label: "Cuadrado",
     ratio: "1:1",
-    hint: "Instagram Feed / Telegram",
+    hint: "Facebook Feed · Instagram Feed",
     width: 1080,
     height: 1080,
   },
@@ -67,7 +68,7 @@ const FORMATS: ExportFormat[] = [
     id: "story",
     label: "Vertical",
     ratio: "9:16",
-    hint: "Stories / Reels / TikTok",
+    hint: "Instagram / Facebook Stories",
     width: 1080,
     height: 1920,
   },
@@ -91,6 +92,11 @@ const FORMATS: ExportFormat[] = [
 
 const LAYOUTS: Array<{ id: LayoutId; label: string; hint: string }> = [
   {
+    id: "pulse",
+    label: "Alerta YIR",
+    hint: "Plantilla Figma naranja · Facebook / Instagram",
+  },
+  {
     id: "minimal",
     label: "Minimalista",
     hint: "Diseño actual: tarjeta flotante, imagen limpia y precios horizontales",
@@ -111,7 +117,6 @@ const LAYOUTS: Array<{ id: LayoutId; label: string; hint: string }> = [
     hint: "Misma tarjeta light con badge de descuento tipo etiqueta/sello",
   },
 ];
-
 
 const STYLE_THEME: Record<
   StyleId,
@@ -1306,6 +1311,14 @@ export function SocialAdminClient({
 
   function renderActiveCard() {
     switch (layoutId) {
+      case "pulse":
+        return selected ? (
+          <SocialPulseTemplate
+            product={selected}
+            width={format.width}
+            height={format.height}
+          />
+        ) : null;
       case "float":
         return renderFloatCard();
       case "banner":
@@ -1388,8 +1401,8 @@ export function SocialAdminClient({
           Redes
         </p>
         <p className="mt-2 text-sm leading-relaxed text-stone-600">
-          Layout Minimalista por defecto (sin cambios). Añade Split, Banner o
-          Sello; elige paleta light y exporta PNG a resolución nativa.
+          Elige plantilla (Alerta YIR = Figma naranja), formato Facebook/Instagram
+          y exporta PNG a resolución nativa.
         </p>
       </header>
 
@@ -1413,7 +1426,13 @@ export function SocialAdminClient({
             textPadY,
           }}
           onChange={(patch) => {
-            if (patch.layoutId !== undefined) setLayoutId(patch.layoutId);
+            if (patch.layoutId !== undefined) {
+              setLayoutId(patch.layoutId);
+              // Plantilla YIR: formato cuadrado por defecto (FB / IG feed).
+              if (patch.layoutId === "pulse" && formatId !== "square") {
+                setFormatId("square");
+              }
+            }
             if (patch.formatId !== undefined) setFormatId(patch.formatId);
             if (patch.styleId !== undefined) setStyleId(patch.styleId);
             if (patch.colorTone !== undefined) setColorTone(patch.colorTone);
@@ -1565,7 +1584,12 @@ export function SocialAdminClient({
                   height: format.height,
                   transform: `scale(${scale})`,
                   transformOrigin: "top left",
-                  overflow: layoutId === "float" ? "visible" : "hidden",
+                  overflow:
+                    layoutId === "float"
+                      ? "visible"
+                      : layoutId === "pulse"
+                        ? "hidden"
+                        : "hidden",
                   fontFamily:
                     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                 }}

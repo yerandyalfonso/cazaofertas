@@ -24,6 +24,7 @@ const FORMAT_LABEL: Record<string, string> = {
 };
 
 const LAYOUT_LABEL: Record<string, string> = {
+  pulse: "Alerta YIR",
   minimal: "Minimal",
   float: "Flotante",
   banner: "Banner",

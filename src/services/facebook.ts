@@ -6,6 +6,7 @@ import {
   isFacebookPageConfigured,
 } from "@/lib/env";
 import { formatEuro } from "@/lib/money";
+import { renderSocialPulsePng } from "@/lib/render-social-pulse-card";
 import { absoluteUrl } from "@/lib/site";
 import type { DealCandidate } from "@/services/alertMatching";
 import { DealLevel } from "@/types";
@@ -116,10 +117,28 @@ function isAuthError(payload: GraphErrorBody): boolean {
   );
 }
 
+type GraphResult =
+  | { ok: true; id: string | null }
+  | { ok: false; error: string; tokenExpired: boolean };
+
+function parseGraphResponse(
+  response: Response,
+  payload: GraphErrorBody & GraphPostSuccess,
+): GraphResult {
+  if (!response.ok || payload.error) {
+    const tokenExpired = isAuthError(payload);
+    const error = tokenExpired
+      ? `Token de Facebook caducado o inválido. Regenera FACEBOOK_PAGE_ACCESS_TOKEN. ${formatGraphError(payload, response.status)}`
+      : formatGraphError(payload, response.status);
+    return { ok: false, error, tokenExpired };
+  }
+  return { ok: true, id: payload.id ?? payload.post_id ?? null };
+}
+
 async function graphPost(
   path: string,
   body: Record<string, string | boolean | number>,
-): Promise<{ ok: true; id: string | null } | { ok: false; error: string; tokenExpired: boolean }> {
+): Promise<GraphResult> {
   const token = getFacebookPageAccessToken();
   if (!token) {
     return { ok: false, error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.", tokenExpired: false };
@@ -141,17 +160,39 @@ async function graphPost(
 
   const payload = (await response.json().catch(() => ({}))) as GraphErrorBody &
     GraphPostSuccess;
+  return parseGraphResponse(response, payload);
+}
 
-  if (!response.ok || payload.error) {
-    const tokenExpired = isAuthError(payload);
-    const error = tokenExpired
-      ? `Token de Facebook caducado o inválido. Regenera FACEBOOK_PAGE_ACCESS_TOKEN. ${formatGraphError(payload, response.status)}`
-      : formatGraphError(payload, response.status);
-    return { ok: false, error, tokenExpired };
+async function graphPostMultipart(
+  path: string,
+  form: FormData,
+): Promise<GraphResult> {
+  const token = getFacebookPageAccessToken();
+  if (!token) {
+    return { ok: false, error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.", tokenExpired: false };
   }
+  form.set("access_token", token);
 
-  const id = payload.id ?? payload.post_id ?? null;
-  return { ok: true, id };
+  const response = await fetch(graphUrl(path), {
+    method: "POST",
+    body: form,
+    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as GraphErrorBody &
+    GraphPostSuccess;
+  return parseGraphResponse(response, payload);
+}
+
+async function attachPhotoToFeed(options: {
+  pageId: string;
+  message: string;
+  photoId: string;
+}): Promise<GraphResult> {
+  return graphPost(`/${encodeURIComponent(options.pageId)}/feed`, {
+    message: options.message,
+    "attached_media[0]": JSON.stringify({ media_fbid: options.photoId }),
+  });
 }
 
 /**
@@ -163,10 +204,7 @@ async function postFeedWithPhoto(options: {
   pageId: string;
   message: string;
   imageUrl: string;
-}): Promise<
-  | { ok: true; id: string | null }
-  | { ok: false; error: string; tokenExpired: boolean }
-> {
+}): Promise<GraphResult> {
   const upload = await graphPost(`/${encodeURIComponent(options.pageId)}/photos`, {
     url: options.imageUrl,
     published: false,
@@ -183,10 +221,47 @@ async function postFeedWithPhoto(options: {
     };
   }
 
-  return graphPost(`/${encodeURIComponent(options.pageId)}/feed`, {
+  return attachPhotoToFeed({
+    pageId: options.pageId,
     message: options.message,
-    // Form field: attached_media[0] = {"media_fbid":"..."}
-    "attached_media[0]": JSON.stringify({ media_fbid: upload.id }),
+    photoId: upload.id,
+  });
+}
+
+/** Sube PNG generado (plantilla YIR) y publica en el feed con el mensaje. */
+async function postFeedWithPngBuffer(options: {
+  pageId: string;
+  message: string;
+  png: Buffer;
+}): Promise<GraphResult> {
+  const form = new FormData();
+  form.set(
+    "source",
+    new Blob([new Uint8Array(options.png)], { type: "image/png" }),
+    "alerta-yir.png",
+  );
+  form.set("published", "false");
+  form.set("temporary", "true");
+
+  const upload = await graphPostMultipart(
+    `/${encodeURIComponent(options.pageId)}/photos`,
+    form,
+  );
+  if (!upload.ok) {
+    return upload;
+  }
+  if (!upload.id) {
+    return {
+      ok: false,
+      error: "Facebook no devolvió id de foto al subir la plantilla YIR.",
+      tokenExpired: false,
+    };
+  }
+
+  return attachPhotoToFeed({
+    pageId: options.pageId,
+    message: options.message,
+    photoId: upload.id,
   });
 }
 
@@ -281,6 +356,49 @@ export async function postDealToFacebookPage(
       };
     }
 
+    // 1) Plantilla Alerta YIR (PNG) — prioridad para el lote Telegram → Facebook.
+    try {
+      const png = await renderSocialPulsePng({
+        title: deal.title,
+        imageUrl: deal.imageUrl,
+        currentPrice: deal.currentPrice,
+        previousPrice: deal.previousPrice,
+        discountPercentage: deal.discountPercentage,
+      });
+      const withTemplate = await postFeedWithPngBuffer({
+        pageId,
+        message,
+        png,
+      });
+      if (withTemplate.ok) {
+        return {
+          ok: true,
+          skipped: false,
+          postId: withTemplate.id ?? undefined,
+        };
+      }
+      console.warn(
+        "[facebook] Plantilla YIR falló; se intenta imagen de producto.",
+        withTemplate.error,
+      );
+      if (withTemplate.tokenExpired) {
+        console.error("[facebook]", withTemplate.error);
+        return {
+          ok: false,
+          skipped: false,
+          error: withTemplate.error,
+          tokenExpired: true,
+        };
+      }
+    } catch (renderError) {
+      const detail =
+        renderError instanceof Error
+          ? renderError.message
+          : "Error al renderizar plantilla YIR.";
+      console.warn("[facebook] Render YIR falló; se intenta imagen de producto.", detail);
+    }
+
+    // 2) Fallback: foto del producto (URL pública).
     const imageUrl = deal.imageUrl?.trim();
     const canUsePhoto = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
 
@@ -304,6 +422,7 @@ export async function postDealToFacebookPage(
       }
     }
 
+    // 3) Solo texto.
     const feed = await graphPost(`/${encodeURIComponent(pageId)}/feed`, {
       message,
     });

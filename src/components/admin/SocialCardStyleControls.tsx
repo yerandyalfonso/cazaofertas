@@ -37,6 +37,11 @@ export const SOCIAL_STYLE_PRESET_TONE: Record<SocialCardStyleId, number> = {
 
 const LAYOUTS: Array<{ id: SocialCardLayoutId; label: string; hint: string }> = [
   {
+    id: "pulse",
+    label: "Alerta YIR",
+    hint: "Plantilla Figma naranja · Facebook / Instagram.",
+  },
+  {
     id: "minimal",
     label: "Minimalista",
     hint: "Imagen arriba, texto abajo.",
@@ -70,7 +75,7 @@ const FORMATS: Array<{
     id: "square",
     label: "Cuadrado",
     ratio: "1:1",
-    hint: "Instagram Feed / Telegram",
+    hint: "Facebook Feed · Instagram Feed",
     width: 1080,
     height: 1080,
   },
@@ -78,7 +83,7 @@ const FORMATS: Array<{
     id: "story",
     label: "Vertical",
     ratio: "9:16",
-    hint: "Stories / Reels / TikTok",
+    hint: "Instagram Stories / Reels · Facebook Stories",
     width: 1080,
     height: 1920,
   },
@@ -251,7 +256,7 @@ export function SocialCardStyleControls({
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
           Layout de tarjeta
         </p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {LAYOUTS.map((item) => (
             <ChipButton
               key={item.id}

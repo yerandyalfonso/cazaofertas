@@ -2,7 +2,12 @@ const STORAGE_KEY = "cazaofertas.social-card.projects.v1";
 
 export type SocialCardFormatId = "square" | "story" | "landscape" | "classic";
 /** `split` se migra a `float` al cargar proyectos antiguos. */
-export type SocialCardLayoutId = "minimal" | "float" | "banner" | "seal";
+export type SocialCardLayoutId =
+  | "minimal"
+  | "float"
+  | "banner"
+  | "seal"
+  | "pulse";
 export type SocialCardStyleId = "cream" | "border" | "pastel" | "sunset";
 export type SocialCardImageFit =
   | "contain"
@@ -46,7 +51,13 @@ const DEFAULT_CARD_SURFACE = "#ffffff";
 
 function normalizeLayoutId(raw: unknown): SocialCardLayoutId {
   if (raw === "split") return "float";
-  if (raw === "minimal" || raw === "float" || raw === "banner" || raw === "seal") {
+  if (
+    raw === "minimal" ||
+    raw === "float" ||
+    raw === "banner" ||
+    raw === "seal" ||
+    raw === "pulse"
+  ) {
     return raw;
   }
   return "minimal";
