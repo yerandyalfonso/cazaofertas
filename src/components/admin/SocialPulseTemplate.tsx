@@ -119,12 +119,11 @@ export function SocialPulseTemplate({
     return diff < 0.22 ? ("cover" as const) : ("blur" as const);
   })();
 
-  const objectFit =
-    resolvedFit === "contain" || resolvedFit === "blur"
-      ? "contain"
-      : "cover";
-  const objectPosition =
-    resolvedFit === "cover-top" ? "center top" : "center";
+  // Alerta YIR: siempre contain — manda la dimensión que toque el borde primero
+  // para ver el producto entero (sin recortar).
+  const objectFit = "contain" as const;
+  const objectPosition = "center";
+  const useBlurBackdrop = resolvedFit === "blur";
 
   return (
     <div
@@ -156,7 +155,7 @@ export function SocialPulseTemplate({
       >
         {imageUrl ? (
           <div className="relative h-full w-full overflow-hidden">
-            {resolvedFit === "blur" ? (
+            {useBlurBackdrop ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imageUrl}

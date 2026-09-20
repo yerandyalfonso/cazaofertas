@@ -6,14 +6,21 @@ import {
   isInstagramPublishingConfigured,
 } from "@/lib/env";
 import { pulseThemeForCategory } from "@/lib/pulse-category-theme";
-import { renderSocialPulsePng } from "@/lib/render-social-pulse-card";
+import {
+  INSTAGRAM_PULSE_HEIGHT,
+  INSTAGRAM_PULSE_WIDTH,
+  renderSocialPulsePng,
+} from "@/lib/render-social-pulse-card";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
-import { buildFacebookDealMessage } from "@/services/facebook";
+import { buildInstagramDealCaption } from "@/services/facebook";
 
 const GRAPH_TIMEOUT_MS = 25_000;
 const AUTH_ERROR_CODES = new Set([190, 102, 463, 467, 458]);
 const STORAGE_BUCKET = "article-images";
+/** Polling del contenedor IG antes de media_publish (error 9007 si aún no está listo). */
+const CONTAINER_POLL_MS = 2_500;
+const CONTAINER_POLL_MAX_MS = 90_000;
 
 export interface InstagramPostResult {
   ok: boolean;
@@ -124,6 +131,114 @@ async function createInstagramImageContainer(options: {
   return { ok: true, id: payload.id };
 }
 
+type ContainerStatusCode =
+  | "EXPIRED"
+  | "ERROR"
+  | "FINISHED"
+  | "IN_PROGRESS"
+  | "PUBLISHED"
+  | string;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getInstagramContainerStatus(
+  creationId: string,
+): Promise<
+  | { ok: true; statusCode: ContainerStatusCode; status?: string }
+  | { ok: false; error: string; tokenExpired: boolean }
+> {
+  const token = getFacebookPageAccessToken();
+  if (!token) {
+    return {
+      ok: false,
+      error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.",
+      tokenExpired: false,
+    };
+  }
+
+  const url = new URL(graphUrl(`/${encodeURIComponent(creationId)}`));
+  url.searchParams.set("fields", "status_code,status");
+  url.searchParams.set("access_token", token);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+  });
+  const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
+    status_code?: ContainerStatusCode;
+    status?: string;
+  };
+
+  if (!response.ok || payload.error || !payload.status_code) {
+    const tokenExpired = isAuthError(payload);
+    return {
+      ok: false,
+      tokenExpired,
+      error: tokenExpired
+        ? `Token caducado o sin permiso Instagram. ${formatGraphError(payload, response.status)}`
+        : formatGraphError(payload, response.status),
+    };
+  }
+
+  return {
+    ok: true,
+    statusCode: payload.status_code,
+    status: payload.status,
+  };
+}
+
+/**
+ * Espera FINISHED/PUBLISHED antes de media_publish.
+ * Evita error 9007 "Media ID is not available".
+ */
+async function waitForInstagramContainerReady(
+  creationId: string,
+): Promise<
+  | { ok: true; statusCode: ContainerStatusCode }
+  | { ok: false; error: string; tokenExpired: boolean }
+> {
+  const started = Date.now();
+  let lastStatus: ContainerStatusCode | undefined;
+
+  while (Date.now() - started < CONTAINER_POLL_MAX_MS) {
+    const status = await getInstagramContainerStatus(creationId);
+    if (!status.ok) return status;
+
+    lastStatus = status.statusCode;
+    if (status.statusCode === "FINISHED" || status.statusCode === "PUBLISHED") {
+      return { ok: true, statusCode: status.statusCode };
+    }
+    if (status.statusCode === "ERROR" || status.statusCode === "EXPIRED") {
+      const detail = status.status ? ` — ${status.status}` : "";
+      return {
+        ok: false,
+        tokenExpired: false,
+        error: `Contenedor Instagram ${status.statusCode}${detail}`,
+      };
+    }
+
+    await sleep(CONTAINER_POLL_MS);
+  }
+
+  return {
+    ok: false,
+    tokenExpired: false,
+    error: `Timeout esperando contenedor Instagram (último estado: ${lastStatus ?? "desconocido"}).`,
+  };
+}
+
+function isMediaNotReadyError(payload: GraphErrorBody): boolean {
+  const code = payload.error?.code;
+  const message = payload.error?.message?.toLowerCase() ?? "";
+  return (
+    code === 9007 ||
+    message.includes("media id is not available") ||
+    message.includes("not ready for publishing")
+  );
+}
+
 async function publishInstagramContainer(options: {
   igUserId: string;
   creationId: string;
@@ -144,31 +259,68 @@ async function publishInstagramContainer(options: {
   form.set("access_token", token);
   form.set("creation_id", options.creationId);
 
-  const response = await fetch(
-    graphUrl(`/${encodeURIComponent(options.igUserId)}/media_publish`),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-    },
-  );
-  const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
-    id?: string;
+  const tryPublish = async (): Promise<
+    | { ok: true; id: string }
+    | { ok: false; payload: GraphErrorBody; status: number }
+  > => {
+    const response = await fetch(
+      graphUrl(`/${encodeURIComponent(options.igUserId)}/media_publish`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
+      id?: string;
+    };
+    if (response.ok && !payload.error && payload.id) {
+      return { ok: true, id: payload.id };
+    }
+    return { ok: false, payload, status: response.status };
   };
 
-  if (!response.ok || payload.error || !payload.id) {
-    const tokenExpired = isAuthError(payload);
+  // Una sola publicación; si 9007, espera FINISHED/PUBLISHED y como máximo
+  // un segundo intento (evita doble post si Meta ya publicó sin devolver id).
+  const first = await tryPublish();
+  if (first.ok) return first;
+
+  if (!isMediaNotReadyError(first.payload)) {
+    const tokenExpired = isAuthError(first.payload);
     return {
       ok: false,
       tokenExpired,
       error: tokenExpired
-        ? `Token caducado o sin permiso Instagram. ${formatGraphError(payload, response.status)}`
-        : formatGraphError(payload, response.status),
+        ? `Token caducado o sin permiso Instagram. ${formatGraphError(first.payload, first.status)}`
+        : formatGraphError(first.payload, first.status),
     };
   }
 
-  return { ok: true, id: payload.id };
+  console.warn("[instagram] Media aún no listo; esperando y reintentando una vez…");
+  const ready = await waitForInstagramContainerReady(options.creationId);
+  if (!ready.ok) return ready;
+  if (ready.statusCode === "PUBLISHED") {
+    return { ok: true, id: options.creationId };
+  }
+
+  const second = await tryPublish();
+  if (second.ok) return second;
+
+  // Tras el 2º intento: si ya quedó PUBLISHED, no es error (ni hay que republicar).
+  const after = await getInstagramContainerStatus(options.creationId);
+  if (after.ok && after.statusCode === "PUBLISHED") {
+    return { ok: true, id: options.creationId };
+  }
+
+  const tokenExpired = isAuthError(second.payload);
+  return {
+    ok: false,
+    tokenExpired,
+    error: tokenExpired
+      ? `Token caducado o sin permiso Instagram. ${formatGraphError(second.payload, second.status)}`
+      : formatGraphError(second.payload, second.status),
+  };
 }
 
 /**
@@ -199,7 +351,7 @@ export async function postDealToInstagram(
       };
     }
 
-    const caption = buildFacebookDealMessage(deal).trim();
+    const caption = buildInstagramDealCaption(deal).trim();
     if (!caption) {
       return {
         ok: false,
@@ -212,6 +364,7 @@ export async function postDealToInstagram(
       deal.parentCategorySlug,
       deal.categorySlug,
     );
+    // 1080×1350 (4:5): máximo en feed; cuadrícula ~3:4 recorta poco a los lados.
     const png = await renderSocialPulsePng({
       title: deal.title,
       imageUrl: deal.imageUrl,
@@ -219,6 +372,8 @@ export async function postDealToInstagram(
       previousPrice: deal.previousPrice,
       discountPercentage: deal.discountPercentage,
       pulseThemeId: themeId,
+      width: INSTAGRAM_PULSE_WIDTH,
+      height: INSTAGRAM_PULSE_HEIGHT,
     });
 
     const imageUrl = await uploadPulsePngPublic(png);
@@ -235,6 +390,20 @@ export async function postDealToInstagram(
         error: container.error,
         tokenExpired: container.tokenExpired,
       };
+    }
+
+    const ready = await waitForInstagramContainerReady(container.id);
+    if (!ready.ok) {
+      console.error("[instagram]", ready.error);
+      return {
+        ok: false,
+        skipped: false,
+        error: ready.error,
+        tokenExpired: ready.tokenExpired,
+      };
+    }
+    if (ready.statusCode === "PUBLISHED") {
+      return { ok: true, skipped: false, mediaId: container.id };
     }
 
     const published = await publishInstagramContainer({

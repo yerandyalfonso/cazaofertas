@@ -205,6 +205,12 @@ export async function flushPendingChannelNotifications(options?: {
       ? Math.min(options.limit, 80)
       : defaultLimit;
 
+  // Recupera claims huérfanos (proceso caído a mitad de envío).
+  await client
+    .from("channel_notifications")
+    .update({ status: "failed" })
+    .eq("status", "sending");
+
   const pendingBefore = queue.queued;
 
   if (pendingBefore === 0) {
@@ -279,14 +285,37 @@ export async function flushPendingChannelNotifications(options?: {
   }
 
   const rows = [...(pendingRows ?? []), ...(failedRows ?? [])];
+  // Una sola alerta por producto en este lote (pending + failed del mismo
+  // product_id provocaban Telegram/Facebook/Instagram duplicados).
+  const seenProducts = new Set<string>();
+  const uniqueRows = rows.filter((row) => {
+    if (seenProducts.has(row.product_id)) return false;
+    seenProducts.add(row.product_id);
+    return true;
+  });
+
   let sent = 0;
   let skippedExpired = 0;
   let skippedLowScore = 0;
   let skippedUnavailable = 0;
   let failed = 0;
 
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
+  for (let index = 0; index < uniqueRows.length; index += 1) {
+    const row = uniqueRows[index]!;
+
+    // Claim atómico: evita que dos flush concurrentes envíen el mismo chollo.
+    const { data: claimed, error: claimError } = await client
+      .from("channel_notifications")
+      .update({ status: "sending" })
+      .eq("id", row.id)
+      .in("status", ["pending", "failed"])
+      .select("id")
+      .maybeSingle();
+
+    if (claimError || !claimed?.id) {
+      continue;
+    }
+
     try {
       const { data: product, error: productError } = await client
         .from("products")
@@ -415,6 +444,14 @@ export async function flushPendingChannelNotifications(options?: {
         })
         .eq("id", row.id);
 
+      // Descarta otras notificaciones del mismo producto (pending/failed/sending).
+      await client
+        .from("channel_notifications")
+        .update({ status: "skipped" })
+        .eq("product_id", product.id)
+        .in("status", ["pending", "failed", "sending"])
+        .neq("id", row.id);
+
       await client
         .from("products")
         .update({
@@ -425,7 +462,7 @@ export async function flushPendingChannelNotifications(options?: {
         .eq("id", product.id);
 
       sent += 1;
-      if (index < rows.length - 1) await sleep(SEND_DELAY_MS);
+      if (index < uniqueRows.length - 1) await sleep(SEND_DELAY_MS);
     } catch (error) {
       console.warn(
         "[telegram-flush]",

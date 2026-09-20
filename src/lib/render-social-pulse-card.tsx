@@ -20,10 +20,18 @@ export interface SocialPulseRenderInput {
   currentPrice: number;
   previousPrice: number | null;
   discountPercentage: number;
-  /** Lienzo cuadrado por defecto (feed/IG). */
+  /** Lienzo cuadrado (Facebook / editor). Ignorado si pasas width+height. */
   size?: number;
+  /** Ancho del PNG (p. ej. Instagram 1080). */
+  width?: number;
+  /** Alto del PNG (p. ej. Instagram 1350 = 4:5). */
+  height?: number;
   pulseThemeId?: PulseThemeId;
 }
+
+/** Feed Instagram 4:5 — llena el feed y encaja bien en la cuadrícula ~3:4. */
+export const INSTAGRAM_PULSE_WIDTH = 1080;
+export const INSTAGRAM_PULSE_HEIGHT = 1350;
 
 function resolveDiscount(input: SocialPulseRenderInput): number {
   if (input.discountPercentage > 0) {
@@ -52,13 +60,16 @@ function pulseBackgroundDataUrl(themeId: PulseThemeId): string {
 /**
  * Renderiza la plantilla Alerta YIR a PNG con next/og (Satori).
  * Compatible con Node (cron local) y runtime serverless.
- * Facebook: sin padding de imagen (cover a sangre).
+ * Facebook: cuadrado 1080. Instagram: 1080×1350 (4:5).
+ * Facebook/Instagram: imagen contain (producto entero; manda alto o ancho).
  */
 export async function renderSocialPulsePng(
   input: SocialPulseRenderInput,
 ): Promise<Buffer> {
-  const size = input.size ?? 1080;
-  const k = pulseScale(size);
+  const width = input.width ?? input.size ?? 1080;
+  const height = input.height ?? input.size ?? width;
+  /** Escala tipografía/badges anclada al ancho (1080), no al alto. */
+  const k = pulseScale(width);
   const theme = getPulseTheme(input.pulseThemeId);
   const discount = resolveDiscount(input);
   const previous =
@@ -67,10 +78,12 @@ export async function renderSocialPulsePng(
       : null;
   const priceText = formatEuro(input.currentPrice);
   const previousText = previous != null ? formatEuro(previous) : null;
-  const metrics = adaptivePriceMetrics(priceText, size);
+  const metrics = adaptivePriceMetrics(priceText, width);
 
-  const frameInset = Math.round(size * 0.11);
-  const frameRadius = Math.round(size * 0.045);
+  const frameInsetX = Math.round(width * 0.11);
+  const frameInsetTop = Math.round(height * 0.09);
+  const frameInsetBottom = Math.round(height * 0.1);
+  const frameRadius = Math.round(width * 0.045);
   const imageUrl = input.imageUrl?.trim() || null;
   const canUseImage = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
   const bgDataUrl = pulseBackgroundDataUrl(theme.id);
@@ -94,26 +107,26 @@ export async function renderSocialPulsePng(
         <img
           src={bgDataUrl}
           alt=""
-          width={size}
-          height={size}
+          width={width}
+          height={height}
           style={{
             position: "absolute",
             inset: 0,
-            width: size,
-            height: size,
+            width,
+            height,
             objectFit: "cover",
             display: "flex",
           }}
         />
 
-        {/* Marco producto — Facebook: sin padding, cover a sangre */}
+        {/* Marco producto — contain: producto entero (manda alto o ancho) */}
         <div
           style={{
             position: "absolute",
-            top: frameInset,
-            left: frameInset,
-            right: frameInset,
-            bottom: Math.round(frameInset * 1.05),
+            top: frameInsetTop,
+            left: frameInsetX,
+            right: frameInsetX,
+            bottom: frameInsetBottom,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -122,7 +135,7 @@ export async function renderSocialPulsePng(
             boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
             transform: "rotate(-2.5deg)",
             overflow: "hidden",
-            padding: 0,
+            padding: Math.round(width * 0.02),
           }}
         >
           {canUseImage && imageUrl ? (
@@ -130,12 +143,13 @@ export async function renderSocialPulsePng(
             <img
               src={imageUrl}
               alt=""
-              width={size}
-              height={size}
+              width={width}
+              height={height}
               style={{
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",
+                objectFit: "contain",
+                objectPosition: "center",
                 display: "flex",
               }}
             />
@@ -144,7 +158,7 @@ export async function renderSocialPulsePng(
               style={{
                 display: "flex",
                 color: "#a8a29e",
-                fontSize: Math.round(size * 0.04),
+                fontSize: Math.round(width * 0.04),
               }}
             >
               Sin imagen
@@ -157,8 +171,8 @@ export async function renderSocialPulsePng(
           <div
             style={{
               position: "absolute",
-              top: Math.round(size * 0.07),
-              left: Math.round(size * 0.06),
+              top: Math.round(height * 0.055),
+              left: Math.round(width * 0.06),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -182,12 +196,12 @@ export async function renderSocialPulsePng(
           style={{
             position: "absolute",
             right: 0,
-            bottom: Math.round(size * 0.085),
+            bottom: Math.round(height * 0.07),
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
             gap: 10 * k,
-            maxWidth: Math.round(size * 0.78),
+            maxWidth: Math.round(width * 0.78),
           }}
         >
           {previousText ? (
@@ -259,8 +273,8 @@ export async function renderSocialPulsePng(
       </div>
     ),
     {
-      width: size,
-      height: size,
+      width,
+      height,
     },
   );
 

@@ -185,87 +185,50 @@ async function graphPostMultipart(
   return parseGraphResponse(response, payload);
 }
 
-async function attachPhotoToFeed(options: {
+/**
+ * Publica una sola foto en el muro de la Página (un POST = un post).
+ * Evita el flujo unpublished + /feed attached_media, que a menudo
+ * genera dos entradas en el feed (foto publicada + post adjunto).
+ */
+async function postPagePhoto(options: {
   pageId: string;
   message: string;
-  photoId: string;
+  imageUrl?: string;
+  png?: Buffer;
 }): Promise<GraphResult> {
-  return graphPost(`/${encodeURIComponent(options.pageId)}/feed`, {
-    message: options.message,
-    "attached_media[0]": JSON.stringify({ media_fbid: options.photoId }),
-  });
+  if (options.png) {
+    const form = new FormData();
+    form.set(
+      "source",
+      new Blob([new Uint8Array(options.png)], { type: "image/png" }),
+      "alerta-yir.png",
+    );
+    form.set("caption", options.message);
+    form.set("published", "true");
+    return graphPostMultipart(
+      `/${encodeURIComponent(options.pageId)}/photos`,
+      form,
+    );
+  }
+
+  if (options.imageUrl) {
+    return graphPost(`/${encodeURIComponent(options.pageId)}/photos`, {
+      url: options.imageUrl,
+      caption: options.message,
+      published: true,
+    });
+  }
+
+  return {
+    ok: false,
+    error: "Falta imagen para publicar en Facebook.",
+    tokenExpired: false,
+  };
 }
 
 /**
- * Sube la imagen sin publicarla y crea un post en el muro con texto + adjunto.
- * Evita el bug de Páginas nuevas: /photos con caption deja posts vacíos en el feed
- * (la foto sí entra al álbum).
+ * Texto del post en Facebook (caption + enlace afiliado trackeado).
  */
-async function postFeedWithPhoto(options: {
-  pageId: string;
-  message: string;
-  imageUrl: string;
-}): Promise<GraphResult> {
-  const upload = await graphPost(`/${encodeURIComponent(options.pageId)}/photos`, {
-    url: options.imageUrl,
-    published: false,
-    temporary: true,
-  });
-  if (!upload.ok) {
-    return upload;
-  }
-  if (!upload.id) {
-    return {
-      ok: false,
-      error: "Facebook no devolvió id de foto al subir la imagen.",
-      tokenExpired: false,
-    };
-  }
-
-  return attachPhotoToFeed({
-    pageId: options.pageId,
-    message: options.message,
-    photoId: upload.id,
-  });
-}
-
-/** Sube PNG generado (plantilla YIR) y publica en el feed con el mensaje. */
-async function postFeedWithPngBuffer(options: {
-  pageId: string;
-  message: string;
-  png: Buffer;
-}): Promise<GraphResult> {
-  const form = new FormData();
-  form.set(
-    "source",
-    new Blob([new Uint8Array(options.png)], { type: "image/png" }),
-    "alerta-yir.png",
-  );
-  form.set("published", "false");
-  form.set("temporary", "true");
-
-  const upload = await graphPostMultipart(
-    `/${encodeURIComponent(options.pageId)}/photos`,
-    form,
-  );
-  if (!upload.ok) {
-    return upload;
-  }
-  if (!upload.id) {
-    return {
-      ok: false,
-      error: "Facebook no devolvió id de foto al subir la plantilla YIR.",
-      tokenExpired: false,
-    };
-  }
-
-  return attachPhotoToFeed({
-    pageId: options.pageId,
-    message: options.message,
-    photoId: upload.id,
-  });
-}
-
 export function buildFacebookDealMessage(deal: DealCandidate): string {
   const emoji = categoryEmoji(deal.parentCategorySlug ?? deal.categorySlug);
   const score =
@@ -324,6 +287,24 @@ export function buildFacebookDealMessage(deal: DealCandidate): string {
 }
 
 /**
+ * Caption Instagram: mismos datos que Facebook, sin URLs
+ * (ni caption ni comentarios son clicables en IG).
+ */
+export function buildInstagramDealCaption(deal: DealCandidate): string {
+  const full = buildFacebookDealMessage(deal);
+  const withoutUrls = full
+    .split("\n")
+    .filter((line) => !/^https?:\/\//i.test(line.trim()))
+    .join("\n")
+    .replace(/\n🛒 Ver oferta:\s*\n+/g, "\n")
+    .replace(/\n🌐 Ficha en CazaOferta:\s*\n+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return `${withoutUrls}\n\n🔗 Enlace en la bio / Facebook`;
+}
+
+/**
  * Publica el chollo en la Página de Facebook.
  * Nunca lanza: un fallo de Meta no debe romper Telegram ni el guardado.
  */
@@ -371,7 +352,7 @@ export async function postDealToFacebookPage(
         discountPercentage: deal.discountPercentage,
         pulseThemeId: themeId,
       });
-      const withTemplate = await postFeedWithPngBuffer({
+      const withTemplate = await postPagePhoto({
         pageId,
         message,
         png,
@@ -409,12 +390,12 @@ export async function postDealToFacebookPage(
     const canUsePhoto = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
 
     if (canUsePhoto && imageUrl) {
-      const withPhoto = await postFeedWithPhoto({ pageId, message, imageUrl });
+      const withPhoto = await postPagePhoto({ pageId, message, imageUrl });
       if (withPhoto.ok) {
         return { ok: true, skipped: false, postId: withPhoto.id ?? undefined };
       }
       console.warn(
-        "[facebook] Foto+feed falló; se publica solo texto en /feed.",
+        "[facebook] Foto falló; se publica solo texto en /feed.",
         withPhoto.error,
       );
       if (withPhoto.tokenExpired) {
