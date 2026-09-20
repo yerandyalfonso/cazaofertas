@@ -4,6 +4,7 @@ import type {
   SocialCardLayoutId,
   SocialCardStyleId,
 } from "@/lib/social-card-projects";
+import type { PulseThemeId } from "@/lib/pulse-themes";
 
 const STORAGE_KEY = "cazaofertas.video.projects.v1";
 
@@ -21,6 +22,7 @@ export interface VideoCardStyle {
   layoutId: SocialCardLayoutId;
   styleId: SocialCardStyleId;
   colorTone: number;
+  pulseThemeId: PulseThemeId;
   imageFit: SocialCardImageFit;
   imagePadX: number;
   imagePadY: number;
@@ -67,6 +69,7 @@ export const DEFAULT_VIDEO_CARD_STYLE: VideoCardStyle = {
   layoutId: "minimal",
   styleId: "sunset",
   colorTone: 58,
+  pulseThemeId: "amber",
   imageFit: "contain",
   imagePadX: 40,
   imagePadY: 40,

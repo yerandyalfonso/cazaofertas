@@ -73,6 +73,7 @@ function styleFromSocialCard(card: SocialCardProject): VideoCardStyle {
     layoutId: card.layoutId,
     styleId: card.styleId,
     colorTone: card.colorTone,
+    pulseThemeId: card.pulseThemeId,
     imageFit: card.imageFit,
     imagePadX: card.imagePadX,
     imagePadY: card.imagePadY,

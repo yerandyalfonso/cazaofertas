@@ -25,8 +25,8 @@ import { DealLevel, ProductAvailability } from "@/types";
 function loadKiabiFallbackItems(): KiabiDiscoveredItem[] | null {
   const rawPath =
     process.env.KIABI_FALLBACK_ITEMS_JSON?.trim() ||
-    "scripts/local-cron/.kiabi-browser-items.json";
-  const path = resolve(process.cwd(), rawPath);
+    "data/kiabi-browser-items.json";
+  const path = resolve(/* turbopackIgnore: true */ process.cwd(), rawPath);
   if (!existsSync(path)) return null;
 
   try {

@@ -285,7 +285,7 @@ async function fetchCatalogueBenefitsViaChrome(): Promise<BenefitVO[]> {
 
   const port = 9300 + Math.floor(Math.random() * 200);
   const userDataDir = join(tmpdir(), `miravia-coupons-${randomUUID()}`);
-  const proc: ChildProcess = spawn(
+  const proc: ChildProcess = spawn(/* turbopackIgnore: true */
     bin,
     [
       `--remote-debugging-port=${port}`,
