@@ -43,7 +43,7 @@ async function runCheckPrices(): Promise<void> {
   );
 
   const amazon = await runAmazonPriceCheck({
-    limit: 2,
+    limit: Number(process.env.AMAZON_PRICE_CHECK_LIMIT ?? "2") || 2,
     notify: true,
     provider: "html",
     force: true,
