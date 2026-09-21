@@ -26,9 +26,9 @@ interface FailureStore {
 const RENOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 /** Tras N fallos consecutivos: avisar + sugerir/aplicar medida. */
 export const PERSIST_FAILURE_THRESHOLD = Number.parseInt(
-  process.env.ASIN_SCRAPE_FAIL_THRESHOLD ?? "6",
+  process.env.ASIN_SCRAPE_FAIL_THRESHOLD ?? "2",
   10,
-) || 6;
+) || 2;
 
 function storePath(): string {
   const logDir =
