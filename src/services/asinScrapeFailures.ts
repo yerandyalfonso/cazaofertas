@@ -5,6 +5,10 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import {
+  resolveAsinScrapeFailThreshold,
+  resolveAsinScrapeFailThresholdSync,
+} from "@/services/appSettings";
 
 export interface AsinFailureRecord {
   asin: string;
@@ -24,11 +28,14 @@ interface FailureStore {
 
 /** Avisar de nuevo el mismo ASIN solo tras este intervalo (salvo umbral de persistencia). */
 const RENOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
-/** Tras N fallos consecutivos: avisar + sugerir/aplicar medida. */
-export const PERSIST_FAILURE_THRESHOLD = Number.parseInt(
-  process.env.ASIN_SCRAPE_FAIL_THRESHOLD ?? "2",
-  10,
-) || 2;
+
+/** @deprecated Preferir resolveAsinScrapeFailThreshold(); valor sync para mensajes. */
+export function getPersistFailureThreshold(): number {
+  return resolveAsinScrapeFailThresholdSync();
+}
+
+/** Alias legacy (cron notify). */
+export const PERSIST_FAILURE_THRESHOLD = getPersistFailureThreshold();
 
 function storePath(): string {
   const logDir =
@@ -89,6 +96,7 @@ export async function recordAsinScrapeFailure(
   const key = asin.trim().toUpperCase();
   const now = new Date();
   const nowIso = now.toISOString();
+  const threshold = await resolveAsinScrapeFailThreshold();
   const store = await loadStore();
   const prev = store.byAsin[key];
   const record: AsinFailureRecord = prev
@@ -125,10 +133,7 @@ export async function recordAsinScrapeFailure(
       reason: "first",
       shouldDeactivate: false,
     };
-  } else if (
-    record.count >= PERSIST_FAILURE_THRESHOLD &&
-    !record.actionTakenAt
-  ) {
+  } else if (record.count >= threshold && !record.actionTakenAt) {
     decision = {
       notify: true,
       record,

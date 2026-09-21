@@ -1,7 +1,7 @@
 import type { AmazonPriceCheckResult } from "@/services/amazonPriceCheck";
 import {
   markAsinFailureActionTaken,
-  PERSIST_FAILURE_THRESHOLD,
+  getPersistFailureThreshold,
   recordAsinScrapeFailure,
 } from "@/services/asinScrapeFailures";
 import {
@@ -160,7 +160,7 @@ export async function reviewCheckPricesResult(
         .slice(0, 1)
         .map((e) => `• Feed: ${e.message}`),
       amazonAlert.deactivated.length > 0
-        ? `Desactivados tras ${PERSIST_FAILURE_THRESHOLD} fallos: ${amazonAlert.deactivated.join(", ")}`
+        ? `Desactivados tras ${getPersistFailureThreshold()} fallos: ${amazonAlert.deactivated.join(", ")}`
         : "",
       flashAlert.deactivated.length > 0
         ? `Flash desactivados: ${flashAlert.deactivated.join(", ")}`

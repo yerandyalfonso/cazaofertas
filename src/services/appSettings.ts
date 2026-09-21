@@ -45,6 +45,8 @@ export interface AppSettings {
   telegramFlushRescheduleMinutes: number;
   amazonAssociateTag: string;
   amazonFlashInsertLimit: number;
+  /** Fallos de scrape consecutivos del mismo ASIN antes de desactivar. */
+  asinScrapeFailThreshold: number;
   miraviaDealsEnabled: boolean;
   miraviaMinDiscountPercent: number;
   miraviaDiscoveryMaxItems: number;
@@ -78,6 +80,7 @@ export type AppSettingsPatch = Partial<
     | "telegramFlushRescheduleMinutes"
     | "amazonAssociateTag"
     | "amazonFlashInsertLimit"
+    | "asinScrapeFailThreshold"
     | "miraviaDealsEnabled"
     | "miraviaMinDiscountPercent"
     | "miraviaDiscoveryMaxItems"
@@ -109,6 +112,7 @@ type AppSettingsRow = {
   telegram_flush_reschedule_minutes?: number | string | null;
   amazon_associate_tag?: string | null;
   amazon_flash_insert_limit?: number | string | null;
+  asin_scrape_fail_threshold?: number | string | null;
   miravia_deals_enabled?: boolean | null;
   miravia_min_discount_percent?: number | string | null;
   miravia_discovery_max_items?: number | string | null;
@@ -131,6 +135,10 @@ type AppSettingsRow = {
 };
 
 const SETTINGS_COLUMNS =
+  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_min_discount_percent, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, asin_scrape_fail_threshold, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, amazon_flash_feed_urls, miravia_feed_urls, kiabi_feed_urls, amazon_department_feeds_per_run, miravia_feeds_per_run, kiabi_feeds_per_run, telegram_flush_limit, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+
+/** Sin columna asin_scrape_fail_threshold (0039). */
+const SETTINGS_COLUMNS_WITHOUT_ASIN_FAIL =
   "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_min_discount_percent, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, amazon_flash_feed_urls, miravia_feed_urls, kiabi_feed_urls, amazon_department_feeds_per_run, miravia_feeds_per_run, kiabi_feeds_per_run, telegram_flush_limit, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
 
 /** Sin columnas de feeds (0027). */
@@ -143,6 +151,7 @@ const SETTINGS_COLUMNS_TELEGRAM_BATCH =
 
 const SETTINGS_SELECT_TIERS = [
   SETTINGS_COLUMNS,
+  SETTINGS_COLUMNS_WITHOUT_ASIN_FAIL,
   SETTINGS_COLUMNS_WITHOUT_FEEDS,
   SETTINGS_COLUMNS_TELEGRAM_BATCH,
   "id, telegram_min_score, telegram_batch_hours, last_telegram_flush_at, updated_at",
@@ -218,6 +227,14 @@ function clampSmallInt(value: number, fallback: number, max = 100): number {
   return Math.min(max, Math.max(1, Math.round(value)));
 }
 
+function getAsinScrapeFailThresholdFromEnv(): number {
+  const parsed = Number.parseInt(
+    process.env.ASIN_SCRAPE_FAIL_THRESHOLD ?? "2",
+    10,
+  );
+  return clampSmallInt(parsed, 2, 50);
+}
+
 function envBool(raw: string | undefined, defaultValue: boolean): boolean {
   if (raw === undefined || raw === "") return defaultValue;
   const v = raw.trim().toLowerCase();
@@ -248,6 +265,7 @@ function envDefaults(): Omit<
     amazonFlashInsertLimit: Number(
       process.env.AMAZON_FLASH_INSERT_LIMIT ?? "4",
     ),
+    asinScrapeFailThreshold: getAsinScrapeFailThresholdFromEnv(),
     miraviaDealsEnabled: envBool(process.env.MIRAVIA_DEALS_ENABLED, true),
     miraviaMinDiscountPercent: Number(
       process.env.MIRAVIA_MIN_DISCOUNT_PERCENT ?? "15",
@@ -325,6 +343,11 @@ function mapRow(row: AppSettingsRow): AppSettings {
       Number(row.amazon_flash_insert_limit ?? env.amazonFlashInsertLimit),
       env.amazonFlashInsertLimit,
       20,
+    ),
+    asinScrapeFailThreshold: clampSmallInt(
+      Number(row.asin_scrape_fail_threshold ?? env.asinScrapeFailThreshold),
+      env.asinScrapeFailThreshold,
+      50,
     ),
     miraviaDealsEnabled:
       row.miravia_deals_enabled ?? env.miraviaDealsEnabled,
@@ -552,6 +575,18 @@ export async function resolveTelegramMinDiscountPercent(): Promise<number> {
   return (await getAppSettings()).telegramMinDiscountPercent;
 }
 
+/** Fallos de scrape consecutivos antes de desactivar un ASIN. */
+export async function resolveAsinScrapeFailThreshold(): Promise<number> {
+  return (await getAppSettings()).asinScrapeFailThreshold;
+}
+
+export function resolveAsinScrapeFailThresholdSync(): number {
+  return (
+    peekAppSettings()?.asinScrapeFailThreshold ??
+    getAsinScrapeFailThresholdFromEnv()
+  );
+}
+
 export async function resolveTelegramMinScoreForRetailer(
   retailer: string | null | undefined,
 ): Promise<number> {
@@ -620,6 +655,14 @@ export async function updateAppSettings(
             20,
           )
         : current.amazonFlashInsertLimit,
+    asinScrapeFailThreshold:
+      patch.asinScrapeFailThreshold !== undefined
+        ? clampSmallInt(
+            patch.asinScrapeFailThreshold,
+            current.asinScrapeFailThreshold,
+            50,
+          )
+        : current.asinScrapeFailThreshold,
     miraviaDealsEnabled:
       patch.miraviaDealsEnabled ?? current.miraviaDealsEnabled,
     miraviaMinDiscountPercent:
@@ -725,6 +768,7 @@ export async function updateAppSettings(
         telegram_flush_reschedule_minutes: merged.telegramFlushRescheduleMinutes,
         amazon_associate_tag: merged.amazonAssociateTag.trim() || null,
         amazon_flash_insert_limit: merged.amazonFlashInsertLimit,
+        asin_scrape_fail_threshold: merged.asinScrapeFailThreshold,
         miravia_deals_enabled: merged.miraviaDealsEnabled,
         miravia_min_discount_percent: merged.miraviaMinDiscountPercent,
         miravia_discovery_max_items: merged.miraviaDiscoveryMaxItems,

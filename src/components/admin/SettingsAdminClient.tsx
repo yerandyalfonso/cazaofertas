@@ -13,6 +13,7 @@ type SettingsForm = {
   telegramFlushLimit: string;
   amazonAssociateTag: string;
   amazonFlashInsertLimit: string;
+  asinScrapeFailThreshold: string;
   amazonFlashFeedUrls: string;
   amazonDepartmentFeedsPerRun: string;
   miraviaDealsEnabled: boolean;
@@ -40,6 +41,7 @@ function settingsToForm(settings: AppSettings): SettingsForm {
     telegramFlushLimit: String(settings.telegramFlushLimit),
     amazonAssociateTag: settings.amazonAssociateTag,
     amazonFlashInsertLimit: String(settings.amazonFlashInsertLimit),
+    asinScrapeFailThreshold: String(settings.asinScrapeFailThreshold),
     amazonFlashFeedUrls: formatFeedUrlsText(settings.amazonFlashFeedUrls),
     amazonDepartmentFeedsPerRun: String(settings.amazonDepartmentFeedsPerRun),
     miraviaDealsEnabled: settings.miraviaDealsEnabled,
@@ -112,6 +114,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
           telegramFlushLimit: Number(form.telegramFlushLimit),
           amazonAssociateTag: form.amazonAssociateTag,
           amazonFlashInsertLimit: Number(form.amazonFlashInsertLimit),
+          asinScrapeFailThreshold: Number(form.asinScrapeFailThreshold),
           amazonFlashFeedUrls: form.amazonFlashFeedUrls,
           amazonDepartmentFeedsPerRun: Number(form.amazonDepartmentFeedsPerRun),
           miraviaDealsEnabled: form.miraviaDealsEnabled,
@@ -353,7 +356,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
 
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Amazon</h2>
-        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           <AdminField
             label="Associate tag"
             hint="Vacío = se usa AMAZON_ASSOCIATE_TAG del entorno en los enlaces"
@@ -377,6 +380,21 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
               max="20"
               value={form.amazonFlashInsertLimit}
               onChange={(e) => patch("amazonFlashInsertLimit", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
+          <AdminField
+            label="Fallos scrape → desactivar"
+            hint="Intentos fallidos seguidos del mismo ASIN antes de desactivarlo"
+          >
+            <input
+              type="number"
+              min="1"
+              max="50"
+              value={form.asinScrapeFailThreshold}
+              onChange={(e) =>
+                patch("asinScrapeFailThreshold", e.target.value)
+              }
               className="admin-input w-full"
             />
           </AdminField>

@@ -72,6 +72,7 @@ export async function PATCH(request: NextRequest) {
       "telegramFlushRescheduleMinutes",
       "telegramFlushLimit",
       "amazonFlashInsertLimit",
+      "asinScrapeFailThreshold",
       "amazonDepartmentFeedsPerRun",
       "miraviaMinDiscountPercent",
       "miraviaDiscoveryMaxItems",

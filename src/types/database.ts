@@ -725,6 +725,7 @@ export type Database = {
           telegram_flush_reschedule_minutes: number;
           amazon_associate_tag: string | null;
           amazon_flash_insert_limit: number;
+          asin_scrape_fail_threshold: number;
           miravia_deals_enabled: boolean;
           miravia_min_discount_percent: number;
           miravia_discovery_max_items: number;
@@ -755,6 +756,7 @@ export type Database = {
           telegram_flush_reschedule_minutes?: number;
           amazon_associate_tag?: string | null;
           amazon_flash_insert_limit?: number;
+          asin_scrape_fail_threshold?: number;
           miravia_deals_enabled?: boolean;
           miravia_min_discount_percent?: number;
           miravia_discovery_max_items?: number;
@@ -785,6 +787,7 @@ export type Database = {
           telegram_flush_reschedule_minutes?: number;
           amazon_associate_tag?: string | null;
           amazon_flash_insert_limit?: number;
+          asin_scrape_fail_threshold?: number;
           miravia_deals_enabled?: boolean;
           miravia_min_discount_percent?: number;
           miravia_discovery_max_items?: number;
