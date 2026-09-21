@@ -16,7 +16,10 @@ import { telegramAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
-import { resolveTelegramTopicId } from "@/lib/telegram-topics";
+import {
+  getTelegramTopicOtros,
+  resolveTelegramTopicId,
+} from "@/lib/telegram-topics";
 import { formatRetailerHashtag } from "@/lib/retailers";
 import { isGeneralSubcategorySlug, resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -342,11 +345,6 @@ export function buildDealAlertText(
   deal: DealCandidate,
   options?: { includeCopyLinks?: boolean },
 ): string {
-  const score =
-    deal.score != null && Number.isFinite(deal.score)
-      ? Math.min(100, Math.round(deal.score))
-      : null;
-
   const lines = [
     dealHeadline(deal.dealLevel, { brand: deal.brand }),
     "",
@@ -364,10 +362,6 @@ export function buildDealAlertText(
     `🏷️ Antes: <s>${formatEuro(deal.previousPrice)}</s>`,
     `📉 Descuento: <b>−${Math.round(deal.discountPercentage)}%</b>`,
   );
-
-  if (score != null) {
-    lines.push(`⭐ Puntuación <b>${score}/100</b>`);
-  }
 
   if (deal.detectedAt) {
     lines.push(`📅 Publicada: ${formatDealStamp(deal.detectedAt)}`);
@@ -610,19 +604,23 @@ export async function sendDealAlertMessage(options: {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Si el tema no existe, reintentar sin thread (no gastar rate-limit en bucle).
+      // Tema inexistente → «Otros», nunca el General (thread null).
       if (/message thread not found/i.test(message) && messageThreadId != null) {
+        const otrosThreadId = getTelegramTopicOtros();
+        console.warn(
+          `[telegram] thread ${messageThreadId} no existe; reintento en Otros (${otrosThreadId}).`,
+        );
         try {
           return await sendTelegramPhoto({
             chatId: options.chatId,
             photoUrl,
             caption: buildDealAlertCaption(options.deal, { includeCopyLinks }),
             replyMarkup,
-            messageThreadId: null,
+            messageThreadId: otrosThreadId,
           });
         } catch (retryError) {
           console.warn(
-            "[telegram] sendPhoto sin thread falló; se envía solo texto.",
+            "[telegram] sendPhoto en Otros falló; se envía solo texto.",
             retryError instanceof Error ? retryError.message : retryError,
           );
         }
@@ -646,12 +644,16 @@ export async function sendDealAlertMessage(options: {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/message thread not found/i.test(message) && messageThreadId != null) {
+      const otrosThreadId = getTelegramTopicOtros();
+      console.warn(
+        `[telegram] thread ${messageThreadId} no existe; texto en Otros (${otrosThreadId}).`,
+      );
       return sendTelegramMessage({
         chatId: options.chatId,
         text: buildDealAlertText(options.deal, { includeCopyLinks }),
         disableWebPagePreview: true,
         replyMarkup,
-        messageThreadId: null,
+        messageThreadId: otrosThreadId,
       });
     }
     throw error;

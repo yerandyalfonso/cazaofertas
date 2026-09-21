@@ -18,12 +18,6 @@ import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import { DealLevel, ProductAvailability } from "@/types";
 
-function miraviaTelegramMinScoreFromSettings(
-  settings: Awaited<ReturnType<typeof getAppSettings>>,
-): number {
-  return settings.miraviaTelegramMinScore;
-}
-
 /** Slug estable: el externalId siempre queda al final (no se trunca). */
 function slugifyTitleWithId(title: string, externalId: string): string {
   const base = title
@@ -190,9 +184,7 @@ async function maybeNotifyMiraviaDeal(
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
   };
 
-  const result = await notifyChannelDealIfEligible(client, deal, {
-    minScore: options.telegramMinScore,
-  });
+  const result = await notifyChannelDealIfEligible(client, deal);
   if (result.queued) return "queued";
   if (result.sent) return "sent";
   if (result.skipped) return "skipped";
@@ -246,8 +238,6 @@ export async function runMiraviaDealsCheck(options?: {
       : appSettings.miraviaFlashUpdateLimit;
   const shouldNotify = options?.notify ?? true;
   const minDiscount = appSettings.miraviaMinDiscountPercent;
-  const miraviaTelegramMinScore =
-    options?.telegramMinScore ?? miraviaTelegramMinScoreFromSettings(appSettings);
 
   const discovery = options?.onlyItems?.length
     ? {
@@ -586,7 +576,6 @@ export async function runMiraviaDealsCheck(options?: {
       }
 
       if (shouldNotify && insertedRow) {
-        const channelMinScore = miraviaTelegramMinScore;
         const affiliateUrl = resolveProductBuyUrl(insertRow);
 
         const notifyResult = await maybeNotifyMiraviaDeal(client, {
@@ -609,7 +598,6 @@ export async function runMiraviaDealsCheck(options?: {
           categorySlug: categoryMeta.subcategorySlug,
           parentCategorySlug: categoryMeta.parentSlug,
           parentCategoryName: categoryMeta.parentName,
-          telegramMinScore: channelMinScore,
         });
         if (notifyResult === "queued") channelNotificationsQueued += 1;
         else if (notifyResult === "sent") channelNotificationsSent += 1;
@@ -689,7 +677,6 @@ export async function runMiraviaDealsCheck(options?: {
       updated += 1;
 
       if (shouldNotify) {
-        const channelMinScore = miraviaTelegramMinScore;
         const dropPct =
           previousForNotify > price
             ? ((previousForNotify - price) / previousForNotify) * 100
@@ -727,7 +714,6 @@ export async function runMiraviaDealsCheck(options?: {
           categorySlug: categoryMeta.subcategorySlug,
           parentCategorySlug: categoryMeta.parentSlug,
           parentCategoryName: categoryMeta.parentName,
-          telegramMinScore: channelMinScore,
         });
         if (notifyResult === "queued") channelNotificationsQueued += 1;
         else if (notifyResult === "sent") channelNotificationsSent += 1;

@@ -207,11 +207,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             size="lg"
           />
 
-          <p className="text-sm text-stone-600">
-            Puntuación{" "}
-            <strong className="text-ink">{Math.min(100, Math.round(product.dealScore))}/100</strong>
-          </p>
-
           {descriptionParts.length > 0 ? (
             <div className="space-y-3 border-y border-stone-200 py-5">
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">

@@ -23,9 +23,8 @@ interface CronStatus {
     lastSuccessAt: string | null;
   } | null;
   settings?: {
-    telegramMinScore: number;
-    miraviaTelegramMinScore?: number;
-    kiabiTelegramMinScore?: number;
+    telegramMinDiscountPercent: number;
+    telegramMinScore?: number;
     telegramBatchHours: number;
     telegramFlushRescheduleMinutes?: number;
     telegramFlushLimit?: number;
@@ -488,13 +487,7 @@ export function CronAdminClient({
         </p>
         {status?.settings ? (
           <p className="mt-3 text-sm text-stone-600">
-            Umbrales: Amazon ≥ {status.settings.telegramMinScore}
-            {status.settings.miraviaTelegramMinScore != null
-              ? ` · Miravia ≥ ${status.settings.miraviaTelegramMinScore}`
-              : ""}
-            {status.settings.kiabiTelegramMinScore != null
-              ? ` · Kiabi ≥ ${status.settings.kiabiTelegramMinScore}`
-              : ""}
+            Umbral canal: dto. ≥ {status.settings.telegramMinDiscountPercent}%
             {" · "}lote cada {status.settings.telegramBatchHours} h
             {status.settings.telegramFlushLimit != null
               ? ` · máx. ${status.settings.telegramFlushLimit} por envío`
@@ -694,8 +687,9 @@ export function CronAdminClient({
         </h2>
         <p className="mt-1 max-w-xl text-sm text-stone-600">
           Solo busca ASINs <strong>nuevos</strong> en Gold Box / Deals e
-          inserta + publica en Telegram si el score es alto. Lo ya indexado
-          lo vigila «Revisar precios» (bajadas → notificación).
+          inserta + publica en Telegram si el descuento alcanza el umbral del
+          admin (%). Lo ya indexado lo vigila «Revisar precios» (bajadas →
+          notificación).
         </p>
         <div className="mt-5 flex flex-wrap items-end gap-4">
           <AdminField label="Límite" className="!w-28 shrink-0">

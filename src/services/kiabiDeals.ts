@@ -1,5 +1,5 @@
-import { resolveCategoryIdBySlug } from "@/lib/categories";
-import { composeSubcategorySlug } from "@/lib/category-taxonomy";
+import { resolveCategoryMetaForDeal } from "@/lib/categories";
+import { inferProductSubcategorySlug } from "@/lib/product-category-inference";
 import { roundMoney, toNumber } from "@/lib/money";
 import { formatDescriptionForStorage } from "@/lib/product-description";
 import { existsSync, readFileSync } from "node:fs";
@@ -16,8 +16,9 @@ import {
   type KiabiDiscoveredItem,
   type KiabiProductQuote,
 } from "@/providers/retail/kiabi";
-import { getAppSettings, resolveKiabiFeedUrlsForRun } from "@/services/appSettings";
+import { getAppSettings, resolveKiabiFeedUrlsForRun, resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import type { DealCandidate } from "@/services/alertMatching";
+import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
 import { DealLevel, ProductAvailability } from "@/types";
@@ -189,14 +190,16 @@ async function resolveKiabiQuote(
   }
 }
 
-async function resolveModaCategoryId(
+async function resolveKiabiCategoryMeta(
   client: TypedSupabaseClient,
-): Promise<string | null> {
-  const category = await resolveCategoryIdBySlug(
-    client,
-    composeSubcategorySlug("moda", "general"),
-  );
-  return category?.id ?? null;
+  title: string,
+  brand?: string | null,
+) {
+  const subcategorySlug = inferProductSubcategorySlug({
+    title,
+    brand: brand ?? "Kiabi",
+  });
+  return resolveCategoryMetaForDeal(client, subcategorySlug);
 }
 
 interface CatalogRow {
@@ -259,7 +262,11 @@ async function maybeNotifyKiabiDeal(
     affiliateUrl: string;
     brand?: string | null;
     imageUrl?: string | null;
-    telegramMinScore?: number;
+    categoryId?: string | null;
+    categoryName?: string | null;
+    categorySlug?: string | null;
+    parentCategorySlug?: string | null;
+    parentCategoryName?: string | null;
   },
 ): Promise<"sent" | "skipped" | "failed" | "queued"> {
   const deal: DealCandidate = {
@@ -267,11 +274,11 @@ async function maybeNotifyKiabiDeal(
     asin: options.syntheticAsin,
     title: options.title,
     brand: options.brand ?? "Kiabi",
-    categoryId: null,
-    categoryName: "Moda",
-    categorySlug: "general",
-    parentCategorySlug: "moda",
-    parentCategoryName: "Moda",
+    categoryId: options.categoryId ?? null,
+    categoryName: options.categoryName ?? null,
+    categorySlug: options.categorySlug ?? null,
+    parentCategorySlug: options.parentCategorySlug ?? null,
+    parentCategoryName: options.parentCategoryName ?? null,
     retailer: "kiabi",
     currentPrice: options.currentPrice,
     previousPrice: options.previousPrice,
@@ -286,9 +293,7 @@ async function maybeNotifyKiabiDeal(
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
   };
 
-  const result = await notifyChannelDealIfEligible(client, deal, {
-    minScore: options.telegramMinScore,
-  });
+  const result = await notifyChannelDealIfEligible(client, deal);
   if (result.queued) return "queued";
   if (result.sent) return "sent";
   if (result.skipped) return "skipped";
@@ -304,8 +309,6 @@ export async function runKiabiDealsCheck(options?: {
   onlyItems?: KiabiDiscoveredItem[];
   /** Solo novedades: omitir productos ya en catálogo (salvo bajada de precio en listado). */
   newProductsOnly?: boolean;
-  /** Umbral mínimo de score para Telegram canal (p. ej. pruebas). */
-  telegramMinScore?: number;
 }): Promise<KiabiDealsRunResult> {
   const finishedAt = new Date().toISOString();
   const appSettings = await getAppSettings();
@@ -334,11 +337,10 @@ export async function runKiabiDealsCheck(options?: {
   const delayMs = options?.delayMs ?? 1_800;
   const shouldNotify = options?.notify ?? true;
   const minDiscount = appSettings.kiabiMinDiscountPercent;
-  const kiabiTelegramMinScore =
-    options?.telegramMinScore ?? appSettings.kiabiTelegramMinScore;
+  const channelMinDiscount = await resolveTelegramMinDiscountPercent();
   const newProductsOnly =
     options?.newProductsOnly ?? appSettings.kiabiNewProductsOnly;
-  const modaCategoryId = await resolveModaCategoryId(client);
+  await ensureCategoryKeywordRulesLoaded();
 
   const discoveryResult = options?.onlyItems?.length
     ? {
@@ -468,11 +470,16 @@ export async function runKiabiDealsCheck(options?: {
       const title = quote.title.trim();
       const productUrl = quote.productUrl;
       const now = new Date().toISOString();
+      const categoryMeta = await resolveKiabiCategoryMeta(
+        client,
+        title,
+        quote.brand,
+      );
       const scoring = dealScoringService.scoreProduct({
         currentPrice: price,
         previousPrice: reference > price ? reference : null,
         lowestPrice: existing ? toNumber(existing.lowest_price) : price,
-        categorySlug: "moda",
+        categorySlug: categoryMeta.parentSlug ?? "moda",
       });
 
       if (!existing) {
@@ -490,7 +497,7 @@ export async function runKiabiDealsCheck(options?: {
           image_url: quote.imageUrl ?? null,
           description:
             formatDescriptionForStorage([], quote.description) ?? null,
-          category_id: modaCategoryId,
+          category_id: categoryMeta.categoryId,
           current_price: price,
           previous_price: reference > price ? reference : null,
           lowest_price: price,
@@ -554,31 +561,35 @@ export async function runKiabiDealsCheck(options?: {
         });
 
         if (shouldNotify) {
-          const channelMinScore = kiabiTelegramMinScore;
-          const qualifiesChannel = scoring.score >= channelMinScore;
+          const qualifiesChannel = discount >= channelMinDiscount;
           const isDeal = scoring.level !== DealLevel.NORMAL;
           if (isDeal || qualifiesChannel) {
-          const affiliateUrl = resolveProductBuyUrl(insertRow);
-          const notifyResult = await maybeNotifyKiabiDeal(client, {
-            productId: insertedRow.id,
-            syntheticAsin,
-            title,
-            slug: insertedRow.slug,
-            currentPrice: price,
-            previousPrice: reference,
-            discountPercentage: discount,
-            score: scoring.score,
-            dealLevel: scoring.level,
-            dealLabel: scoring.label,
-            productUrl,
-            affiliateUrl,
-            brand: quote.brand,
-            imageUrl: quote.imageUrl,
-            telegramMinScore: channelMinScore,
-          });
-          if (notifyResult === "queued") channelNotificationsQueued += 1;
-          else if (notifyResult === "sent") channelNotificationsSent += 1;
-          else if (notifyResult === "skipped") channelNotificationsSkipped += 1;
+            const affiliateUrl = resolveProductBuyUrl(insertRow);
+            const notifyResult = await maybeNotifyKiabiDeal(client, {
+              productId: insertedRow.id,
+              syntheticAsin,
+              title,
+              slug: insertedRow.slug,
+              currentPrice: price,
+              previousPrice: reference,
+              discountPercentage: discount,
+              score: scoring.score,
+              dealLevel: scoring.level,
+              dealLabel: scoring.label,
+              productUrl,
+              affiliateUrl,
+              brand: quote.brand,
+              imageUrl: quote.imageUrl,
+              categoryId: categoryMeta.categoryId,
+              categoryName: categoryMeta.subcategoryName,
+              categorySlug: categoryMeta.subcategorySlug,
+              parentCategorySlug: categoryMeta.parentSlug,
+              parentCategoryName: categoryMeta.parentName,
+            });
+            if (notifyResult === "queued") channelNotificationsQueued += 1;
+            else if (notifyResult === "sent") channelNotificationsSent += 1;
+            else if (notifyResult === "skipped")
+              channelNotificationsSkipped += 1;
           }
         }
       } else {
@@ -601,7 +612,7 @@ export async function runKiabiDealsCheck(options?: {
                   existing.description,
               }
             : {}),
-          category_id: existing.category_id ?? modaCategoryId,
+          category_id: existing.category_id ?? categoryMeta.categoryId,
           current_price: price,
           previous_price:
             reference > price
@@ -636,34 +647,38 @@ export async function runKiabiDealsCheck(options?: {
           updated += 1;
 
           if (shouldNotify) {
-            const channelMinScore = kiabiTelegramMinScore;
-            const qualifiesChannel = scoring.score >= channelMinScore;
+            const qualifiesChannel = discount >= channelMinDiscount;
             const isDeal = scoring.level !== DealLevel.NORMAL;
             if (isDeal || qualifiesChannel) {
-            const affiliateUrl = resolveProductBuyUrl({
-              ...existing,
-              ...patch,
-            });
-            const notifyResult = await maybeNotifyKiabiDeal(client, {
-              productId: existing.id,
-              syntheticAsin: existing.asin,
-              title,
-              slug: existing.slug,
-              currentPrice: price,
-              previousPrice: reference,
-              discountPercentage: discount,
-              score: scoring.score,
-              dealLevel: scoring.level,
-              dealLabel: scoring.label,
-              productUrl,
-              affiliateUrl,
-              brand: quote.brand,
-              imageUrl: quote.imageUrl ?? existing.image_url,
-              telegramMinScore: channelMinScore,
-            });
-            if (notifyResult === "queued") channelNotificationsQueued += 1;
-            if (notifyResult === "sent") channelNotificationsSent += 1;
-            else if (notifyResult === "skipped") channelNotificationsSkipped += 1;
+              const affiliateUrl = resolveProductBuyUrl({
+                ...existing,
+                ...patch,
+              });
+              const notifyResult = await maybeNotifyKiabiDeal(client, {
+                productId: existing.id,
+                syntheticAsin: existing.asin,
+                title,
+                slug: existing.slug,
+                currentPrice: price,
+                previousPrice: reference,
+                discountPercentage: discount,
+                score: scoring.score,
+                dealLevel: scoring.level,
+                dealLabel: scoring.label,
+                productUrl,
+                affiliateUrl,
+                brand: quote.brand,
+                imageUrl: quote.imageUrl ?? existing.image_url,
+                categoryId: categoryMeta.categoryId,
+                categoryName: categoryMeta.subcategoryName,
+                categorySlug: categoryMeta.subcategorySlug,
+                parentCategorySlug: categoryMeta.parentSlug,
+                parentCategoryName: categoryMeta.parentName,
+              });
+              if (notifyResult === "queued") channelNotificationsQueued += 1;
+              if (notifyResult === "sent") channelNotificationsSent += 1;
+              else if (notifyResult === "skipped")
+                channelNotificationsSkipped += 1;
             }
           }
         } else {

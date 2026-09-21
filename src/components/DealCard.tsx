@@ -173,9 +173,13 @@ export function DealCard({
           />
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-[0.16em] text-stone-500">
-              {Math.min(100, Math.round(product.dealScore))}/100
-            </p>
+            {product.discountPercentage > 0 ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
+                −{Math.round(product.discountPercentage)}%
+              </p>
+            ) : (
+              <span />
+            )}
             <a
               href={buildTrackedAffiliatePath({
                 productId: product.id,

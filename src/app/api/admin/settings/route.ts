@@ -67,9 +67,7 @@ export async function PATCH(request: NextRequest) {
 
     const patch: AppSettingsPatch = {};
     const numericFields: Array<keyof AppSettingsPatch> = [
-      "telegramMinScore",
-      "miraviaTelegramMinScore",
-      "kiabiTelegramMinScore",
+      "telegramMinDiscountPercent",
       "telegramBatchHours",
       "telegramFlushRescheduleMinutes",
       "telegramFlushLimit",

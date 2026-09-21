@@ -33,9 +33,14 @@ let settingsCache: { value: AppSettings; expiresAt: number } | null = null;
 
 export interface AppSettings {
   id: string;
+  /** @deprecated Canal Telegram usa telegramMinDiscountPercent */
   telegramMinScore: number;
+  /** @deprecated Canal Telegram usa telegramMinDiscountPercent */
   miraviaTelegramMinScore: number;
+  /** @deprecated Canal Telegram usa telegramMinDiscountPercent */
   kiabiTelegramMinScore: number;
+  /** Descuento mínimo (%) para encolar/publicar en Telegram — todas las tiendas. */
+  telegramMinDiscountPercent: number;
   telegramBatchHours: number;
   telegramFlushRescheduleMinutes: number;
   amazonAssociateTag: string;
@@ -68,6 +73,7 @@ export type AppSettingsPatch = Partial<
     | "telegramMinScore"
     | "miraviaTelegramMinScore"
     | "kiabiTelegramMinScore"
+    | "telegramMinDiscountPercent"
     | "telegramBatchHours"
     | "telegramFlushRescheduleMinutes"
     | "amazonAssociateTag"
@@ -98,6 +104,7 @@ type AppSettingsRow = {
   telegram_min_score?: number | string | null;
   miravia_telegram_min_score?: number | string | null;
   kiabi_telegram_min_score?: number | string | null;
+  telegram_min_discount_percent?: number | string | null;
   telegram_batch_hours?: number | string | null;
   telegram_flush_reschedule_minutes?: number | string | null;
   amazon_associate_tag?: string | null;
@@ -124,11 +131,11 @@ type AppSettingsRow = {
 };
 
 const SETTINGS_COLUMNS =
-  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, amazon_flash_feed_urls, miravia_feed_urls, kiabi_feed_urls, amazon_department_feeds_per_run, miravia_feeds_per_run, kiabi_feeds_per_run, telegram_flush_limit, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_min_discount_percent, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, amazon_flash_feed_urls, miravia_feed_urls, kiabi_feed_urls, amazon_department_feeds_per_run, miravia_feeds_per_run, kiabi_feeds_per_run, telegram_flush_limit, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
 
 /** Sin columnas de feeds (0027). */
 const SETTINGS_COLUMNS_WITHOUT_FEEDS =
-  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
+  "id, telegram_min_score, miravia_telegram_min_score, kiabi_telegram_min_score, telegram_min_discount_percent, telegram_batch_hours, telegram_flush_reschedule_minutes, amazon_associate_tag, amazon_flash_insert_limit, miravia_deals_enabled, miravia_min_discount_percent, miravia_discovery_max_items, miravia_flash_limit, miravia_flash_update_limit, kiabi_deals_enabled, kiabi_min_discount_percent, kiabi_discovery_max_items, kiabi_new_products_only, last_telegram_flush_at, telegram_flush_resume_at, updated_at";
 
 /** Solo Telegram batch (0018 + 0025). */
 const SETTINGS_COLUMNS_TELEGRAM_BATCH =
@@ -193,6 +200,19 @@ function clampPercent(value: number, fallback: number): number {
   return Math.min(99, Math.max(1, Math.round(value * 100) / 100));
 }
 
+/** % canal Telegram: permite 0 (todo) hasta 99. */
+function clampTelegramDiscountPercent(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(99, Math.max(0, Math.round(value * 100) / 100));
+}
+
+function getTelegramMinDiscountFromEnv(): number {
+  const parsed = Number.parseFloat(
+    process.env.TELEGRAM_MIN_DISCOUNT_PERCENT ?? "20",
+  );
+  return clampTelegramDiscountPercent(parsed, 20);
+}
+
 function clampSmallInt(value: number, fallback: number, max = 100): number {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(1, Math.round(value)));
@@ -217,6 +237,7 @@ function envDefaults(): Omit<
     kiabiTelegramMinScore: Number(
       process.env.KIABI_TELEGRAM_MIN_SCORE ?? "75",
     ),
+    telegramMinDiscountPercent: getTelegramMinDiscountFromEnv(),
     telegramBatchHours: DEFAULT_TELEGRAM_BATCH_HOURS,
     telegramFlushRescheduleMinutes: Number(
       process.env.TELEGRAM_FLUSH_RESCHEDULE_MINUTES ??
@@ -282,6 +303,12 @@ function mapRow(row: AppSettingsRow): AppSettings {
     kiabiTelegramMinScore: clampScore(
       Number(row.kiabi_telegram_min_score ?? env.kiabiTelegramMinScore),
       env.kiabiTelegramMinScore,
+    ),
+    telegramMinDiscountPercent: clampTelegramDiscountPercent(
+      Number(
+        row.telegram_min_discount_percent ?? env.telegramMinDiscountPercent,
+      ),
+      env.telegramMinDiscountPercent,
     ),
     telegramBatchHours: clampTelegramBatchHours(
       Number(row.telegram_batch_hours ?? env.telegramBatchHours),
@@ -520,6 +547,11 @@ export async function resolveTelegramMinScore(): Promise<number> {
   return (await getAppSettings()).telegramMinScore;
 }
 
+/** Descuento mínimo (%) para el canal Telegram — misma regla para todas las tiendas. */
+export async function resolveTelegramMinDiscountPercent(): Promise<number> {
+  return (await getAppSettings()).telegramMinDiscountPercent;
+}
+
 export async function resolveTelegramMinScoreForRetailer(
   retailer: string | null | undefined,
 ): Promise<number> {
@@ -561,6 +593,13 @@ export async function updateAppSettings(
       patch.kiabiTelegramMinScore !== undefined
         ? clampScore(patch.kiabiTelegramMinScore, current.kiabiTelegramMinScore)
         : current.kiabiTelegramMinScore,
+    telegramMinDiscountPercent:
+      patch.telegramMinDiscountPercent !== undefined
+        ? clampTelegramDiscountPercent(
+            patch.telegramMinDiscountPercent,
+            current.telegramMinDiscountPercent,
+          )
+        : current.telegramMinDiscountPercent,
     telegramBatchHours:
       patch.telegramBatchHours !== undefined
         ? clampTelegramBatchHours(patch.telegramBatchHours)
@@ -681,6 +720,7 @@ export async function updateAppSettings(
         telegram_min_score: merged.telegramMinScore,
         miravia_telegram_min_score: merged.miraviaTelegramMinScore,
         kiabi_telegram_min_score: merged.kiabiTelegramMinScore,
+        telegram_min_discount_percent: merged.telegramMinDiscountPercent,
         telegram_batch_hours: merged.telegramBatchHours,
         telegram_flush_reschedule_minutes: merged.telegramFlushRescheduleMinutes,
         amazon_associate_tag: merged.amazonAssociateTag,

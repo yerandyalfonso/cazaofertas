@@ -720,6 +720,7 @@ export type Database = {
           telegram_min_score: number;
           miravia_telegram_min_score: number;
           kiabi_telegram_min_score: number;
+          telegram_min_discount_percent: number;
           telegram_batch_hours: number;
           telegram_flush_reschedule_minutes: number;
           amazon_associate_tag: string | null;
@@ -749,6 +750,7 @@ export type Database = {
           telegram_min_score?: number;
           miravia_telegram_min_score?: number;
           kiabi_telegram_min_score?: number;
+          telegram_min_discount_percent?: number;
           telegram_batch_hours?: number;
           telegram_flush_reschedule_minutes?: number;
           amazon_associate_tag?: string | null;
@@ -778,6 +780,7 @@ export type Database = {
           telegram_min_score?: number;
           miravia_telegram_min_score?: number;
           kiabi_telegram_min_score?: number;
+          telegram_min_discount_percent?: number;
           telegram_batch_hours?: number;
           telegram_flush_reschedule_minutes?: number;
           amazon_associate_tag?: string | null;

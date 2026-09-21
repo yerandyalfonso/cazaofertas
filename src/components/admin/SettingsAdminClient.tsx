@@ -8,9 +8,7 @@ import { formatFeedUrlsText } from "@/lib/feed-urls";
 import type { AppSettings } from "@/services/appSettings";
 
 type SettingsForm = {
-  telegramMinScore: string;
-  miraviaTelegramMinScore: string;
-  kiabiTelegramMinScore: string;
+  telegramMinDiscountPercent: string;
   telegramBatchHours: string;
   telegramFlushRescheduleMinutes: string;
   telegramFlushLimit: string;
@@ -35,9 +33,7 @@ type SettingsForm = {
 
 function settingsToForm(settings: AppSettings): SettingsForm {
   return {
-    telegramMinScore: String(settings.telegramMinScore),
-    miraviaTelegramMinScore: String(settings.miraviaTelegramMinScore),
-    kiabiTelegramMinScore: String(settings.kiabiTelegramMinScore),
+    telegramMinDiscountPercent: String(settings.telegramMinDiscountPercent),
     telegramBatchHours: String(settings.telegramBatchHours),
     telegramFlushRescheduleMinutes: String(
       settings.telegramFlushRescheduleMinutes,
@@ -109,9 +105,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegramMinScore: Number(form.telegramMinScore),
-          miraviaTelegramMinScore: Number(form.miraviaTelegramMinScore),
-          kiabiTelegramMinScore: Number(form.kiabiTelegramMinScore),
+          telegramMinDiscountPercent: Number(form.telegramMinDiscountPercent),
           telegramBatchHours: Number(form.telegramBatchHours),
           telegramFlushRescheduleMinutes: Number(
             form.telegramFlushRescheduleMinutes,
@@ -200,38 +194,23 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Telegram — criterios</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Score mínimo para encolar ofertas al grupo/canal según tienda.
+          Descuento mínimo (%) para encolar ofertas al grupo/canal. Misma regla
+          para Amazon, Miravia, Kiabi y el resto.
         </p>
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-          <AdminField label="Amazon" hint="Amazon y resto de retailers">
+          <AdminField
+            label="Dto. mínimo canal (%)"
+            hint="Ej. 20 = solo ofertas con −20% o más"
+          >
             <input
               type="number"
               min="0"
-              max="100"
-              value={form.telegramMinScore}
-              onChange={(e) => patch("telegramMinScore", e.target.value)}
-              className="admin-input w-full"
-            />
-          </AdminField>
-          <AdminField label="Miravia" hint="Descuentos ~15–25%">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={form.miraviaTelegramMinScore}
+              max="99"
+              step="1"
+              value={form.telegramMinDiscountPercent}
               onChange={(e) =>
-                patch("miraviaTelegramMinScore", e.target.value)
+                patch("telegramMinDiscountPercent", e.target.value)
               }
-              className="admin-input w-full"
-            />
-          </AdminField>
-          <AdminField label="Kiabi" hint="Moda y hogar">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={form.kiabiTelegramMinScore}
-              onChange={(e) => patch("kiabiTelegramMinScore", e.target.value)}
               className="admin-input w-full"
             />
           </AdminField>

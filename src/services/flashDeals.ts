@@ -297,7 +297,7 @@ export async function runFlashDealsCheck(options?: {
       let listPrice =
         item.origin === "simulated" ? (item.listPriceHint ?? null) : null;
       let amazonUrl = item.amazonUrl || generateAmazonUrl(item.asin);
-      let isFlashDeal = item.origin !== "live" || Boolean(listPrice && price);
+      let isFlashDeal = false;
       let imageUrl: string | null = null;
       let brand: string | null = null;
       let description: string | null = null;
@@ -393,11 +393,12 @@ export async function runFlashDealsCheck(options?: {
       const discount =
         computeDiscount(price, reference) ?? discountPercentage ?? 0;
 
+      // Flash = señal real de Amazon (badge / lightning) o dto. claro en simulación.
+      // No marcar todo el feed live como flash solo por existir en Gold Box.
       isFlashDeal =
-        isFlashDeal ||
-        discount >= 15 ||
-        item.origin === "simulated" ||
-        item.origin === "live";
+        Boolean(isFlashDeal) ||
+        (item.origin === "simulated" && discount >= 15) ||
+        (item.origin !== "live" && discount >= 15);
 
       const subcategorySlug = inferProductSubcategorySlug({
         breadcrumbs: categoryBreadcrumbs,

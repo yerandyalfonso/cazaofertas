@@ -2,7 +2,6 @@ import {
   extractAsin,
   generateAmazonUrl,
   generateAffiliateUrl,
-  type AffiliateProductInput,
 } from "@/lib/affiliate";
 
 export const PRODUCT_RETAILERS = [
@@ -208,21 +207,23 @@ export function resolveProductPageUrl(product: ProductLinkFields): string {
 
 /**
  * URL de compra/afiliado.
- * Amazon: tag de afiliado. Otras tiendas: affiliate_url o product_url directo.
+ * Amazon: siempre reaplica el tag actual (aunque haya affiliate_url guardada).
+ * Otras tiendas: affiliate_url si existe; si no, product_url / amazon_url normal.
  */
 export function resolveProductBuyUrl(product: ProductLinkFields): string {
-  if (product.affiliate_url?.trim()) {
-    return product.affiliate_url.trim();
-  }
-
   const retailer = normalizeRetailer(product.retailer);
+
   if (retailer === "amazon") {
-    const input: AffiliateProductInput = {
+    return generateAffiliateUrl({
       amazon_url: product.amazon_url ?? product.product_url,
       affiliate_url: product.affiliate_url,
       asin: product.asin,
-    };
-    return generateAffiliateUrl(input);
+    });
+  }
+
+  const affiliate = product.affiliate_url?.trim();
+  if (affiliate) {
+    return affiliate;
   }
 
   const direct = resolveProductPageUrl(product);

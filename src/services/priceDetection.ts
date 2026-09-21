@@ -9,7 +9,7 @@ import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/sup
 import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
-import { resolveTelegramMinScore } from "@/services/appSettings";
+import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import {
   notifyMatchingUsers,
   type NotificationDispatchResult,
@@ -282,7 +282,7 @@ export async function runPriceDetection(
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
   const source = options.source ?? "mock";
   const shouldNotify = options.notify ?? true;
-  const telegramMinScore = await resolveTelegramMinScore();
+  const telegramMinDiscount = await resolveTelegramMinDiscountPercent();
 
   const allowList = options.asinAllowList
     ? [...new Set(options.asinAllowList.map((asin) => asin.toUpperCase()).filter(Boolean))]
@@ -541,7 +541,8 @@ export async function runPriceDetection(
         stats.updated += 1;
 
         const isDeal = scoring.level !== DealLevel.NORMAL;
-        const qualifiesChannel = scoring.score >= telegramMinScore;
+        const qualifiesChannel =
+          scoring.discountPercentage >= telegramMinDiscount;
 
         if (!isDeal && !qualifiesChannel) {
           continue;

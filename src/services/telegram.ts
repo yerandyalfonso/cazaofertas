@@ -1,7 +1,7 @@
 import { roundMoney, toNumber } from "@/lib/money";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
-import { resolveTelegramMinScore } from "@/services/appSettings";
+import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import { isTelegramChannelConfigured } from "@/services/telegram/bot";
 
 /** Horas sin re-encolar el mismo producto al mismo precio tras un envío real. */
@@ -14,6 +14,11 @@ export interface ChannelNotifyResult {
   skipped: boolean;
   reason?: string;
   score: number;
+  /** Descuento del deal (%). */
+  discountPercentage: number;
+  /** Umbral admin de % para el canal. */
+  minDiscountPercent: number;
+  /** @deprecated Alias de minDiscountPercent (compat). */
   minScore: number;
 }
 
@@ -22,20 +27,30 @@ function cooldownMs(hours = DEFAULT_COOLDOWN_HOURS): number {
 }
 
 /**
- * Encola un chollo para el grupo/canal si pasa umbral y cooldown.
+ * Encola un chollo para el grupo/canal si pasa umbral de % y cooldown.
  * El envío real lo hace `flushPendingChannelNotifications` (lote cada N horas).
  */
 export async function notifyChannelDealIfEligible(
   client: TypedSupabaseClient,
   deal: DealCandidate,
   options?: {
+    /** @deprecated Ignorado; el umbral es global por % (admin). */
     minScore?: number;
+    minDiscountPercent?: number;
     cooldownHours?: number;
   },
 ): Promise<ChannelNotifyResult> {
-  const minScore =
-    options?.minScore ?? (await resolveTelegramMinScore());
+  const minDiscountPercent =
+    options?.minDiscountPercent ?? (await resolveTelegramMinDiscountPercent());
   const score = deal.score ?? 0;
+  const discountPercentage = deal.discountPercentage ?? 0;
+
+  const base = {
+    score,
+    discountPercentage,
+    minDiscountPercent,
+    minScore: minDiscountPercent,
+  };
 
   if (!isTelegramChannelConfigured()) {
     return {
@@ -44,20 +59,18 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: true,
       reason: "Telegram canal no configurado (TELEGRAM_BOT_TOKEN / TELEGRAM_CHANNEL_ID).",
-      score,
-      minScore,
+      ...base,
     };
   }
 
-  if (score < minScore) {
+  if (discountPercentage < minDiscountPercent) {
     return {
       attempted: false,
       sent: false,
       queued: false,
       skipped: true,
-      reason: `Score ${Math.round(score)} < umbral ${minScore}.`,
-      score,
-      minScore,
+      reason: `Descuento −${Math.round(discountPercentage)}% < umbral −${minDiscountPercent}%.`,
+      ...base,
     };
   }
 
@@ -76,8 +89,7 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: true,
       reason: productError.message,
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -93,8 +105,7 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: true,
       reason: "La oferta ya ha caducado.",
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -125,8 +136,7 @@ export async function notifyChannelDealIfEligible(
       queued: true,
       skipped: false,
       reason: "Ya en cola; se actualizó el precio/score.",
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -147,8 +157,7 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: true,
       reason: "Ya notificado recientemente al mismo precio.",
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -163,8 +172,7 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: true,
       reason: "En cooldown sin mejora relevante de score.",
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -187,8 +195,7 @@ export async function notifyChannelDealIfEligible(
       queued: false,
       skipped: false,
       reason: insertError.message,
-      score,
-      minScore,
+      ...base,
     };
   }
 
@@ -197,8 +204,7 @@ export async function notifyChannelDealIfEligible(
     sent: false,
     queued: true,
     skipped: false,
-    score,
-    minScore,
+    ...base,
   };
 }
 

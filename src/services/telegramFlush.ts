@@ -1,5 +1,5 @@
-import { generateAffiliateUrl } from "@/lib/affiliate";
 import { calculateDiscountPercentage, toNumber } from "@/lib/money";
+import { resolveProductBuyUrl } from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -8,7 +8,7 @@ import {
   getTelegramFlushRescheduleMinutes,
   persistTelegramFlushAt,
   resolveTelegramFlushLimit,
-  resolveTelegramMinScoreForRetailer,
+  resolveTelegramMinDiscountPercent,
   updateAppSettings,
 } from "@/services/appSettings";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -385,10 +385,8 @@ export async function flushPendingChannelNotifications(options?: {
         categorySlug: parentSlug ?? "otros",
       });
 
-      const minScore = await resolveTelegramMinScoreForRetailer(
-        product.retailer,
-      );
-      if (scoring.score < minScore) {
+      const minDiscount = await resolveTelegramMinDiscountPercent();
+      if (discount < minDiscount) {
         await client
           .from("channel_notifications")
           .update({ status: "skipped" })
@@ -417,10 +415,12 @@ export async function flushPendingChannelNotifications(options?: {
         productSlug: product.slug,
         imageUrl: product.image_url,
         summary: product.description?.trim() || product.brand,
-        affiliateUrl: generateAffiliateUrl({
+        affiliateUrl: resolveProductBuyUrl({
+          retailer: product.retailer,
+          asin: product.asin,
           amazon_url: product.amazon_url,
           affiliate_url: product.affiliate_url,
-          asin: product.asin,
+          product_url: product.amazon_url,
         }),
         nearHistoricalLow: scoring.level === DealLevel.HISTORICAL_LOW,
         detectedAt: row.created_at,

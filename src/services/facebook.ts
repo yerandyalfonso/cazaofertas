@@ -231,10 +231,6 @@ async function postPagePhoto(options: {
  */
 export function buildFacebookDealMessage(deal: DealCandidate): string {
   const emoji = categoryEmoji(deal.parentCategorySlug ?? deal.categorySlug);
-  const score =
-    deal.score != null && Number.isFinite(deal.score)
-      ? Math.min(100, Math.round(deal.score))
-      : null;
   const offerUrl = buildTrackedAffiliateUrl({
     productId: deal.productId,
     source: "facebook",
@@ -263,9 +259,6 @@ export function buildFacebookDealMessage(deal: DealCandidate): string {
     `📉 Descuento: −${Math.round(deal.discountPercentage)}%`,
   );
 
-  if (score != null) {
-    lines.push(`⭐ Puntuación ${score}/100`);
-  }
   if (deal.detectedAt) {
     lines.push(`📅 Publicada: ${formatDealStamp(deal.detectedAt)}`);
   }
