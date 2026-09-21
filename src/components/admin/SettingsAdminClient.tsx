@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
@@ -176,26 +175,44 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
               </>
             ) : null}
           </p>
-          <p className="mt-2 text-sm text-stone-500">
-            Envío manual y cola Telegram:{" "}
-            <Link href="/admin/cron?tab=monitor" className="text-teal-800 underline">
-              Resumen operaciones
-            </Link>
-          </p>
         </header>
       ) : (
         <p className="text-sm text-stone-600">
           Los valores guardados aquí tienen prioridad sobre{" "}
           <code className="text-xs">.env.local</code>.
-          {source === "env" ? " Hasta el primer guardado se usan variables de entorno." : null}
+          {source === "env"
+            ? " Hasta el primer guardado se usan variables de entorno."
+            : null}
         </p>
       )}
 
+      <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-3 border border-stone-200 bg-paper/95 px-4 py-3 backdrop-blur">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void save()}
+          className="admin-btn admin-btn-primary"
+        >
+          {saving ? "Guardando…" : "Guardar configuración"}
+        </button>
+        <button
+          type="button"
+          disabled={loading || saving}
+          onClick={() => void load()}
+          className="admin-btn admin-btn-ghost"
+        >
+          Recargar
+        </button>
+        <span className="text-xs text-stone-500">
+          Fuente: {source === "database" ? "base de datos" : "entorno"}
+        </span>
+      </div>
+
       <section className="admin-card p-6">
-        <h2 className="font-display text-2xl text-ink">Telegram — criterios</h2>
+        <h2 className="font-display text-2xl text-ink">Canal Telegram</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Descuento mínimo (%) para encolar ofertas al grupo/canal. Misma regla
-          para Amazon, Miravia, Kiabi y el resto.
+          Descuento mínimo (%) para encolar ofertas. Misma regla para Amazon,
+          Miravia, Kiabi y el resto.
         </p>
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           <AdminField
@@ -339,14 +356,15 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
           <AdminField
             label="Associate tag"
-            hint="Tag de afiliado en enlaces generados"
+            hint="Vacío = se usa AMAZON_ASSOCIATE_TAG del entorno en los enlaces"
           >
             <input
               type="text"
               value={form.amazonAssociateTag}
               onChange={(e) => patch("amazonAssociateTag", e.target.value)}
-              placeholder="cazaoferta-21"
+              placeholder="(usar variable de entorno)"
               className="admin-input w-full"
+              autoComplete="off"
             />
           </AdminField>
           <AdminField
@@ -470,7 +488,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 pb-4">
         <button
           type="button"
           disabled={saving}

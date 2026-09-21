@@ -319,8 +319,8 @@ function mapRow(row: AppSettingsRow): AppSettings {
           env.telegramFlushRescheduleMinutes,
       ),
     ),
-    amazonAssociateTag:
-      row.amazon_associate_tag?.trim() || env.amazonAssociateTag,
+    // Valor guardado en BD (puede ser ""). El fallback a env solo en resolveAmazonAssociateTag*.
+    amazonAssociateTag: row.amazon_associate_tag?.trim() ?? "",
     amazonFlashInsertLimit: clampSmallInt(
       Number(row.amazon_flash_insert_limit ?? env.amazonFlashInsertLimit),
       env.amazonFlashInsertLimit,
@@ -610,7 +610,7 @@ export async function updateAppSettings(
         : current.telegramFlushRescheduleMinutes,
     amazonAssociateTag:
       patch.amazonAssociateTag !== undefined
-        ? patch.amazonAssociateTag.trim() || current.amazonAssociateTag
+        ? patch.amazonAssociateTag.trim()
         : current.amazonAssociateTag,
     amazonFlashInsertLimit:
       patch.amazonFlashInsertLimit !== undefined
@@ -723,7 +723,7 @@ export async function updateAppSettings(
         telegram_min_discount_percent: merged.telegramMinDiscountPercent,
         telegram_batch_hours: merged.telegramBatchHours,
         telegram_flush_reschedule_minutes: merged.telegramFlushRescheduleMinutes,
-        amazon_associate_tag: merged.amazonAssociateTag,
+        amazon_associate_tag: merged.amazonAssociateTag.trim() || null,
         amazon_flash_insert_limit: merged.amazonFlashInsertLimit,
         miravia_deals_enabled: merged.miraviaDealsEnabled,
         miravia_min_discount_percent: merged.miraviaMinDiscountPercent,

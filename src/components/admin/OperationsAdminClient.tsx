@@ -6,9 +6,21 @@ import { CronAdminClient } from "@/components/admin/CronAdminClient";
 import { SettingsAdminClient } from "@/components/admin/SettingsAdminClient";
 
 const TABS = [
-  { id: "monitor", label: "Resumen" },
-  { id: "config", label: "Configuración" },
-  { id: "run", label: "Ejecutar" },
+  {
+    id: "monitor",
+    label: "Resumen",
+    blurb: "Estado, cola Telegram y métricas del catálogo",
+  },
+  {
+    id: "run",
+    label: "Tareas",
+    blurb: "Ejecutar crons y lotes a mano",
+  },
+  {
+    id: "config",
+    label: "Ajustes",
+    blurb: "Umbrales, feeds y tag de afiliado",
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -22,6 +34,7 @@ export function OperationsAdminClient() {
   const router = useRouter();
   const rawTab = searchParams.get("tab");
   const tab: TabId = isTabId(rawTab) ? rawTab : "monitor";
+  const activeMeta = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   function setTab(next: TabId) {
     const params = new URLSearchParams(searchParams.toString());
@@ -33,21 +46,18 @@ export function OperationsAdminClient() {
 
   return (
     <div>
-      <header>
+      <header className="max-w-3xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
           Operaciones
         </p>
         <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
-          Monitorización y configuración
+          {activeMeta.label}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Estado de crons, ajustes de feeds y Telegram, y ejecución manual de
-          tareas.
-        </p>
+        <p className="mt-2 text-sm text-stone-600">{activeMeta.blurb}</p>
       </header>
 
       <nav
-        className="mt-8 flex flex-wrap gap-2 border-b border-stone-200"
+        className="mt-8 grid gap-2 sm:grid-cols-3"
         aria-label="Secciones de operaciones"
       >
         {TABS.map((item) => {
@@ -57,13 +67,22 @@ export function OperationsAdminClient() {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+              className={`rounded-lg border px-4 py-3 text-left transition ${
                 active
-                  ? "border-teal-800 text-teal-900"
-                  : "border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-800"
+                  ? "border-teal-800 bg-teal-50/80 shadow-sm"
+                  : "border-stone-200 bg-white hover:border-stone-300"
               }`}
             >
-              {item.label}
+              <span
+                className={`block text-sm font-semibold ${
+                  active ? "text-teal-950" : "text-ink"
+                }`}
+              >
+                {item.label}
+              </span>
+              <span className="mt-0.5 block text-xs text-stone-500">
+                {item.blurb}
+              </span>
             </button>
           );
         })}
@@ -71,18 +90,36 @@ export function OperationsAdminClient() {
 
       <div className="mt-8">
         {tab === "monitor" ? <CronAdminClient mode="monitor" embedded /> : null}
-        {tab === "config" ? <SettingsAdminClient embedded /> : null}
         {tab === "run" ? <CronAdminClient mode="run" embedded /> : null}
+        {tab === "config" ? <SettingsAdminClient embedded /> : null}
       </div>
 
-      {tab !== "config" ? (
+      {tab === "monitor" ? (
         <p className="mt-10 text-sm text-stone-500">
-          Feeds, umbrales Telegram y límites:{" "}
+          ¿Lanzar un cron?{" "}
+          <Link
+            href="/admin/cron?tab=run"
+            className="font-medium text-teal-800 underline"
+          >
+            Ir a Tareas
+          </Link>
+          {" · "}
           <Link
             href="/admin/cron?tab=config"
             className="font-medium text-teal-800 underline"
           >
-            Configuración
+            Ajustes
+          </Link>
+        </p>
+      ) : null}
+      {tab === "run" ? (
+        <p className="mt-10 text-sm text-stone-500">
+          Umbrales y feeds:{" "}
+          <Link
+            href="/admin/cron?tab=config"
+            className="font-medium text-teal-800 underline"
+          >
+            Ajustes
           </Link>
         </p>
       ) : null}
