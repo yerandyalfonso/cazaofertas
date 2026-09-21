@@ -50,8 +50,23 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Flujo VPS (producción real desde 2026-09-21)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El sistema real ya **no corre en Vercel/Supabase Cloud** — corre en un VPS propio
+(self-hosted Supabase + `systemd` + Caddy). Vercel/Supabase Cloud quedan inactivos
+como rollback, sin borrar, pero no hay que desplegar ahí.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# Publicar código (después de git push a main):
+./deploy.sh          # ambas apps
+./deploy.sh caza     # solo CazaOfertas (admin + blog, hoy en admin.chollosdhoy.com)
+./deploy.sh chollos  # solo Chollos de Hoy (marketplace, en chollosdhoy.com)
+
+# Aplicar un cambio de esquema de la base de datos:
+./apply-migration.sh supabase/migrations/00XX_nombre.sql
+```
+
+Requisitos: alias SSH `vps` configurado en `~/.ssh/config` de tu máquina, apuntando
+al VPS con la llave de deploy.
+
+`scripts/deploy-chollos.sh` (Vercel) quedó obsoleto — usa `./deploy.sh chollos`.
