@@ -52,3 +52,19 @@ export function createSupabaseServiceClient(): TypedSupabaseClient {
     },
   );
 }
+
+/**
+ * URL pública de un objeto de Storage, alcanzable desde fuera del servidor
+ * (Meta/Instagram, navegadores, etc).
+ *
+ * `NEXT_PUBLIC_SUPABASE_URL` puede ser una URL interna (p. ej. `http://127.0.0.1:8000`
+ * en el VPS, para que las llamadas server-to-server sean rápidas y no salgan a
+ * internet). Esa URL interna NO sirve para generar links públicos: Instagram
+ * necesita poder descargar la imagen desde fuera, así que usamos
+ * `NEXT_PUBLIC_SITE_URL` (el dominio público real) como base cuando está definida.
+ */
+export function getPublicStorageUrl(bucket: string, path: string): string {
+  const publicBase = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  const base = publicBase || getPublicEnv().NEXT_PUBLIC_SUPABASE_URL;
+  return `${base}/storage/v1/object/public/${bucket}/${path}`;
+}

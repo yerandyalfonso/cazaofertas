@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
-import { createSupabaseServiceClient } from "@/lib/supabase";
+import { createSupabaseServiceClient, getPublicStorageUrl } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { data } = client.storage.from("article-images").getPublicUrl(path);
+    const url = getPublicStorageUrl("article-images", path);
 
     return NextResponse.json({
       ok: true,
-      url: data.publicUrl,
+      url,
       storage: "supabase",
       path,
     });

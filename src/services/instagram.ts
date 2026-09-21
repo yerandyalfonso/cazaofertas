@@ -11,7 +11,7 @@ import {
   INSTAGRAM_PULSE_WIDTH,
   renderSocialPulsePng,
 } from "@/lib/render-social-pulse-card";
-import { createSupabaseServiceClient } from "@/lib/supabase";
+import { createSupabaseServiceClient, getPublicStorageUrl } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
 import { buildInstagramDealCaption } from "@/services/facebook";
 
@@ -75,11 +75,7 @@ async function uploadPulsePngPublic(png: Buffer): Promise<string> {
   if (error) {
     throw new Error(`No se pudo subir PNG para Instagram: ${error.message}`);
   }
-  const { data } = client.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-  if (!data?.publicUrl) {
-    throw new Error("Supabase no devolvió URL pública del PNG.");
-  }
-  return data.publicUrl;
+  return getPublicStorageUrl(STORAGE_BUCKET, path);
 }
 
 async function createInstagramImageContainer(options: {
