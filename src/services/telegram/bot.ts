@@ -375,10 +375,10 @@ export function buildDealAlertText(
       productId: deal.productId,
       source: "telegram",
     });
-    lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${offerUrl}`);
+    lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${escapeHtml(offerUrl)}`);
     if (deal.productSlug?.trim()) {
       lines.push(
-        `🌐 Ver en la web: ${telegramAbsoluteUrl(`/producto/${deal.productSlug.trim()}`)}`,
+        `🌐 Ver en la web: ${escapeHtml(telegramAbsoluteUrl(`/producto/${deal.productSlug.trim()}`))}`,
       );
     }
   }
