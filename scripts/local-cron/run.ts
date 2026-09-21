@@ -10,6 +10,7 @@ loadEnv({ path: resolve(process.cwd(), ".env") });
 
 type LocalCronJob =
   | "check-prices"
+  | "amazon-price-check"
   | "flash-deals"
   | "miravia-deals"
   | "user-alerts"
@@ -19,6 +20,7 @@ type LocalCronJob =
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
+  "amazon-price-check",
   "flash-deals",
   "miravia-deals",
   "user-alerts",
@@ -63,6 +65,28 @@ async function runCheckPrices(): Promise<void> {
 
   await reviewCheckPricesResult(amazon);
   await reviewRetailPricesResult(retail);
+}
+
+/**
+ * Solo Amazon, sin retail ni flush de Telegram (eso ya lo hace el VPS).
+ * Pensado para correr desde la Mac (IP residencial): mucho menos riesgo de
+ * bloqueo que la IP del VPS, así que aquí sí respetamos la pausa preventiva
+ * en vez de forzar (a mayor límite, más vale ser conservador si Amazon
+ * empieza a denegar).
+ */
+async function runAmazonOnlyCheck(): Promise<void> {
+  const { runAmazonPriceCheck } = await import("@/services/amazonPriceCheck");
+  const { reviewCheckPricesResult } = await import("./notify");
+
+  const amazon = await runAmazonPriceCheck({
+    limit: Number(process.env.AMAZON_PRICE_CHECK_LIMIT_MAC ?? "10") || 10,
+    notify: true,
+    provider: "html",
+    force: process.argv.includes("--force"),
+    delayMs: 2_500,
+  });
+  console.log(JSON.stringify({ amazon }, null, 2));
+  await reviewCheckPricesResult(amazon);
 }
 
 async function runFlashDeals(): Promise<void> {
@@ -221,6 +245,9 @@ async function main(): Promise<void> {
   switch (job) {
     case "check-prices":
       await runCheckPrices();
+      break;
+    case "amazon-price-check":
+      await runAmazonOnlyCheck();
       break;
     case "flash-deals":
       await runFlashDeals();
