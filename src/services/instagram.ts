@@ -45,6 +45,11 @@ function graphUrl(path: string): string {
   return `https://graph.facebook.com/${version}${trimmed}`;
 }
 
+/** Código 4 = "Application request limit reached": transitorio, hay que reintentar, no abortar. */
+function isRateLimitError(payload: GraphErrorBody): boolean {
+  return payload.error?.code === 4;
+}
+
 function isAuthError(payload: GraphErrorBody): boolean {
   const code = payload.error?.code;
   const sub = payload.error?.error_subcode;
@@ -100,18 +105,31 @@ async function createInstagramImageContainer(options: {
   form.set("image_url", options.imageUrl);
   form.set("caption", options.caption);
 
-  const response = await fetch(
-    graphUrl(`/${encodeURIComponent(options.igUserId)}/media`),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-    },
-  );
-  const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
-    id?: string;
+  const attempt = async () => {
+    const response = await fetch(
+      graphUrl(`/${encodeURIComponent(options.igUserId)}/media`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
+      id?: string;
+    };
+    return { response, payload };
   };
+
+  let { response, payload } = await attempt();
+
+  // Límite de tasa transitorio de Meta: un reintento tras una pausa corta
+  // (todavía no se creó nada publicable, es solo el contenedor).
+  if (!response.ok && isRateLimitError(payload)) {
+    console.warn("[instagram] Rate limit creando contenedor; reintentando en 5s…");
+    await sleep(5_000);
+    ({ response, payload } = await attempt());
+  }
 
   if (!response.ok || payload.error || !payload.id) {
     const tokenExpired = isAuthError(payload);
@@ -143,7 +161,7 @@ async function getInstagramContainerStatus(
   creationId: string,
 ): Promise<
   | { ok: true; statusCode: ContainerStatusCode; status?: string }
-  | { ok: false; error: string; tokenExpired: boolean }
+  | { ok: false; error: string; tokenExpired: boolean; rateLimited: boolean }
 > {
   const token = getFacebookPageAccessToken();
   if (!token) {
@@ -151,6 +169,7 @@ async function getInstagramContainerStatus(
       ok: false,
       error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.",
       tokenExpired: false,
+      rateLimited: false,
     };
   }
 
@@ -172,6 +191,7 @@ async function getInstagramContainerStatus(
     return {
       ok: false,
       tokenExpired,
+      rateLimited: isRateLimitError(payload),
       error: tokenExpired
         ? `Token caducado o sin permiso Instagram. ${formatGraphError(payload, response.status)}`
         : formatGraphError(payload, response.status),
@@ -200,7 +220,18 @@ async function waitForInstagramContainerReady(
 
   while (Date.now() - started < CONTAINER_POLL_MAX_MS) {
     const status = await getInstagramContainerStatus(creationId);
-    if (!status.ok) return status;
+    if (!status.ok) {
+      if (status.rateLimited) {
+        // Transitorio (límite de tasa de Meta): reintentar, no abortar — el
+        // contenedor puede publicarse igual aunque este poll puntual falle.
+        console.warn(
+          "[instagram] Rate limit al consultar estado; reintentando…",
+        );
+        await sleep(CONTAINER_POLL_MS);
+        continue;
+      }
+      return status;
+    }
 
     lastStatus = status.statusCode;
     if (status.statusCode === "FINISHED" || status.statusCode === "PUBLISHED") {
@@ -283,6 +314,16 @@ async function publishInstagramContainer(options: {
   if (first.ok) return first;
 
   if (!isMediaNotReadyError(first.payload)) {
+    // Límite de tasa transitorio: puede que el publish haya salido bien en el
+    // servidor de Meta aunque esta respuesta puntual haya fallado. Comprobar
+    // antes de darlo por error definitivo (evita falsos negativos).
+    if (isRateLimitError(first.payload)) {
+      await sleep(3_000);
+      const check = await getInstagramContainerStatus(options.creationId);
+      if (check.ok && check.statusCode === "PUBLISHED") {
+        return { ok: true, id: options.creationId };
+      }
+    }
     const tokenExpired = isAuthError(first.payload);
     return {
       ok: false,
