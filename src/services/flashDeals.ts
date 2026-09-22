@@ -39,6 +39,20 @@ function slugify(value: string): string {
     .slice(0, 80);
 }
 
+/**
+ * El ASIN siempre queda entero al final (no se trunca), truncando el t\u00edtulo
+ * en su lugar. Trunar la cadena `titulo-asin` completa (como antes) pod\u00eda
+ * cortar el ASIN en t\u00edtulos largos, haciendo que dos productos distintos
+ * (p. ej. variantes de color con ASIN propio) colisionaran en el mismo slug
+ * y se borraran/reinsertaran mutuamente en cada pasada del cron, generando
+ * notificaciones infinitas del "mismo" producto.
+ */
+function slugifyProductWithAsin(title: string, asin: string): string {
+  const base = slugify(title).slice(0, 60);
+  const id = slugify(asin);
+  return `${base || "producto"}-${id}`;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -421,7 +435,7 @@ export async function runFlashDealsCheck(options?: {
         subcategorySlug,
       );
 
-      const slug = slugify(`${title}-${item.asin}`);
+      const slug = slugifyProductWithAsin(title, item.asin);
       const now = new Date().toISOString();
       const scoring = dealScoringService.scoreProduct({
         currentPrice: price,
