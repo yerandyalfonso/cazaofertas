@@ -21,6 +21,7 @@ import {
   resolveAmazonFlashFeedUrlsForRun,
 } from "@/services/appSettings";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
+import { notifyMatchingUsers } from "@/services/notifications";
 import type { DealCandidate } from "@/services/alertMatching";
 import {
   addFlashAsinCooldown,
@@ -113,6 +114,15 @@ async function maybeNotifyFlashChannel(
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
     expiresAt: options.expiresAt ?? null,
   };
+
+  try {
+    await notifyMatchingUsers(client, deal);
+  } catch (error) {
+    console.warn(
+      "[flash-deals] notifyMatchingUsers falló (alertas personales)",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   const result = await notifyChannelDealIfEligible(client, deal);
   if (result.queued) return "queued";

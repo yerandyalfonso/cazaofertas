@@ -16,6 +16,7 @@ import {
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
+import { notifyMatchingUsers } from "@/services/notifications";
 import { DealLevel, ProductAvailability } from "@/types";
 
 /** Slug estable: el externalId siempre queda al final (no se trunca). */
@@ -183,6 +184,15 @@ async function maybeNotifyMiraviaDeal(
     affiliateUrl: options.affiliateUrl,
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
   };
+
+  try {
+    await notifyMatchingUsers(client, deal);
+  } catch (error) {
+    console.warn(
+      "[miravia-deals] notifyMatchingUsers falló (alertas personales)",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   const result = await notifyChannelDealIfEligible(client, deal);
   if (result.queued) return "queued";

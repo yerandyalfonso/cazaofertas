@@ -55,7 +55,18 @@ function normalizeBrand(value: string | null | undefined): string | null {
   return value.trim().toLowerCase();
 }
 
-export function alertMatchesDeal(alert: AlertRow, deal: DealCandidate): boolean {
+/**
+ * @param categoryAncestryIds IDs de la categoría de la oferta + su padre
+ * (si tiene). Las alertas se crean casi siempre sobre categorías raíz
+ * ("Tecnología"), pero los productos se archivan en la subcategoría hoja
+ * ("tecnologia-moviles") — sin subir al padre, `alert.category_id` nunca
+ * coincide con `deal.categoryId` y la alerta no dispara nunca.
+ */
+export function alertMatchesDeal(
+  alert: AlertRow,
+  deal: DealCandidate,
+  categoryAncestryIds?: ReadonlySet<string>,
+): boolean {
   if (!alert.is_active) {
     return false;
   }
@@ -64,8 +75,13 @@ export function alertMatchesDeal(alert: AlertRow, deal: DealCandidate): boolean 
     return false;
   }
 
-  if (alert.category_id && alert.category_id !== deal.categoryId) {
-    return false;
+  if (alert.category_id) {
+    const matchesCategory = categoryAncestryIds
+      ? categoryAncestryIds.has(alert.category_id)
+      : alert.category_id === deal.categoryId;
+    if (!matchesCategory) {
+      return false;
+    }
   }
 
   const alertBrand = normalizeBrand(alert.brand);
@@ -97,10 +113,37 @@ export function alertMatchesDeal(alert: AlertRow, deal: DealCandidate): boolean 
   return true;
 }
 
+/** Categoría de la oferta + su padre (si lo tiene), para que una alerta
+ * sobre la categoría raíz también dispare con productos de sus hojas. */
+async function resolveCategoryAncestryIds(
+  client: TypedSupabaseClient,
+  categoryId: string | null | undefined,
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (!categoryId) return ids;
+  ids.add(categoryId);
+
+  const { data } = await client
+    .from("categories")
+    .select("parent_id")
+    .eq("id", categoryId)
+    .maybeSingle();
+
+  if (data?.parent_id) {
+    ids.add(data.parent_id);
+  }
+  return ids;
+}
+
 export async function findMatchingAlerts(
   client: TypedSupabaseClient,
   deal: DealCandidate,
 ): Promise<AlertMatch[]> {
+  const categoryAncestryIds = await resolveCategoryAncestryIds(
+    client,
+    deal.categoryId,
+  );
+
   const { data, error } = await client
     .from("alerts")
     .select("*, users(*)")
@@ -122,7 +165,7 @@ export async function findMatchingAlerts(
       continue;
     }
 
-    if (alertMatchesDeal(alert, deal)) {
+    if (alertMatchesDeal(alert, deal, categoryAncestryIds)) {
       matches.push({ alert, user });
     }
   }

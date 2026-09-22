@@ -21,6 +21,7 @@ import type { DealCandidate } from "@/services/alertMatching";
 import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import { dealScoringService } from "@/services/deal-scoring";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
+import { notifyMatchingUsers } from "@/services/notifications";
 import { DealLevel, ProductAvailability } from "@/types";
 
 function loadKiabiFallbackItems(): KiabiDiscoveredItem[] | null {
@@ -292,6 +293,15 @@ async function maybeNotifyKiabiDeal(
     affiliateUrl: options.affiliateUrl,
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
   };
+
+  try {
+    await notifyMatchingUsers(client, deal);
+  } catch (error) {
+    console.warn(
+      "[kiabi-deals] notifyMatchingUsers falló (alertas personales)",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   const result = await notifyChannelDealIfEligible(client, deal);
   if (result.queued) return "queued";
