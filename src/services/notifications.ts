@@ -42,8 +42,9 @@ async function hasDuplicateNotification(
 export async function notifyMatchingUsers(
   client: TypedSupabaseClient,
   deal: DealCandidate,
+  options?: { excludeAlertId?: string },
 ): Promise<NotificationDispatchResult> {
-  const matches = await findMatchingAlerts(client, deal);
+  const matches = await findMatchingAlerts(client, deal, options);
   const result: NotificationDispatchResult = {
     matched: matches.length,
     created: 0,

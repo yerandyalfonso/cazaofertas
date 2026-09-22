@@ -21,12 +21,16 @@ import {
   scrapePcComponentesProductPage,
 } from "@/providers/browser";
 import { ensureProductFromUrl } from "@/services/products";
-import { ProductAvailability } from "@/types";
+import { DealLevel, ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
   buildOfferActionMarkup,
 } from "@/services/telegram/bot";
+import { notifyChannelDealIfEligible } from "@/services/telegram";
+import { notifyMatchingUsers } from "@/services/notifications";
+import { dealScoringService } from "@/services/deal-scoring";
+import type { DealCandidate } from "@/services/alertMatching";
 
 export interface UserUrlAlertsResult {
   ok: true;
@@ -408,14 +412,34 @@ export async function runUserUrlAlerts(options?: {
         ((previousKnown - currentPrice) / previousKnown) * 100,
       );
 
+      type LinkedProductRow = {
+        slug: string;
+        brand: string | null;
+        image_url: string | null;
+        description: string | null;
+        deal_expires_at: string | null;
+        lowest_price: number | string | null;
+        category_id: string | null;
+        categories: {
+          id: string;
+          slug: string;
+          name: string;
+          parent: { id: string; slug: string; name: string } | null;
+        } | null;
+      };
+
       let productSlug: string | null = null;
+      let linkedProduct: LinkedProductRow | null = null;
       if (productId) {
         const { data: linked } = await client
           .from("products")
-          .select("slug")
+          .select(
+            "slug, brand, image_url, description, deal_expires_at, lowest_price, category_id, categories(id, slug, name, parent:parent_id(id, slug, name))",
+          )
           .eq("id", productId)
           .maybeSingle();
-        productSlug = linked?.slug ?? null;
+        linkedProduct = linked as LinkedProductRow | null;
+        productSlug = linkedProduct?.slug ?? null;
       }
 
       await sendTelegramMessage({
@@ -435,6 +459,62 @@ export async function runUserUrlAlerts(options?: {
       });
 
       result.notified += 1;
+
+      // Misma oferta detectada por una alerta de usuario: también se ofrece
+      // al canal/grupo/Facebook/Instagram y a las alertas de categoría/marca/
+      // keyword de otros usuarios, si cumple sus propios umbrales. El
+      // cooldown de `notifyChannelDealIfEligible` (pendiente + 12h al mismo
+      // precio) evita reenvíos duplicados si el descubrimiento normal ya
+      // publicó este mismo producto.
+      if (productId) {
+        try {
+          const category = linkedProduct?.categories ?? null;
+          const scoring = dealScoringService.scoreProduct({
+            currentPrice,
+            previousPrice: previousKnown,
+            lowestPrice: Math.min(
+              currentPrice,
+              toNumber(linkedProduct?.lowest_price) ?? currentPrice,
+            ),
+            categorySlug: category?.parent?.slug ?? category?.slug ?? "otros",
+          });
+
+          const deal: DealCandidate = {
+            productId,
+            asin,
+            title,
+            brand: linkedProduct?.brand ?? null,
+            categoryId: category?.id ?? linkedProduct?.category_id ?? null,
+            categoryName: category?.name ?? null,
+            categorySlug: category?.slug ?? null,
+            parentCategorySlug: category?.parent?.slug ?? null,
+            parentCategoryName: category?.parent?.name ?? null,
+            retailer,
+            currentPrice,
+            previousPrice: previousKnown,
+            discountPercentage: discountPct,
+            dealLevel: scoring.level,
+            score: scoring.score,
+            dealLabel: scoring.label,
+            affiliateUrl,
+            nearHistoricalLow: scoring.level === DealLevel.HISTORICAL_LOW,
+            productSlug,
+            imageUrl: linkedProduct?.image_url ?? null,
+            summary: linkedProduct?.description?.trim() || null,
+            expiresAt: linkedProduct?.deal_expires_at ?? null,
+          };
+
+          await notifyMatchingUsers(client, deal, { excludeAlertId: alert.id });
+          await notifyChannelDealIfEligible(client, deal);
+        } catch (broadcastError) {
+          console.warn(
+            `[user-alerts] Alerta ${alert.id}: no se pudo ofrecer al canal/otras alertas`,
+            broadcastError instanceof Error
+              ? broadcastError.message
+              : broadcastError,
+          );
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Bloqueo anti-bot de la tienda (DataDome, Cloudflare, 403…): transitorio,

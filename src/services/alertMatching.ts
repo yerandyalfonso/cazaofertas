@@ -151,6 +151,10 @@ async function resolveCategoryAncestryIds(
 export async function findMatchingAlerts(
   client: TypedSupabaseClient,
   deal: DealCandidate,
+  options?: {
+    /** Alerta a excluir (p. ej. la de URL que ya se notificó en directo). */
+    excludeAlertId?: string;
+  },
 ): Promise<AlertMatch[]> {
   const categoryAncestryIds = await resolveCategoryAncestryIds(
     client,
@@ -175,6 +179,9 @@ export async function findMatchingAlerts(
     const user = Array.isArray(users) ? users[0] : users;
 
     if (!user) {
+      continue;
+    }
+    if (options?.excludeAlertId && alert.id === options.excludeAlertId) {
       continue;
     }
 
