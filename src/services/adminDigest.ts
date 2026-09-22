@@ -1,3 +1,11 @@
+import {
+  getFacebookGraphApiVersion,
+  getFacebookPageAccessToken,
+  getFacebookPageId,
+  getInstagramBusinessAccountId,
+  isFacebookPageConfigured,
+  isInstagramPublishingConfigured,
+} from "@/lib/env";
 import { detectRetailerFromUrl, type ProductRetailer } from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { getCronControlState } from "@/services/cronControl";
@@ -7,6 +15,10 @@ const WINDOW_HOURS = 24;
 const STALE_HOURS = 48;
 /** Una sola alerta disparando más que esto en 24h es sospechoso (bug tipo "comodín"). */
 const ANOMALY_THRESHOLD = 15;
+/** Sin publicar en Facebook/Instagram durante más de esto = aviso. */
+const SOCIAL_SILENCE_HOURS = 4;
+/** Página de la Graph API; si se llega al límite, el conteo de 24h es un mínimo. */
+const SOCIAL_FETCH_LIMIT = 25;
 
 function resolveAdminChatId(): string | number | null {
   const admin = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim();
@@ -50,6 +62,19 @@ interface CatalogStats {
   staleOver48h: number;
 }
 
+interface SocialPlatformStats {
+  configured: boolean;
+  ok: boolean;
+  postsLast24h: number;
+  hoursSinceLastPost: number | null;
+  lastError: string | null;
+}
+
+interface SocialStats {
+  facebook: SocialPlatformStats;
+  instagram: SocialPlatformStats;
+}
+
 export interface AdminDigestReport {
   generatedAt: string;
   cronPaused: boolean;
@@ -57,6 +82,7 @@ export interface AdminDigestReport {
   cronPausedUntil: string | null;
   discovery: DiscoveryStats;
   catalog: CatalogStats;
+  social: SocialStats;
   channel: ChannelStats;
   urlAlerts: UrlAlertsStats;
   personalAlerts: PersonalAlertsStats;
@@ -94,6 +120,134 @@ async function buildCatalogStats(client: ReturnType<typeof createSupabaseService
     .or(`last_checked_at.is.null,last_checked_at.lt.${staleCutoff}`);
 
   return { activeTotal: activeTotal ?? 0, staleOver48h: staleOver48h ?? 0 };
+}
+
+function emptySocialPlatformStats(configured: boolean): SocialPlatformStats {
+  return {
+    configured,
+    ok: !configured,
+    postsLast24h: 0,
+    hoursSinceLastPost: null,
+    lastError: null,
+  };
+}
+
+async function fetchFacebookStats(): Promise<SocialPlatformStats> {
+  if (!isFacebookPageConfigured()) return emptySocialPlatformStats(false);
+
+  const pageId = getFacebookPageId();
+  const token = getFacebookPageAccessToken();
+  const version = getFacebookGraphApiVersion();
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${version}/${pageId}/posts?fields=created_time&limit=${SOCIAL_FETCH_LIMIT}&access_token=${token}`,
+    );
+    const json = (await res.json()) as {
+      data?: Array<{ created_time: string }>;
+      error?: { message?: string };
+    };
+
+    if (json.error) {
+      return {
+        configured: true,
+        ok: false,
+        postsLast24h: 0,
+        hoursSinceLastPost: null,
+        lastError: json.error.message ?? "Error desconocido de Facebook.",
+      };
+    }
+
+    const posts = json.data ?? [];
+    const since = Date.now() - WINDOW_HOURS * 3_600_000;
+    const postsLast24h = posts.filter(
+      (p) => new Date(p.created_time).getTime() >= since,
+    ).length;
+    const lastPost = posts[0]?.created_time
+      ? new Date(posts[0].created_time).getTime()
+      : null;
+    const hoursSinceLastPost =
+      lastPost != null ? Math.round((Date.now() - lastPost) / 3_600_000) : null;
+
+    return {
+      configured: true,
+      ok: hoursSinceLastPost === null || hoursSinceLastPost <= SOCIAL_SILENCE_HOURS,
+      postsLast24h,
+      hoursSinceLastPost,
+      lastError: null,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      ok: false,
+      postsLast24h: 0,
+      hoursSinceLastPost: null,
+      lastError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function fetchInstagramStats(): Promise<SocialPlatformStats> {
+  if (!isInstagramPublishingConfigured()) return emptySocialPlatformStats(false);
+
+  const igId = getInstagramBusinessAccountId();
+  const token = getFacebookPageAccessToken();
+  const version = getFacebookGraphApiVersion();
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${version}/${igId}/media?fields=timestamp&limit=${SOCIAL_FETCH_LIMIT}&access_token=${token}`,
+    );
+    const json = (await res.json()) as {
+      data?: Array<{ timestamp: string }>;
+      error?: { message?: string };
+    };
+
+    if (json.error) {
+      return {
+        configured: true,
+        ok: false,
+        postsLast24h: 0,
+        hoursSinceLastPost: null,
+        lastError: json.error.message ?? "Error desconocido de Instagram.",
+      };
+    }
+
+    const posts = json.data ?? [];
+    const since = Date.now() - WINDOW_HOURS * 3_600_000;
+    const postsLast24h = posts.filter(
+      (p) => new Date(p.timestamp).getTime() >= since,
+    ).length;
+    const lastPost = posts[0]?.timestamp
+      ? new Date(posts[0].timestamp).getTime()
+      : null;
+    const hoursSinceLastPost =
+      lastPost != null ? Math.round((Date.now() - lastPost) / 3_600_000) : null;
+
+    return {
+      configured: true,
+      ok: hoursSinceLastPost === null || hoursSinceLastPost <= SOCIAL_SILENCE_HOURS,
+      postsLast24h,
+      hoursSinceLastPost,
+      lastError: null,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      ok: false,
+      postsLast24h: 0,
+      hoursSinceLastPost: null,
+      lastError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function buildSocialStats(): Promise<SocialStats> {
+  const [facebook, instagram] = await Promise.all([
+    fetchFacebookStats(),
+    fetchInstagramStats(),
+  ]);
+  return { facebook, instagram };
 }
 
 async function buildChannelStats(client: ReturnType<typeof createSupabaseServiceClient>): Promise<ChannelStats> {
@@ -202,11 +356,12 @@ async function buildPersonalAlertsStats(
 
 export async function buildAdminDigestReport(): Promise<AdminDigestReport> {
   const client = createSupabaseServiceClient();
-  const [cronState, discovery, catalog, channel, urlAlerts, personalAlerts] =
+  const [cronState, discovery, catalog, social, channel, urlAlerts, personalAlerts] =
     await Promise.all([
       getCronControlState(),
       buildDiscoveryStats(client),
       buildCatalogStats(client),
+      buildSocialStats(),
       buildChannelStats(client),
       buildUrlAlertsStats(client),
       buildPersonalAlertsStats(client),
@@ -219,6 +374,7 @@ export async function buildAdminDigestReport(): Promise<AdminDigestReport> {
     cronPausedUntil: cronState.pausedUntil,
     discovery,
     catalog,
+    social,
     channel,
     urlAlerts,
     personalAlerts,
@@ -228,6 +384,21 @@ export async function buildAdminDigestReport(): Promise<AdminDigestReport> {
 function formatRetailerCounts(items: RetailerCount[]): string {
   if (items.length === 0) return "sin datos";
   return items.map((item) => `${item.retailer}: ${item.count}`).join(", ");
+}
+
+function formatSocialLine(label: string, stats: SocialPlatformStats): string {
+  if (!stats.configured) return `${label}: no configurado`;
+  if (stats.lastError) return `⚠️ ${label}: error — ${stats.lastError}`;
+  const lastPost =
+    stats.hoursSinceLastPost === null
+      ? "sin publicaciones registradas"
+      : `hace ${stats.hoursSinceLastPost}h`;
+  const icon = stats.ok ? "✅" : "⚠️";
+  const count =
+    stats.postsLast24h >= SOCIAL_FETCH_LIMIT
+      ? `${stats.postsLast24h}+`
+      : String(stats.postsLast24h);
+  return `${icon} ${label}: ${count} en 24h · última ${lastPost}`;
 }
 
 export function formatAdminDigestMessage(report: AdminDigestReport): string {
@@ -271,6 +442,8 @@ export function formatAdminDigestMessage(report: AdminDigestReport): string {
     `${report.channel.sentLast24h} enviados · ${report.channel.skippedLast24h} saltados` +
       (report.channel.pendingTotal > 0 ? ` · ${report.channel.pendingTotal} pendientes` : ""),
   );
+
+  lines.push("", "📱 <b>Facebook / Instagram</b>", formatSocialLine("Facebook", report.social.facebook), formatSocialLine("Instagram", report.social.instagram));
 
   lines.push(
     "",
