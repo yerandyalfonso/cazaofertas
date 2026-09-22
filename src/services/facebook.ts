@@ -432,6 +432,144 @@ export async function postDealToFacebookPage(
   }
 }
 
+/**
+ * Texto del post por lote: uno o varios chollos en un solo post
+ * (fotos adjuntas vía `attached_media`), con enlace propio por producto.
+ */
+export function buildFacebookBatchMessage(deals: DealCandidate[]): string {
+  const lines = [`🔥 ${deals.length} chollos seleccionados`, ""];
+
+  deals.forEach((deal, index) => {
+    const offerUrl = buildTrackedAffiliateUrl({
+      productId: deal.productId,
+      source: "facebook",
+    });
+    lines.push(
+      `${index + 1}. ${truncatePlain(deal.title, 90)}`,
+      `💰 ${formatEuro(deal.currentPrice)} (antes ${formatEuro(deal.previousPrice)}, −${Math.round(deal.discountPercentage)}%)`,
+      `🛒 ${offerUrl}`,
+      "",
+    );
+  });
+
+  return lines.join("\n").trim();
+}
+
+/**
+ * Publica varios chollos en un solo post de Facebook: una foto sin publicar
+ * por producto (`/photos` con `published=false`) adjuntadas a un único
+ * `/feed` vía `attached_media`. Reduce el nº de publicaciones frente a un
+ * post individual por chollo (clave tras el bloqueo por volumen 368).
+ * Nunca lanza: un fallo de Meta no debe romper Telegram ni el guardado.
+ */
+export async function postDealBatchToFacebookPage(
+  deals: DealCandidate[],
+): Promise<FacebookPostResult> {
+  try {
+    if (deals.length === 0) {
+      return { ok: false, skipped: true, reason: "Lote vacío." };
+    }
+    if (!isFacebookPageConfigured()) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "Facebook no configurado (FACEBOOK_PAGE_ID / FACEBOOK_PAGE_ACCESS_TOKEN).",
+      };
+    }
+
+    const pageId = getFacebookPageId();
+    if (!pageId) {
+      return { ok: false, skipped: true, reason: "Falta FACEBOOK_PAGE_ID." };
+    }
+
+    const message = buildFacebookBatchMessage(deals);
+
+    const photoIds: string[] = [];
+    for (const deal of deals) {
+      try {
+        const themeId = pulseThemeForCategory(
+          deal.parentCategorySlug,
+          deal.categorySlug,
+        );
+        const png = await renderSocialPulsePng({
+          title: deal.title,
+          imageUrl: deal.imageUrl,
+          currentPrice: deal.currentPrice,
+          previousPrice: deal.previousPrice,
+          discountPercentage: deal.discountPercentage,
+          pulseThemeId: themeId,
+        });
+        const form = new FormData();
+        form.set(
+          "source",
+          new Blob([new Uint8Array(png)], { type: "image/png" }),
+          `chollo-${deal.productId}.png`,
+        );
+        form.set("published", "false");
+        const uploaded = await graphPostMultipart(
+          `/${encodeURIComponent(pageId)}/photos`,
+          form,
+        );
+        if (uploaded.ok && uploaded.id) {
+          photoIds.push(uploaded.id);
+        } else if (!uploaded.ok) {
+          console.warn(
+            "[facebook] Foto de lote falló; se omite producto del carrusel.",
+            deal.productId,
+            uploaded.error,
+          );
+        }
+      } catch (renderError) {
+        console.warn(
+          "[facebook] Render de lote falló; se omite producto del carrusel.",
+          deal.productId,
+          renderError instanceof Error ? renderError.message : renderError,
+        );
+      }
+    }
+
+    if (photoIds.length === 0) {
+      return {
+        ok: false,
+        skipped: false,
+        error: "No se pudo subir ninguna foto del lote.",
+      };
+    }
+
+    const body: Record<string, string> = { message };
+    photoIds.forEach((id, index) => {
+      body[`attached_media[${index}]`] = JSON.stringify({ media_fbid: id });
+    });
+
+    const feed = await graphPost(`/${encodeURIComponent(pageId)}/feed`, body);
+    if (feed.ok) {
+      return { ok: true, skipped: false, postId: feed.id ?? undefined };
+    }
+
+    if (feed.tokenExpired) {
+      console.error("[facebook]", feed.error);
+    } else {
+      console.error("[facebook] Error al publicar lote:", feed.error);
+    }
+    return {
+      ok: false,
+      skipped: false,
+      error: feed.error,
+      tokenExpired: feed.tokenExpired,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al publicar lote en Facebook.";
+    console.error(
+      "[facebook] Error al publicar lote (no afecta a Telegram ni al chollo):",
+      message,
+    );
+    return { ok: false, skipped: false, error: message };
+  }
+}
+
 /** Comprueba token y página sin publicar. */
 export async function verifyFacebookPageCredentials(): Promise<{
   ok: boolean;

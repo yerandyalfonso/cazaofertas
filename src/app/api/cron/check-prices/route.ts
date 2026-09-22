@@ -52,7 +52,16 @@ export async function GET(request: NextRequest) {
     const { maybeFlushTelegramBatch } = await import("@/services/telegramFlush");
     const telegramFlush = await maybeFlushTelegramBatch();
 
-    return NextResponse.json({ ...amazon, retail, telegramFlush });
+    const { maybeFlushMetaBatch } = await import("@/services/metaPostQueue");
+    const metaFlush = await maybeFlushMetaBatch().catch((error) => {
+      console.warn(
+        "[check-prices] maybeFlushMetaBatch falló",
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    });
+
+    return NextResponse.json({ ...amazon, retail, telegramFlush, metaFlush });
   } catch (error) {
     const message = formatEnvError(error);
     const paused = message.includes("Cron en pausa");

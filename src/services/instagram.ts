@@ -145,6 +145,286 @@ async function createInstagramImageContainer(options: {
   return { ok: true, id: payload.id };
 }
 
+async function createInstagramCarouselItemContainer(options: {
+  igUserId: string;
+  imageUrl: string;
+}): Promise<
+  | { ok: true; id: string }
+  | { ok: false; error: string; tokenExpired: boolean }
+> {
+  const token = getFacebookPageAccessToken();
+  if (!token) {
+    return {
+      ok: false,
+      error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.",
+      tokenExpired: false,
+    };
+  }
+
+  const form = new URLSearchParams();
+  form.set("access_token", token);
+  form.set("image_url", options.imageUrl);
+  form.set("is_carousel_item", "true");
+
+  const attempt = async () => {
+    const response = await fetch(
+      graphUrl(`/${encodeURIComponent(options.igUserId)}/media`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
+      id?: string;
+    };
+    return { response, payload };
+  };
+
+  let { response, payload } = await attempt();
+  if (!response.ok && isRateLimitError(payload)) {
+    console.warn("[instagram] Rate limit creando item de carrusel; reintentando en 5s…");
+    await sleep(5_000);
+    ({ response, payload } = await attempt());
+  }
+
+  if (!response.ok || payload.error || !payload.id) {
+    const tokenExpired = isAuthError(payload);
+    return {
+      ok: false,
+      tokenExpired,
+      error: tokenExpired
+        ? `Token caducado o sin permiso Instagram. ${formatGraphError(payload, response.status)}`
+        : formatGraphError(payload, response.status),
+    };
+  }
+
+  return { ok: true, id: payload.id };
+}
+
+async function createInstagramCarouselContainer(options: {
+  igUserId: string;
+  childrenIds: string[];
+  caption: string;
+}): Promise<
+  | { ok: true; id: string }
+  | { ok: false; error: string; tokenExpired: boolean }
+> {
+  const token = getFacebookPageAccessToken();
+  if (!token) {
+    return {
+      ok: false,
+      error: "Falta FACEBOOK_PAGE_ACCESS_TOKEN.",
+      tokenExpired: false,
+    };
+  }
+
+  const form = new URLSearchParams();
+  form.set("access_token", token);
+  form.set("media_type", "CAROUSEL");
+  form.set("children", options.childrenIds.join(","));
+  form.set("caption", options.caption);
+
+  const response = await fetch(
+    graphUrl(`/${encodeURIComponent(options.igUserId)}/media`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+    },
+  );
+  const payload = (await response.json().catch(() => ({}))) as GraphErrorBody & {
+    id?: string;
+  };
+
+  if (!response.ok || payload.error || !payload.id) {
+    const tokenExpired = isAuthError(payload);
+    return {
+      ok: false,
+      tokenExpired,
+      error: tokenExpired
+        ? `Token caducado o sin permiso Instagram. ${formatGraphError(payload, response.status)}`
+        : formatGraphError(payload, response.status),
+    };
+  }
+
+  return { ok: true, id: payload.id };
+}
+
+function truncatePlain(value: string, maxChars: number): string {
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
+/** Caption del carrusel: sin URLs (ni caption ni comentarios son clicables en IG). */
+export function buildInstagramBatchCaption(deals: DealCandidate[]): string {
+  const lines = [`🔥 ${deals.length} chollos seleccionados`, ""];
+  deals.forEach((deal, index) => {
+    lines.push(
+      `${index + 1}. ${truncatePlain(deal.title, 90)} — ${Math.round(deal.discountPercentage)}%`,
+    );
+  });
+  lines.push("", "🔗 Todos los enlaces en Facebook / bio");
+  return lines.join("\n").trim().slice(0, 2200);
+}
+
+/**
+ * Publica varios chollos en un solo carrusel de Instagram (máx. 10 items,
+ * límite de la API). Cada foto es un contenedor `is_carousel_item=true`;
+ * el contenedor padre (`media_type=CAROUSEL`) lleva el caption y es el que
+ * se publica. Reduce el nº de publicaciones frente a un post por chollo
+ * (clave tras el bloqueo por volumen, código 9).
+ * Nunca lanza: un fallo de Meta no debe romper Telegram.
+ */
+export async function postDealBatchToInstagram(
+  deals: DealCandidate[],
+): Promise<InstagramPostResult> {
+  try {
+    if (deals.length === 0) {
+      return { ok: false, skipped: true, reason: "Lote vacío." };
+    }
+    if (!isInstagramPublishingConfigured()) {
+      return {
+        ok: false,
+        skipped: true,
+        reason:
+          "Instagram no configurado (INSTAGRAM_BUSINESS_ACCOUNT_ID + FACEBOOK_PAGE_ACCESS_TOKEN).",
+      };
+    }
+
+    const igUserId = getInstagramBusinessAccountId();
+    if (!igUserId) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "Falta INSTAGRAM_BUSINESS_ACCOUNT_ID.",
+      };
+    }
+
+    // Máx. 10 elementos por carrusel (límite de la API de Instagram).
+    const batch = deals.slice(0, 10);
+    const caption = buildInstagramBatchCaption(batch);
+
+    const childrenIds: string[] = [];
+    for (const deal of batch) {
+      try {
+        const themeId = pulseThemeForCategory(
+          deal.parentCategorySlug,
+          deal.categorySlug,
+        );
+        const png = await renderSocialPulsePng({
+          title: deal.title,
+          imageUrl: deal.imageUrl,
+          currentPrice: deal.currentPrice,
+          previousPrice: deal.previousPrice,
+          discountPercentage: deal.discountPercentage,
+          pulseThemeId: themeId,
+          width: INSTAGRAM_PULSE_WIDTH,
+          height: INSTAGRAM_PULSE_HEIGHT,
+        });
+        const imageUrl = await uploadPulsePngPublic(png);
+        const item = await createInstagramCarouselItemContainer({
+          igUserId,
+          imageUrl,
+        });
+        if (!item.ok) {
+          console.warn(
+            "[instagram] Item de carrusel falló; se omite producto.",
+            deal.productId,
+            item.error,
+          );
+          if (item.tokenExpired) {
+            return { ok: false, skipped: false, error: item.error, tokenExpired: true };
+          }
+          continue;
+        }
+        const ready = await waitForInstagramContainerReady(item.id);
+        if (!ready.ok) {
+          console.warn(
+            "[instagram] Item de carrusel no quedó listo; se omite producto.",
+            deal.productId,
+            ready.error,
+          );
+          continue;
+        }
+        childrenIds.push(item.id);
+      } catch (renderError) {
+        console.warn(
+          "[instagram] Render de lote falló; se omite producto.",
+          deal.productId,
+          renderError instanceof Error ? renderError.message : renderError,
+        );
+      }
+    }
+
+    if (childrenIds.length < 2) {
+      return {
+        ok: false,
+        skipped: false,
+        error: `Solo ${childrenIds.length} foto(s) lista(s); Instagram necesita ≥2 para un carrusel.`,
+      };
+    }
+
+    const parent = await createInstagramCarouselContainer({
+      igUserId,
+      childrenIds,
+      caption,
+    });
+    if (!parent.ok) {
+      console.error("[instagram]", parent.error);
+      return {
+        ok: false,
+        skipped: false,
+        error: parent.error,
+        tokenExpired: parent.tokenExpired,
+      };
+    }
+
+    const ready = await waitForInstagramContainerReady(parent.id);
+    if (!ready.ok) {
+      console.error("[instagram]", ready.error);
+      return {
+        ok: false,
+        skipped: false,
+        error: ready.error,
+        tokenExpired: ready.tokenExpired,
+      };
+    }
+    if (ready.statusCode === "PUBLISHED") {
+      return { ok: true, skipped: false, mediaId: parent.id };
+    }
+
+    const published = await publishInstagramContainer({
+      igUserId,
+      creationId: parent.id,
+    });
+    if (!published.ok) {
+      console.error("[instagram]", published.error);
+      return {
+        ok: false,
+        skipped: false,
+        error: published.error,
+        tokenExpired: published.tokenExpired,
+      };
+    }
+
+    return { ok: true, skipped: false, mediaId: published.id };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al publicar lote en Instagram.";
+    console.error(
+      "[instagram] Error al publicar lote (no afecta a Telegram):",
+      message,
+    );
+    return { ok: false, skipped: false, error: message };
+  }
+}
+
 type ContainerStatusCode =
   | "EXPIRED"
   | "ERROR"

@@ -746,6 +746,7 @@ export type Database = {
           telegram_flush_resume_at: string | null;
           meta_min_discount_percent: number;
           meta_post_interval_minutes: number;
+          meta_batch_size: number;
           last_meta_post_at: string | null;
           updated_at: string;
         };
@@ -780,6 +781,7 @@ export type Database = {
           telegram_flush_resume_at?: string | null;
           meta_min_discount_percent?: number;
           meta_post_interval_minutes?: number;
+          meta_batch_size?: number;
           last_meta_post_at?: string | null;
           updated_at?: string;
         };
@@ -814,8 +816,45 @@ export type Database = {
           telegram_flush_resume_at?: string | null;
           meta_min_discount_percent?: number;
           meta_post_interval_minutes?: number;
+          meta_batch_size?: number;
           last_meta_post_at?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      meta_post_queue: {
+        Row: {
+          id: string;
+          product_id: string;
+          score: number;
+          old_price: number | null;
+          new_price: number;
+          discount_percentage: number | null;
+          status: string;
+          created_at: string;
+          posted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          score?: number;
+          old_price?: number | null;
+          new_price: number;
+          discount_percentage?: number | null;
+          status?: string;
+          created_at?: string;
+          posted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          score?: number;
+          old_price?: number | null;
+          new_price?: number;
+          discount_percentage?: number | null;
+          status?: string;
+          created_at?: string;
+          posted_at?: string | null;
         };
         Relationships: [];
       };

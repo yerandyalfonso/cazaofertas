@@ -5,8 +5,6 @@ import {
   getTelegramEnv,
   getTelegramPublicChannelId,
 } from "@/lib/env";
-import { postDealToFacebookPage } from "@/services/facebook";
-import { postDealToInstagram } from "@/services/instagram";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
 import { marketplaceAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
@@ -705,46 +703,13 @@ export async function sendChannelDealAlert(
     }
   }
 
-  await maybePostToMeta(deal);
+  // Facebook/Instagram ya no publican por chollo individual: se encola y se
+  // publica en lote (carrusel de varios productos en un solo post) desde
+  // `maybeFlushMetaBatch` — ver `src/services/metaPostQueue.ts`.
+  const { queueMetaPost } = await import("@/services/metaPostQueue");
+  await queueMetaPost(deal);
 
   return groupMessage;
-}
-
-/**
- * Facebook/Instagram, con umbral de descuento propio (más alto que Telegram)
- * y espaciado mínimo entre publicaciones — Meta bloqueó temporalmente la
- * página por volumen (Facebook 368, Instagram 9); esto evita repetirlo.
- */
-async function maybePostToMeta(deal: DealCandidate): Promise<void> {
-  const { getMetaSocialSettings, isMetaPostIntervalElapsed, recordMetaPostSent } =
-    await import("@/services/metaSocialSettings");
-
-  const settings = await getMetaSocialSettings();
-  const discount = deal.discountPercentage ?? 0;
-
-  if (discount < settings.minDiscountPercent) {
-    return;
-  }
-  if (!(await isMetaPostIntervalElapsed(settings))) {
-    return;
-  }
-
-  const facebook = await postDealToFacebookPage(deal);
-  if (!facebook.ok && !facebook.skipped) {
-    console.warn("[facebook]", facebook.error ?? "No se pudo publicar en Facebook.");
-  }
-
-  const instagram = await postDealToInstagram(deal);
-  if (!instagram.ok && !instagram.skipped) {
-    console.warn(
-      "[instagram]",
-      instagram.error ?? "No se pudo publicar en Instagram.",
-    );
-  }
-
-  if (facebook.ok || instagram.ok) {
-    await recordMetaPostSent();
-  }
 }
 
 async function handleCreateAlert(chatId: number, telegramId?: number): Promise<void> {

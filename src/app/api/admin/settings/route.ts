@@ -129,7 +129,11 @@ export async function PATCH(request: NextRequest) {
       if (parsed !== undefined) patch[field] = parsed;
     }
 
-    const metaPatch: { minDiscountPercent?: number; postIntervalMinutes?: number } = {};
+    const metaPatch: {
+      minDiscountPercent?: number;
+      postIntervalMinutes?: number;
+      batchSize?: number;
+    } = {};
     const metaMinDiscount = parseOptionalNumber(
       body.metaMinDiscountPercent,
       "metaMinDiscountPercent",
@@ -155,6 +159,19 @@ export async function PATCH(request: NextRequest) {
     }
     if (metaInterval.value !== undefined) {
       metaPatch.postIntervalMinutes = metaInterval.value;
+    }
+    const metaBatchSize = parseOptionalNumber(
+      body.metaBatchSize,
+      "metaBatchSize",
+    );
+    if (!metaBatchSize.ok) {
+      return NextResponse.json(
+        { ok: false, error: metaBatchSize.error },
+        { status: 400 },
+      );
+    }
+    if (metaBatchSize.value !== undefined) {
+      metaPatch.batchSize = metaBatchSize.value;
     }
 
     if (Object.keys(patch).length === 0 && Object.keys(metaPatch).length === 0) {

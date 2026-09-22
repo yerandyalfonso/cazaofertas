@@ -10,6 +10,7 @@ import type { MetaSocialSettings } from "@/services/metaSocialSettings";
 type SettingsForm = {
   metaMinDiscountPercent: string;
   metaPostIntervalMinutes: string;
+  metaBatchSize: string;
   telegramMinDiscountPercent: string;
   telegramBatchHours: string;
   telegramFlushRescheduleMinutes: string;
@@ -41,6 +42,7 @@ function settingsToForm(
   return {
     metaMinDiscountPercent: String(metaSocial.minDiscountPercent),
     metaPostIntervalMinutes: String(metaSocial.postIntervalMinutes),
+    metaBatchSize: String(metaSocial.batchSize),
     telegramMinDiscountPercent: String(settings.telegramMinDiscountPercent),
     telegramBatchHours: String(settings.telegramBatchHours),
     telegramFlushRescheduleMinutes: String(
@@ -117,6 +119,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         body: JSON.stringify({
           metaMinDiscountPercent: Number(form.metaMinDiscountPercent),
           metaPostIntervalMinutes: Number(form.metaPostIntervalMinutes),
+          metaBatchSize: Number(form.metaBatchSize),
           telegramMinDiscountPercent: Number(form.telegramMinDiscountPercent),
           telegramBatchHours: Number(form.telegramBatchHours),
           telegramFlushRescheduleMinutes: Number(
@@ -226,10 +229,14 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Facebook / Instagram</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Umbral y espaciado propios, independientes de Telegram — Meta llegó
-          a bloquear temporalmente la página por publicar con demasiada
-          frecuencia (código 368 en Facebook, 9 en Instagram). El espaciado se
-          comprueba por publicación individual, no por lote.
+          Umbral, tamaño de lote y espaciado propios, independientes de
+          Telegram — Meta llegó a bloquear temporalmente la página por
+          publicar con demasiada frecuencia (código 368 en Facebook, 9 en
+          Instagram). Ya no se publica un post por chollo: se juntan los que
+          superan el umbral hasta llegar al tamaño de lote y se publican
+          juntos en un solo carrusel (una publicación en Facebook + una en
+          Instagram, con foto propia por producto). El espaciado se comprueba
+          entre lotes, no por chollo individual.
         </p>
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           <AdminField
@@ -247,8 +254,22 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
             />
           </AdminField>
           <AdminField
+            label="Productos por lote"
+            hint="Chollos por carrusel (máx. 10, límite de Instagram)"
+          >
+            <input
+              type="number"
+              min="2"
+              max="10"
+              step="1"
+              value={form.metaBatchSize}
+              onChange={(e) => patch("metaBatchSize", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
+          <AdminField
             label="Espaciado mín. (min)"
-            hint="Minutos entre cada publicación en Facebook/Instagram"
+            hint="Minutos entre cada lote (carrusel) en Facebook/Instagram"
           >
             <input
               type="number"
