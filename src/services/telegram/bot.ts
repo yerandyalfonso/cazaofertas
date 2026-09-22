@@ -12,7 +12,7 @@ import {
 import { postDealToFacebookPage } from "@/services/facebook";
 import { postDealToInstagram } from "@/services/instagram";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
-import { telegramAbsoluteUrl } from "@/lib/site";
+import { marketplaceAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseTelegramStartPayload } from "@/lib/telegram-links";
@@ -378,7 +378,7 @@ export function buildDealAlertText(
     lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${escapeHtml(offerUrl)}`);
     if (deal.productSlug?.trim()) {
       lines.push(
-        `🌐 Ver en la web: ${escapeHtml(telegramAbsoluteUrl(`/producto/${deal.productSlug.trim()}`))}`,
+        `🌐 Ver en la web: ${escapeHtml(marketplaceAbsoluteUrl(`/oferta/${deal.productSlug.trim()}`))}`,
       );
     }
   }
@@ -452,7 +452,7 @@ export function buildOfferActionMarkup(options: {
   if (options.productSlug?.trim()) {
     row.push({
       text: "🌐 Ver en la web",
-      url: telegramAbsoluteUrl(`/producto/${options.productSlug.trim()}`),
+      url: marketplaceAbsoluteUrl(`/oferta/${options.productSlug.trim()}`),
     });
   }
   return { inline_keyboard: [row] };

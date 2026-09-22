@@ -75,6 +75,26 @@ export function telegramAbsoluteUrl(path: string): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * URL del marketplace (Chollos de Hoy), donde vive la ficha de producto
+ * pública (`/oferta/[slug]`). Los enlaces "Ver en la web" de Telegram/
+ * Facebook deben apuntar aquí en vez de al blog, porque el producto ya
+ * existe en el marketplace.
+ */
+export function getMarketplaceSiteUrl(): string {
+  const explicit = process.env.MARKETPLACE_SITE_URL?.trim();
+  if (explicit) {
+    return normalizeSiteBase(explicit);
+  }
+  return "https://chollosdhoy.com";
+}
+
+export function marketplaceAbsoluteUrl(path: string): string {
+  const base = getMarketplaceSiteUrl();
+  if (!path || path === "/") return base;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 /** Handle de Instagram / redes para carruseles y pie de tarjetas. */
 export function getSocialHandle(): string {
   const raw = process.env.NEXT_PUBLIC_SOCIAL_HANDLE?.trim();

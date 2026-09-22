@@ -8,7 +8,7 @@ import {
 import { formatEuro } from "@/lib/money";
 import { renderSocialPulsePng } from "@/lib/render-social-pulse-card";
 import { pulseThemeForCategory } from "@/lib/pulse-category-theme";
-import { absoluteUrl } from "@/lib/site";
+import { marketplaceAbsoluteUrl } from "@/lib/site";
 import type { DealCandidate } from "@/services/alertMatching";
 import { DealLevel } from "@/types";
 
@@ -272,7 +272,7 @@ export function buildFacebookDealMessage(deal: DealCandidate): string {
     lines.push(
       "",
       "🌐 Ficha en CazaOferta:",
-      absoluteUrl(`/producto/${deal.productSlug.trim()}`),
+      marketplaceAbsoluteUrl(`/oferta/${deal.productSlug.trim()}`),
     );
   }
 
