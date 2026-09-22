@@ -83,6 +83,43 @@ export async function isMetaPostIntervalElapsed(
   return elapsedMs >= resolved.postIntervalMinutes * 60_000;
 }
 
+/** Guarda desde el admin el umbral de descuento y/o el espaciado mínimo. */
+export async function updateMetaSocialSettings(patch: {
+  minDiscountPercent?: number;
+  postIntervalMinutes?: number;
+}): Promise<MetaSocialSettings> {
+  const current = await getMetaSocialSettings();
+  const client = createSupabaseServiceClient();
+
+  const update: {
+    updated_at: string;
+    meta_min_discount_percent?: number;
+    meta_post_interval_minutes?: number;
+  } = { updated_at: new Date().toISOString() };
+  if (patch.minDiscountPercent !== undefined) {
+    update.meta_min_discount_percent = clampPercent(
+      patch.minDiscountPercent,
+      current.minDiscountPercent,
+    );
+  }
+  if (patch.postIntervalMinutes !== undefined) {
+    update.meta_post_interval_minutes = clampIntervalMinutes(
+      patch.postIntervalMinutes,
+      current.postIntervalMinutes,
+    );
+  }
+
+  const { error } = await client
+    .from("app_settings")
+    .update(update)
+    .eq("id", APP_SETTINGS_ID);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return getMetaSocialSettings();
+}
+
 /** Marca "se acaba de publicar en Meta" (Facebook y/o Instagram). */
 export async function recordMetaPostSent(): Promise<void> {
   const client = createSupabaseServiceClient();

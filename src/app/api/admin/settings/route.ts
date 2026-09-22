@@ -7,6 +7,10 @@ import {
   getAppSettings,
   updateAppSettings,
 } from "@/services/appSettings";
+import {
+  getMetaSocialSettings,
+  updateMetaSocialSettings,
+} from "@/services/metaSocialSettings";
 
 export const runtime = "nodejs";
 
@@ -45,8 +49,11 @@ export async function GET(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
 
-    const settings = await getAppSettings();
-    return NextResponse.json({ ok: true, settings });
+    const [settings, metaSocial] = await Promise.all([
+      getAppSettings(),
+      getMetaSocialSettings(),
+    ]);
+    return NextResponse.json({ ok: true, settings, metaSocial });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: formatEnvError(error) },
@@ -122,15 +129,48 @@ export async function PATCH(request: NextRequest) {
       if (parsed !== undefined) patch[field] = parsed;
     }
 
-    if (Object.keys(patch).length === 0) {
+    const metaPatch: { minDiscountPercent?: number; postIntervalMinutes?: number } = {};
+    const metaMinDiscount = parseOptionalNumber(
+      body.metaMinDiscountPercent,
+      "metaMinDiscountPercent",
+    );
+    if (!metaMinDiscount.ok) {
+      return NextResponse.json(
+        { ok: false, error: metaMinDiscount.error },
+        { status: 400 },
+      );
+    }
+    if (metaMinDiscount.value !== undefined) {
+      metaPatch.minDiscountPercent = metaMinDiscount.value;
+    }
+    const metaInterval = parseOptionalNumber(
+      body.metaPostIntervalMinutes,
+      "metaPostIntervalMinutes",
+    );
+    if (!metaInterval.ok) {
+      return NextResponse.json(
+        { ok: false, error: metaInterval.error },
+        { status: 400 },
+      );
+    }
+    if (metaInterval.value !== undefined) {
+      metaPatch.postIntervalMinutes = metaInterval.value;
+    }
+
+    if (Object.keys(patch).length === 0 && Object.keys(metaPatch).length === 0) {
       return NextResponse.json(
         { ok: false, error: "No hay campos válidos para actualizar." },
         { status: 400 },
       );
     }
 
-    const settings = await updateAppSettings(patch);
-    return NextResponse.json({ ok: true, settings });
+    const [settings, metaSocial] = await Promise.all([
+      Object.keys(patch).length > 0 ? updateAppSettings(patch) : getAppSettings(),
+      Object.keys(metaPatch).length > 0
+        ? updateMetaSocialSettings(metaPatch)
+        : getMetaSocialSettings(),
+    ]);
+    return NextResponse.json({ ok: true, settings, metaSocial });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: formatEnvError(error) },

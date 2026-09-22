@@ -5,8 +5,11 @@ import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatFeedUrlsText } from "@/lib/feed-urls";
 import type { AppSettings } from "@/services/appSettings";
+import type { MetaSocialSettings } from "@/services/metaSocialSettings";
 
 type SettingsForm = {
+  metaMinDiscountPercent: string;
+  metaPostIntervalMinutes: string;
   telegramMinDiscountPercent: string;
   telegramBatchHours: string;
   telegramFlushRescheduleMinutes: string;
@@ -31,8 +34,13 @@ type SettingsForm = {
   kiabiFeedsPerRun: string;
 };
 
-function settingsToForm(settings: AppSettings): SettingsForm {
+function settingsToForm(
+  settings: AppSettings,
+  metaSocial: MetaSocialSettings,
+): SettingsForm {
   return {
+    metaMinDiscountPercent: String(metaSocial.minDiscountPercent),
+    metaPostIntervalMinutes: String(metaSocial.postIntervalMinutes),
     telegramMinDiscountPercent: String(settings.telegramMinDiscountPercent),
     telegramBatchHours: String(settings.telegramBatchHours),
     telegramFlushRescheduleMinutes: String(
@@ -74,12 +82,13 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
       const data = (await response.json()) as {
         ok?: boolean;
         settings?: AppSettings;
+        metaSocial?: MetaSocialSettings;
         error?: string;
       };
-      if (!response.ok || !data.ok || !data.settings) {
+      if (!response.ok || !data.ok || !data.settings || !data.metaSocial) {
         throw new Error(data.error ?? "No se pudieron cargar los ajustes.");
       }
-      setForm(settingsToForm(data.settings));
+      setForm(settingsToForm(data.settings, data.metaSocial));
       setSource(data.settings.source);
     } catch (error) {
       toast.error(
@@ -106,6 +115,8 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          metaMinDiscountPercent: Number(form.metaMinDiscountPercent),
+          metaPostIntervalMinutes: Number(form.metaPostIntervalMinutes),
           telegramMinDiscountPercent: Number(form.telegramMinDiscountPercent),
           telegramBatchHours: Number(form.telegramBatchHours),
           telegramFlushRescheduleMinutes: Number(
@@ -135,12 +146,13 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
       const data = (await response.json()) as {
         ok?: boolean;
         settings?: AppSettings;
+        metaSocial?: MetaSocialSettings;
         error?: string;
       };
-      if (!response.ok || !data.ok || !data.settings) {
+      if (!response.ok || !data.ok || !data.settings || !data.metaSocial) {
         throw new Error(data.error ?? "No se pudieron guardar los ajustes.");
       }
-      setForm(settingsToForm(data.settings));
+      setForm(settingsToForm(data.settings, data.metaSocial));
       setSource(data.settings.source);
       toast.success("Configuración guardada.");
     } catch (error) {
@@ -210,6 +222,48 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
           Fuente: {source === "database" ? "base de datos" : "entorno"}
         </span>
       </div>
+
+      <section className="admin-card p-6">
+        <h2 className="font-display text-2xl text-ink">Facebook / Instagram</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Umbral y espaciado propios, independientes de Telegram — Meta llegó
+          a bloquear temporalmente la página por publicar con demasiada
+          frecuencia (código 368 en Facebook, 9 en Instagram). El espaciado se
+          comprueba por publicación individual, no por lote.
+        </p>
+        <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+          <AdminField
+            label="Dto. mínimo Meta (%)"
+            hint="Ej. 70 = solo ofertas con −70% o más"
+          >
+            <input
+              type="number"
+              min="0"
+              max="99"
+              step="1"
+              value={form.metaMinDiscountPercent}
+              onChange={(e) => patch("metaMinDiscountPercent", e.target.value)}
+              className="admin-input w-full"
+            />
+          </AdminField>
+          <AdminField
+            label="Espaciado mín. (min)"
+            hint="Minutos entre cada publicación en Facebook/Instagram"
+          >
+            <input
+              type="number"
+              min="0"
+              max="720"
+              step="5"
+              value={form.metaPostIntervalMinutes}
+              onChange={(e) =>
+                patch("metaPostIntervalMinutes", e.target.value)
+              }
+              className="admin-input w-full"
+            />
+          </AdminField>
+        </div>
+      </section>
 
       <section className="admin-card p-6">
         <h2 className="font-display text-2xl text-ink">Canal Telegram</h2>
