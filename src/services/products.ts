@@ -1,8 +1,11 @@
 import {
   detectRetailerFromUrl,
+  extractExternalId,
+  getRetailerDefinition,
   normalizeRetailer,
   resolveProductPageUrl,
   retailerScrapeSupported,
+  syntheticAsinForRetailer,
   type ProductRetailer,
 } from "@/lib/retailers";
 import {
@@ -10,10 +13,14 @@ import {
   generateAffiliateUrl,
   generateAmazonUrl,
 } from "@/lib/affiliate";
-import { resolveAmazonProductCategoryId } from "@/lib/categories";
+import {
+  resolveAmazonProductCategoryId,
+  resolveCategoryIdBySlug,
+} from "@/lib/categories";
 import { roundMoney, toNumber } from "@/lib/money";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
+import { previewProductPage } from "@/services/productScrape";
 import type { ProductRow } from "@/types/database";
 import { ProductAvailability } from "@/types";
 
@@ -330,6 +337,187 @@ export async function ensureProductFromAmazonUrl(
     asin: inserted.asin,
     title: inserted.title,
     amazonUrl: inserted.amazon_url || amazonUrl,
+    currentPrice: toNumber(inserted.current_price),
+    created: true,
+  };
+}
+
+export interface EnsuredRetailProduct {
+  id: string;
+  asin: string;
+  retailer: ProductRetailer;
+  title: string;
+  productUrl: string;
+  currentPrice: number | null;
+  created: boolean;
+}
+
+function slugifyRetailProduct(title: string, asin: string): string {
+  const base = title
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${base || "producto"}-${asin}`.toLowerCase().replace(/^-+/, "");
+}
+
+/**
+ * Igual que `ensureProductFromAmazonUrl` pero para cualquier tienda soportada
+ * (Kiabi, Miravia, …). Detecta la tienda por la URL, busca el producto por su
+ * ID sintético (`syntheticAsinForRetailer`) y si no existe lo crea scrapeando
+ * la ficha. Así las alertas de usuario alimentan el catálogo también para
+ * tiendas no-Amazon.
+ */
+export async function ensureProductFromUrl(
+  client: TypedSupabaseClient,
+  url: string,
+  options?: { retailer?: ProductRetailer },
+): Promise<EnsuredRetailProduct> {
+  const retailer = options?.retailer ?? detectRetailerFromUrl(url) ?? "amazon";
+
+  if (retailer === "amazon") {
+    const ensured = await ensureProductFromAmazonUrl(client, url);
+    return {
+      id: ensured.id,
+      asin: ensured.asin,
+      retailer: "amazon",
+      title: ensured.title,
+      productUrl: ensured.amazonUrl,
+      currentPrice: ensured.currentPrice,
+      created: ensured.created,
+    };
+  }
+
+  if (!retailerScrapeSupported(retailer)) {
+    throw new Error(`${retailer} aún no soporta extracción automática.`);
+  }
+
+  const externalId = extractExternalId(retailer, url);
+  if (!externalId) {
+    throw new Error(`No se pudo obtener el identificador de ${retailer} en la URL.`);
+  }
+  const asin = syntheticAsinForRetailer(retailer, externalId);
+
+  const { data: existing, error: lookupError } = await client
+    .from("products")
+    .select("id, asin, title, product_url, current_price")
+    .eq("asin", asin)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(lookupError.message);
+  }
+
+  if (existing) {
+    return {
+      id: existing.id,
+      asin: existing.asin,
+      retailer,
+      title: existing.title,
+      productUrl: existing.product_url || url,
+      currentPrice: toNumber(existing.current_price),
+      created: false,
+    };
+  }
+
+  const preview = await previewProductPage(url, { retailer, timeoutMs: 18_000 });
+  if (preview.price === null) {
+    throw new Error(
+      `No se pudo obtener el precio del producto en ${getRetailerDefinition(retailer).label}.`,
+    );
+  }
+
+  const price = roundMoney(preview.price);
+  const previous =
+    preview.referencePrice != null && preview.referencePrice > price
+      ? roundMoney(preview.referencePrice)
+      : price;
+  const title = (preview.title?.trim() || `Producto ${retailer} ${externalId}`).slice(
+    0,
+    200,
+  );
+  const slug = slugifyRetailProduct(title, asin);
+  const now = new Date().toISOString();
+  const discount =
+    previous > price ? roundMoney(((previous - price) / previous) * 100) : 0;
+  const definition = getRetailerDefinition(retailer);
+  const categoryId = definition.defaultCategorySlug
+    ? (await resolveCategoryIdBySlug(client, definition.defaultCategorySlug))?.id ?? null
+    : null;
+
+  const { error: slugCleanupError } = await client
+    .from("products")
+    .delete()
+    .eq("slug", slug)
+    .neq("asin", asin);
+
+  if (slugCleanupError) {
+    throw new Error(slugCleanupError.message);
+  }
+
+  const { data: inserted, error: insertError } = await client
+    .from("products")
+    .insert({
+      asin,
+      retailer,
+      external_id: externalId,
+      title,
+      slug,
+      amazon_url: preview.productUrl,
+      product_url: preview.productUrl,
+      image_url: preview.imageUrl ?? null,
+      brand: preview.brand ?? definition.defaultBrand ?? null,
+      category_id: categoryId,
+      current_price: price,
+      previous_price: previous,
+      lowest_price: price,
+      highest_price: Math.max(price, previous),
+      discount_percentage: discount,
+      currency: "EUR",
+      availability: ProductAvailability.IN_STOCK,
+      is_active: true,
+      last_checked_at: now,
+      updated_at: now,
+    })
+    .select("id, asin, title, product_url, current_price")
+    .single();
+
+  if (insertError) {
+    if (insertError.code === "23505" || /duplicate|unique/i.test(insertError.message)) {
+      const { data: raced } = await client
+        .from("products")
+        .select("id, asin, title, product_url, current_price")
+        .eq("asin", asin)
+        .maybeSingle();
+      if (raced) {
+        return {
+          id: raced.id,
+          asin: raced.asin,
+          retailer,
+          title: raced.title,
+          productUrl: raced.product_url || url,
+          currentPrice: toNumber(raced.current_price),
+          created: false,
+        };
+      }
+    }
+    throw new Error(insertError.message);
+  }
+
+  await client.from("price_history").insert({
+    product_id: inserted.id,
+    price,
+    source: retailer,
+  });
+
+  return {
+    id: inserted.id,
+    asin: inserted.asin,
+    retailer,
+    title: inserted.title,
+    productUrl: inserted.product_url || url,
     currentPrice: toNumber(inserted.current_price),
     created: true,
   };

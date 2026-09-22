@@ -1,15 +1,21 @@
-import {
-  extractAsin,
-  generateAffiliateUrl,
-  generateAmazonUrl,
-  looksLikeAmazonUrl,
-} from "@/lib/affiliate";
 import { formatEuro, roundMoney, toNumber } from "@/lib/money";
 import { buildOutOfStockUpdate } from "@/lib/out-of-stock-policy";
+import { isRetailBlockedError } from "@/lib/retail-url-utils";
+import {
+  detectRetailerFromUrl,
+  extractExternalId,
+  getRetailerDefinition,
+  resolveProductBuyUrl,
+  retailerScrapeSupported,
+  syntheticAsinForRetailer,
+  type ProductRetailer,
+} from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
-import { ensureProductFromAmazonUrl } from "@/services/products";
-import { ProductAvailability } from "@/types";
+import { scrapeKiabiProductPage } from "@/providers/retail/kiabi";
+import { scrapeMiraviaProductPage } from "@/providers/retail/miravia";
+import { ensureProductFromUrl } from "@/services/products";
+import { ProductAvailability, type PriceSource } from "@/types";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
@@ -26,7 +32,70 @@ export interface UserUrlAlertsResult {
   finishedAt: string;
 }
 
-export { looksLikeAmazonUrl };
+interface RetailQuote {
+  price: number | null;
+  previousPrice: number | null;
+  title: string | null;
+  productUrl: string;
+  availability: ProductAvailability;
+}
+
+/** Ficha de producto normalizada, sea la tienda que sea. */
+async function fetchRetailQuote(
+  retailer: ProductRetailer,
+  pageUrl: string,
+  externalId: string,
+  timeoutMs: number,
+): Promise<RetailQuote> {
+  if (retailer === "amazon") {
+    const quote = await scrapeAmazonProductPage(pageUrl, externalId, {
+      timeoutMs,
+    });
+    return {
+      price: quote.price,
+      previousPrice: quote.previousPrice ?? null,
+      title: quote.title ?? null,
+      productUrl: quote.amazonUrl ?? pageUrl,
+      availability: quote.availability,
+    };
+  }
+
+  if (retailer === "kiabi") {
+    const quote = await scrapeKiabiProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice ?? null,
+      title: quote.title ?? null,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
+  if (retailer === "miravia") {
+    const quote = await scrapeMiraviaProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice ?? null,
+      title: quote.title ?? null,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
+  throw new Error(
+    `${getRetailerDefinition(retailer).label} aún no soporta el chequeo de alertas.`,
+  );
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,7 +110,7 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Cron: monitoriza alertas de usuario con URL de Amazon.
+ * Cron: monitoriza alertas de usuario con URL (Amazon, Kiabi, Miravia).
  * Si el precio baja respecto a last_known_price, notifica por Telegram.
  */
 export async function runUserUrlAlerts(options?: {
@@ -90,22 +159,32 @@ export async function runUserUrlAlerts(options?: {
       continue;
     }
 
-    const asin = extractAsin(url);
-    if (!asin) {
+    const retailer = detectRetailerFromUrl(url) ?? "amazon";
+    if (!retailerScrapeSupported(retailer)) {
       result.failed += 1;
-      console.warn(`[user-alerts] Alerta ${alert.id}: URL sin ASIN válido`);
+      console.warn(
+        `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
+      );
       continue;
     }
 
+    const externalId = extractExternalId(retailer, url);
+    if (!externalId) {
+      result.failed += 1;
+      console.warn(`[user-alerts] Alerta ${alert.id}: URL sin identificador válido`);
+      continue;
+    }
+    const asin = syntheticAsinForRetailer(retailer, externalId);
+
     try {
-      const pageUrl = /https?:\/\//i.test(url)
-        ? url
-        : generateAmazonUrl(asin);
+      const pageUrl = url;
 
       let productId = alert.product_id;
       if (!productId) {
         try {
-          const ensured = await ensureProductFromAmazonUrl(client, pageUrl);
+          const ensured = await ensureProductFromUrl(client, pageUrl, {
+            retailer,
+          });
           productId = ensured.id;
           await client
             .from("alerts")
@@ -119,9 +198,7 @@ export async function runUserUrlAlerts(options?: {
         }
       }
 
-      const quote = await scrapeAmazonProductPage(pageUrl, asin, {
-        timeoutMs: 12_000,
-      });
+      const quote = await fetchRetailQuote(retailer, pageUrl, externalId, 12_000);
 
       if (quote.price === null) {
         const nowIso = new Date().toISOString();
@@ -214,7 +291,7 @@ export async function runUserUrlAlerts(options?: {
             await client.from("price_history").insert({
               product_id: productId,
               price: currentPrice,
-              source: "amazon",
+              source: retailer as PriceSource,
             });
           }
         }
@@ -254,10 +331,13 @@ export async function runUserUrlAlerts(options?: {
         continue;
       }
 
-      const title = quote.title?.trim() || alert.keyword || `ASIN ${asin}`;
-      const affiliateUrl = generateAffiliateUrl(
-        quote.amazonUrl ?? generateAmazonUrl(asin),
-      );
+      const title = quote.title?.trim() || alert.keyword || `${retailer} ${asin}`;
+      const affiliateUrl = resolveProductBuyUrl({
+        retailer,
+        asin,
+        product_url: quote.productUrl,
+        amazon_url: quote.productUrl,
+      });
       const discountPct = Math.round(
         ((previousKnown - currentPrice) / previousKnown) * 100,
       );
@@ -290,11 +370,16 @@ export async function runUserUrlAlerts(options?: {
 
       result.notified += 1;
     } catch (error) {
-      result.failed += 1;
-      console.warn(
-        `[user-alerts] Alerta ${alert.id}:`,
-        error instanceof Error ? error.message : error,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      // Bloqueo anti-bot de la tienda (DataDome, Cloudflare, 403…): transitorio,
+      // no es un fallo real de la alerta. No lo contamos como "failed" para no
+      // disparar avisos ruidosos al admin en cada ciclo.
+      if (isRetailBlockedError(message)) {
+        result.skipped += 1;
+      } else {
+        result.failed += 1;
+      }
+      console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
 
     if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);

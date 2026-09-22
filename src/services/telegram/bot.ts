@@ -1,8 +1,4 @@
-import {
-  extractAsin,
-  generateAmazonUrl,
-  looksLikeAmazonUrl,
-} from "@/lib/affiliate";
+import { generateAmazonUrl } from "@/lib/affiliate";
 import { buildTrackedAffiliateUrl } from "@/lib/affiliate-tracking";
 import {
   getTelegramChannelId,
@@ -20,12 +16,18 @@ import {
   getTelegramTopicOtros,
   resolveTelegramTopicId,
 } from "@/lib/telegram-topics";
-import { formatRetailerHashtag } from "@/lib/retailers";
+import {
+  detectRetailerFromUrl,
+  extractExternalId,
+  formatRetailerHashtag,
+  getRetailerDefinition,
+  retailerScrapeSupported,
+  syntheticAsinForRetailer,
+} from "@/lib/retailers";
 import { isGeneralSubcategorySlug, resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
-import { inferRetailerFromAsin } from "@/services/products";
+import { ensureProductFromUrl, inferRetailerFromAsin } from "@/services/products";
 import { dealScoringService } from "@/services/deal-scoring";
-import { ensureProductFromAmazonUrl } from "@/services/products";
 import {
   buildWizardCancelOnlyMarkup,
   buildWizardCategoryMarkup,
@@ -914,7 +916,7 @@ async function promptWizardTarget(
       ? "Escribe la <b>palabra clave</b> (ej: airpods, silla gaming):"
       : mode === "brand"
         ? "Escribe la <b>marca</b> exacta (ej: Sony, Samsung):"
-        : "Pega la <b>URL de Amazon</b> del producto:";
+        : "Pega la <b>URL del producto</b> (Amazon, Kiabi o Miravia):";
   await sendTelegramMessage({
     chatId,
     text: [
@@ -1158,7 +1160,7 @@ async function commitWizardAlert(options: {
 
   if (draft.mode === "url" && url) {
     try {
-      const product = await ensureProductFromAmazonUrl(client, url);
+      const product = await ensureProductFromUrl(client, url);
       productId = product.id;
       productTitle = product.title;
       initialPrice = product.currentPrice;
@@ -1237,28 +1239,28 @@ async function handleWizardTextInput(
   }
 
   if (draft.mode === "url") {
-    if (!looksLikeAmazonUrl(rawText) || !extractAsin(rawText)) {
+    const retailer = detectRetailerFromUrl(rawText);
+    const externalId = retailer ? extractExternalId(retailer, rawText) : null;
+    if (!retailer || !retailerScrapeSupported(retailer) || !externalId) {
       await sendTelegramMessage({
         chatId,
-        text: "Esa no parece una URL de producto Amazon válida (debe incluir /dp/…). Pégala de nuevo o cancela con /start.",
+        text: "Esa no parece una URL de producto válida (Amazon, Kiabi o Miravia). Pégala de nuevo o cancela con /start.",
       });
       return true;
     }
     const url = rawText.slice(0, 500);
-    const asin = extractAsin(rawText);
+    const asin = syntheticAsinForRetailer(retailer, externalId);
     let title: string | null = null;
     try {
       const client = createSupabaseServiceClient();
-      if (asin) {
-        const { data } = await client
-          .from("products")
-          .select("title")
-          .eq("asin", asin)
-          .maybeSingle();
-        title = data?.title ?? null;
-      }
+      const { data } = await client
+        .from("products")
+        .select("title")
+        .eq("asin", asin)
+        .maybeSingle();
+      title = data?.title ?? null;
       if (!title) {
-        const product = await ensureProductFromAmazonUrl(client, url);
+        const product = await ensureProductFromUrl(client, url, { retailer });
         title = product.title;
       }
     } catch (error) {
@@ -1475,7 +1477,7 @@ function formatAlertLine(index: number, alert: UserAlertRow): string {
     parts.push(`📂 ${escapeHtml(categoryName)}`);
   }
   if (alert.url) {
-    parts.push(`🔗 URL Amazon`);
+    parts.push(`🔗 URL de producto`);
   }
   if (alert.keyword) {
     parts.push(`🔑 ${escapeHtml(alert.keyword)}`);
@@ -1512,7 +1514,7 @@ function buildDeleteAlertsMarkup(alerts: UserAlertRow[]): InlineKeyboardMarkup {
       const label =
         category?.name?.trim() ||
         alert.keyword?.trim() ||
-        (alert.url ? "URL Amazon" : alert.brand?.trim() || "Alerta");
+        (alert.url ? "URL de producto" : alert.brand?.trim() || "Alerta");
       const truncated =
         label.length > 40 ? `${label.slice(0, 37)}…` : label;
 
@@ -1614,7 +1616,7 @@ async function fetchUserAlerts(telegramId: number): Promise<{
 }
 
 /**
- * Guarda una alerta por palabra clave o URL de Amazon.
+ * Guarda una alerta por palabra clave o URL de producto (Amazon/Kiabi/Miravia).
  * Usa el cliente service_role para saltar RLS.
  */
 export async function handleNewAlert(message: TelegramMessage): Promise<void> {
@@ -1638,18 +1640,26 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (!rawText) {
     await sendTelegramMessage({
       chatId,
-      text: "Envía una palabra clave o pega una URL de Amazon, o usa «Crear alerta» en el menú.",
+      text: "Envía una palabra clave o pega una URL de producto (Amazon, Kiabi o Miravia), o usa «Crear alerta» en el menú.",
     });
     return;
   }
 
-  const isUrlAlert = looksLikeAmazonUrl(rawText);
-  const asin = isUrlAlert ? extractAsin(rawText) : null;
+  const detectedRetailer = detectRetailerFromUrl(rawText);
+  const isUrlAlert = Boolean(
+    detectedRetailer && retailerScrapeSupported(detectedRetailer),
+  );
+  const externalId = isUrlAlert
+    ? extractExternalId(detectedRetailer!, rawText)
+    : null;
+  const asin = externalId
+    ? syntheticAsinForRetailer(detectedRetailer!, externalId)
+    : null;
 
   if (isUrlAlert && !asin) {
     await sendTelegramMessage({
       chatId,
-      text: "No pude extraer el ASIN de esa URL. Pega un enlace de producto de Amazon (con /dp/…).",
+      text: "No pude extraer el identificador de esa URL. Pega un enlace de producto de Amazon, Kiabi o Miravia.",
     });
     return;
   }
@@ -1696,7 +1706,9 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
 
     if (isUrlAlert && asin && url) {
       try {
-        const product = await ensureProductFromAmazonUrl(client, url);
+        const product = await ensureProductFromUrl(client, url, {
+          retailer: detectedRetailer!,
+        });
         productId = product.id;
         productTitle = product.title;
         initialPrice = product.currentPrice;
@@ -1711,7 +1723,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
         });
         await sendTelegramMessage({
           chatId,
-          text: "Pude leer la URL, pero no extraje el producto de Amazon (bloqueo o ficha rara). Inténtalo de nuevo en unos minutos.",
+          text: `Pude leer la URL, pero no extraje el producto de ${getRetailerDefinition(detectedRetailer!).label} (bloqueo o ficha rara). Inténtalo de nuevo en unos minutos.`,
         });
         return;
       }
