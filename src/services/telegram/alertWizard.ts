@@ -53,7 +53,7 @@ export function shortProductLabel(
     return `${clean.slice(0, max - 1).trimEnd()}…`;
   }
   if (fallbackAsin) return `Producto ${fallbackAsin}`;
-  return "Producto de Amazon";
+  return "Producto";
 }
 
 const WIZARD_TTL_MS = 30 * 60 * 1000;
@@ -186,7 +186,7 @@ export function buildWizardModeMarkup(): InlineKeyboardMarkup {
       ],
       [
         { text: "🏷️ Marca", callback_data: "wiz:mode:brand" },
-        { text: "🔗 URL Amazon", callback_data: "wiz:mode:url" },
+        { text: "🔗 URL de producto", callback_data: "wiz:mode:url" },
       ],
       navRow(false),
     ],
