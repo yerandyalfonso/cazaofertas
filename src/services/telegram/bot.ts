@@ -22,7 +22,9 @@ import {
   extractExternalId,
   formatRetailerHashtag,
   getRetailerDefinition,
+  normalizeRetailer,
   requiresResidentialIp,
+  retailerViewCtaLabel,
   syntheticAsinForRetailer,
 } from "@/lib/retailers";
 import { isGeneralSubcategorySlug, resolveParentSlug } from "@/lib/category-taxonomy";
@@ -1369,16 +1371,28 @@ async function handleCategoryPick(
   });
 }
 
+/** Sin esto, el ranking siempre sacaba el mismo "record" de descuento
+ * congelado de hace semanas, incluso con el precio ya vuelto a la normalidad
+ * (discount_percentage es una columna estática, solo se actualiza al
+ * revisar). Con freshness + excluyendo fichas nunca revisadas (título
+ * genérico "Producto <tienda> <id>") se evita mostrar chollos falsos. */
+const TOP_DEALS_MAX_AGE_HOURS = 24;
+
 async function fetchTopDealsText(): Promise<string> {
   const client = createSupabaseServiceClient();
+  const freshCutoff = new Date(
+    Date.now() - TOP_DEALS_MAX_AGE_HOURS * 3_600_000,
+  ).toISOString();
   const { data, error } = await client
     .from("products")
     .select(
-      "id, title, brand, current_price, previous_price, lowest_price, discount_percentage, affiliate_url, asin, categories(slug, name)",
+      "id, title, brand, retailer, current_price, previous_price, lowest_price, discount_percentage, affiliate_url, asin, last_checked_at, categories(slug, name)",
     )
     .eq("is_active", true)
     .not("previous_price", "is", null)
+    .not("title", "ilike", "Producto %")
     .gt("discount_percentage", 0)
+    .gte("last_checked_at", freshCutoff)
     .order("discount_percentage", { ascending: false })
     .limit(40);
 
@@ -1411,10 +1425,13 @@ async function fetchTopDealsText(): Promise<string> {
         previousPriceAgeHours: 72,
       });
 
+      const retailer = normalizeRetailer(product.retailer);
+
       return {
         productId: product.id,
         title: product.title,
         brand: product.brand as string | null,
+        retailer,
         currentPrice,
         previousPrice,
         discountPercentage,
@@ -1435,7 +1452,7 @@ async function fetchTopDealsText(): Promise<string> {
     .slice(0, 3);
 
   if (ranked.length === 0) {
-    return "Ahora mismo no hay ofertas GOOD_DEAL / GREAT_DEAL disponibles. Vuelve a intentarlo tras una detección de precios.";
+    return "Ahora mismo no hay ofertas GOOD_DEAL / GREAT_DEAL recientes disponibles. Vuelve a intentarlo tras una detección de precios.";
   }
 
   const lines = ["🔥 Top 3 mejores ofertas", ""];
@@ -1450,7 +1467,7 @@ async function fetchTopDealsText(): Promise<string> {
           : ""
       }`,
       `📉 -${Math.round(deal.discountPercentage)}%`,
-      `<a href="${deal.affiliateUrl}">🛒 Ver en Amazon</a>`,
+      `<a href="${deal.affiliateUrl}">🛒 ${retailerViewCtaLabel(deal.retailer)}</a>`,
       "",
     );
   });
