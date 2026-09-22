@@ -71,6 +71,19 @@ export function alertMatchesDeal(
     return false;
   }
 
+  const hasCriteria =
+    Boolean(alert.product_id) ||
+    Boolean(alert.category_id) ||
+    Boolean(alert.brand?.trim()) ||
+    Boolean(alert.keyword?.trim());
+
+  if (!hasCriteria) {
+    // Sin ningún criterio real (p. ej. alerta de URL todavía sin producto
+    // vinculado) no debe actuar como comodín y disparar con cualquier
+    // oferta del descubrimiento general.
+    return false;
+  }
+
   if (alert.product_id && alert.product_id !== deal.productId) {
     return false;
   }
