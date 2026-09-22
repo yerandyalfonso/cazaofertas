@@ -744,6 +744,9 @@ export type Database = {
           telegram_flush_limit: number;
           last_telegram_flush_at: string | null;
           telegram_flush_resume_at: string | null;
+          meta_min_discount_percent: number;
+          meta_post_interval_minutes: number;
+          last_meta_post_at: string | null;
           updated_at: string;
         };
         Insert: {
@@ -775,6 +778,9 @@ export type Database = {
           telegram_flush_limit?: number;
           last_telegram_flush_at?: string | null;
           telegram_flush_resume_at?: string | null;
+          meta_min_discount_percent?: number;
+          meta_post_interval_minutes?: number;
+          last_meta_post_at?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -806,6 +812,9 @@ export type Database = {
           telegram_flush_limit?: number;
           last_telegram_flush_at?: string | null;
           telegram_flush_resume_at?: string | null;
+          meta_min_discount_percent?: number;
+          meta_post_interval_minutes?: number;
+          last_meta_post_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];
