@@ -17,7 +17,8 @@ type LocalCronJob =
   | "user-alerts-residential"
   | "kiabi-deals"
   | "telegram-flush"
-  | "coupons-discover";
+  | "coupons-discover"
+  | "admin-digest";
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
@@ -29,6 +30,7 @@ const JOBS: LocalCronJob[] = [
   "kiabi-deals",
   "telegram-flush",
   "coupons-discover",
+  "admin-digest",
 ];
 
 function parseJob(raw: string | undefined): LocalCronJob {
@@ -250,6 +252,14 @@ async function runCouponsDiscover(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 }
 
+async function runAdminDigest(): Promise<void> {
+  const { buildAdminDigestReport, formatAdminDigestMessage, sendAdminDigest } =
+    await import("@/services/adminDigest");
+  const report = await buildAdminDigestReport();
+  console.log(formatAdminDigestMessage(report));
+  await sendAdminDigest();
+}
+
 async function main(): Promise<void> {
   const job = parseJob(process.argv[2]);
   const started = new Date().toISOString();
@@ -288,6 +298,9 @@ async function main(): Promise<void> {
       break;
     case "coupons-discover":
       await runCouponsDiscover();
+      break;
+    case "admin-digest":
+      await runAdminDigest();
       break;
   }
 
