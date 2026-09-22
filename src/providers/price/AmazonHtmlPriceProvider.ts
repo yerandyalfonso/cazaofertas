@@ -545,22 +545,6 @@ function availabilityFromHtml($: cheerio.CheerioAPI): ProductAvailability {
   return ProductAvailability.IN_STOCK;
 }
 
-function listPriceFromPageScripts(html: string): number | null {
-  const patterns = [
-    /"basisPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/,
-    /"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
-    /"landingAsinPrice"[\s\S]{0,200}?"basisPriceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (!match?.[1]) continue;
-    const price = parseAmazonPriceText(match[1]);
-    if (price !== null) return price;
-  }
-  return null;
-}
-
 const BUYBOX_ROOTS = [
   "#corePrice_feature_div",
   "#corePriceDisplay_desktop_feature_div",
@@ -791,20 +775,18 @@ export function extractPriceFromAmazonHtml(html: string): {
     priceFromPageScripts(html);
 
   // Precio recomendado / lista: solo basis del buy box (nunca mini de relacionados).
+  // "basisPrice"/"apex-basisprice-value"/"apex-priceperunit-value" son el
+  // precio unitario legal (€/kg, €/100g…) que exige la UE, NO el precio de
+  // referencia antes del descuento — nunca deben entrar aquí (causaban
+  // descuentos falsos del 90-100% en productos vendidos por peso/volumen,
+  // porque comparten las clases a-price/a-text-price con el precio "antes"
+  // real y no hay forma de distinguirlos salvo excluyéndolos explícitamente).
   const listCandidates = collectPricesFromSelectors(
     $,
-    buyboxSelectors(".apex-basisprice-value span.a-offscreen").concat(
-      buyboxSelectors(".basisPrice .a-offscreen"),
-      buyboxSelectors(
-        "span.a-price.a-text-price:not(.srpPriceBlockAUI) span.a-offscreen",
-      ),
-      ["#listPrice"],
-    ),
+    buyboxSelectors(
+      "span.a-price.a-text-price:not(.srpPriceBlockAUI):not(.apex-priceperunit-value):not(.basisPrice) span.a-offscreen",
+    ).concat(["#listPrice"]),
   );
-  const scriptList = listPriceFromPageScripts(html);
-  if (scriptList !== null && !listCandidates.includes(scriptList)) {
-    listCandidates.push(scriptList);
-  }
 
   const badgeDiscount = discountFromSavingsBadge($);
   let listPrice =
