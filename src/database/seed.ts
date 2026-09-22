@@ -269,90 +269,14 @@ export async function seedFromMockProvider(
     throw new Error(`Error al sembrar productos: ${productsError.message}`);
   }
 
-  const { data: storedProducts, error: storedProductsError } = await client
-    .from("products")
-    .select("id, asin")
-    .in(
-      "asin",
-      catalog.map((item) => item.asin),
-    );
-
-  if (storedProductsError || !storedProducts) {
-    throw new Error(
-      `No se pudieron leer productos: ${storedProductsError?.message ?? "sin datos"}`,
-    );
-  }
-
-  const productIdByAsin = new Map(
-    storedProducts.map((product) => [product.asin, product.id]),
-  );
-
-  const historyRows = catalog.flatMap((item, index) => {
-    const productId = productIdByAsin.get(item.asin);
-    if (!productId) {
-      throw new Error(`Producto no encontrado tras el upsert: ${item.asin}`);
-    }
-
-    const quote = quotes[index];
-    const previousPrice =
-      quote.previousPrice ?? item.previousPrice ?? quote.price ?? item.price;
-    const highestPrice = Math.max(
-      quote.price ?? item.price,
-      previousPrice,
-      item.price * 1.15,
-    );
-    const now = Date.now();
-
-    return [
-      {
-        product_id: productId,
-        price: highestPrice,
-        timestamp: new Date(now - 21 * 24 * 60 * 60 * 1000).toISOString(),
-        source: "seed" as const,
-      },
-      {
-        product_id: productId,
-        price: previousPrice,
-        timestamp: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        source: "seed" as const,
-      },
-      {
-        product_id: productId,
-        price: quote.price ?? item.price,
-        timestamp: new Date(now).toISOString(),
-        source: "seed" as const,
-      },
-    ];
-  });
-
-  const { error: deleteHistoryError } = await client
-    .from("price_history")
-    .delete()
-    .in(
-      "product_id",
-      storedProducts.map((product) => product.id),
-    );
-
-  if (deleteHistoryError) {
-    throw new Error(
-      `Error al limpiar histórico: ${deleteHistoryError.message}`,
-    );
-  }
-
-  const { error: historyError } = await client
-    .from("price_history")
-    .insert(historyRows);
-
-  if (historyError) {
-    throw new Error(`Error al sembrar histórico: ${historyError.message}`);
-  }
+  // Histórico de precios desactivado.
 
   const { articles, articleProducts } = await seedBlogArticles(client);
 
   return {
     categories: categoriesToSeed.length,
     products: productPayload.length,
-    priceHistory: historyRows.length,
+    priceHistory: 0,
     articles,
     articleProducts,
     deals: dealSummaries,

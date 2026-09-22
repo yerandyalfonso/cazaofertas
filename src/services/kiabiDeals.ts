@@ -544,12 +544,6 @@ export async function runKiabiDealsCheck(options?: {
           continue;
         }
 
-        await client.from("price_history").insert({
-          product_id: insertedRow.id,
-          price,
-          source: "kiabi",
-        });
-
         inserted += 1;
         catalogByExternalId.set(quote.externalId.toUpperCase(), {
           ...(insertRow as unknown as CatalogRow),
@@ -639,11 +633,7 @@ export async function runKiabiDealsCheck(options?: {
         if (updateError) throw new Error(updateError.message);
 
         if (priceChanged) {
-          await client.from("price_history").insert({
-            product_id: existing.id,
-            price,
-            source: "kiabi",
-          });
+
           updated += 1;
 
           if (shouldNotify) {

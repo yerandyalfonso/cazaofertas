@@ -4,7 +4,6 @@ import {
   buildOutOfStockUpdate,
   inStockAvailabilityPatch,
 } from "@/lib/out-of-stock-policy";
-import { computeMovingAverages } from "@/lib/price-history";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -45,45 +44,6 @@ async function touchLastCheckedOnScrapeMiss(
     .from("products")
     .update({ last_checked_at: nowIso, updated_at: nowIso })
     .eq("id", productId);
-}
-
-async function refreshProductAverages(
-  client: TypedSupabaseClient,
-  productId: string,
-): Promise<void> {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - 90);
-
-  const { data, error } = await client
-    .from("price_history")
-    .select("price, timestamp")
-    .eq("product_id", productId)
-    .gte("timestamp", since.toISOString())
-    .order("timestamp", { ascending: false })
-    .limit(500);
-
-  if (error) {
-    console.warn("[priceDetection] averages", error.message);
-    return;
-  }
-
-  const points = (data ?? []).map((row) => ({
-    price: toNumber(row.price) ?? 0,
-    timestamp: row.timestamp,
-  }));
-  const { averagePrice30d, averagePrice90d } = computeMovingAverages(points);
-
-  const { error: updateError } = await client
-    .from("products")
-    .update({
-      average_price_30d: averagePrice30d,
-      average_price_90d: averagePrice90d,
-    })
-    .eq("id", productId);
-
-  if (updateError) {
-    console.warn("[priceDetection] average update", updateError.message);
-  }
 }
 
 export interface DetectedDeal {
@@ -198,51 +158,6 @@ function resolveReferencePrice(options: {
     return roundMoney(storedCurrent);
   }
   return nextPrice;
-}
-
-async function loadScoringContext(
-  client: TypedSupabaseClient,
-  productId: string,
-  previousPrice: number,
-): Promise<{ priceChangeCount30d: number; previousPriceAgeHours: number | null }> {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - 30);
-
-  const { data, error } = await client
-    .from("price_history")
-    .select("price, timestamp")
-    .eq("product_id", productId)
-    .gte("timestamp", since.toISOString())
-    .order("timestamp", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const history = data ?? [];
-  let changes = 0;
-  let lastPrice: number | null = null;
-
-  for (const row of [...history].reverse()) {
-    const price = requireNumber(row.price);
-    if (lastPrice !== null && price !== lastPrice) {
-      changes += 1;
-    }
-    lastPrice = price;
-  }
-
-  const matchingPrevious = history.find(
-    (row) => requireNumber(row.price) === previousPrice,
-  );
-
-  const previousPriceAgeHours = matchingPrevious
-    ? (Date.now() - new Date(matchingPrevious.timestamp).getTime()) / 3_600_000
-    : null;
-
-  return {
-    priceChangeCount30d: changes,
-    previousPriceAgeHours,
-  };
 }
 
 function emptyNotificationStats(): NotificationDispatchResult {
@@ -485,19 +400,14 @@ export async function runPriceDetection(
         const parentSlug =
           parentCategory?.slug ??
           (category?.slug ? resolveParentSlug(category.slug) : null);
-        const scoringContext = await loadScoringContext(
-          client,
-          product.id,
-          storedPrice,
-        );
         const scoring = dealScoringService.score({
           currentPrice: nextPrice,
           previousPrice: referencePrice > nextPrice ? referencePrice : storedPrice,
           lowestPrice: previousLowest,
           discountPercentage,
           categorySlug: parentSlug ?? "otros",
-          priceChangeCount30d: scoringContext.priceChangeCount30d,
-          previousPriceAgeHours: scoringContext.previousPriceAgeHours,
+          priceChangeCount30d: 1,
+          previousPriceAgeHours: 72,
         });
 
         const availability = availabilityFrom(quote.availability);
@@ -525,18 +435,6 @@ export async function runPriceDetection(
         if (updateError) {
           throw new Error(updateError.message);
         }
-
-        const { error: historyError } = await client.from("price_history").insert({
-          product_id: product.id,
-          price: nextPrice,
-          source,
-        });
-
-        if (historyError) {
-          throw new Error(historyError.message);
-        }
-
-        await refreshProductAverages(client, product.id);
 
         stats.updated += 1;
 

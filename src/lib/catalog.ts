@@ -11,11 +11,6 @@ import {
   type ProductRetailer,
 } from "@/lib/retailers";
 import { toNumber } from "@/lib/money";
-import {
-  computeMovingAverages,
-  downsamplePoints,
-  type PricePoint,
-} from "@/lib/price-history";
 import { withRetry } from "@/lib/retry";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -68,7 +63,7 @@ export interface CatalogProduct {
 }
 
 export interface PriceHistoryResult {
-  points: PricePoint[];
+  points: Array<{ price: number; timestamp: string }>;
   averagePrice30d: number | null;
   averagePrice90d: number | null;
 }
@@ -379,66 +374,21 @@ export const getProductsBySlugs = cache((slugs: string[]) =>
 );
 
 export interface GetPriceHistoryOptions {
-  /** Ventana temporal en días (default 90 para medias 30/90). */
+  /** @deprecated Histórico desactivado para liberar recursos. */
   days?: number;
-  /** Máximo de puntos crudos a leer de Supabase (default 400). */
   fetchLimit?: number;
-  /** Máximo de puntos tras downsampling para el gráfico (default 120). */
   maxPoints?: number;
 }
 
-/**
- * Histórico reciente (más nuevos primero en query; se devuelve cronológico).
- * Calcula medias móviles 30d/90d sobre la ventana completa.
- */
+/** Histórico desactivado: no lee `price_history`. Se mantiene la firma por compat. */
 export async function getPriceHistory(
-  productId: string,
-  options: GetPriceHistoryOptions | number = {},
+  _productId: string,
+  _options: GetPriceHistoryOptions | number = {},
 ): Promise<PriceHistoryResult> {
-  const opts: GetPriceHistoryOptions =
-    typeof options === "number" ? { fetchLimit: options } : options;
-  const days = opts.days ?? 90;
-  const fetchLimit = Math.min(Math.max(opts.fetchLimit ?? 400, 30), 2_000);
-  const maxPoints = opts.maxPoints ?? 120;
-
-  const empty: PriceHistoryResult = {
+  return {
     points: [],
     averagePrice30d: null,
     averagePrice90d: null,
-  };
-
-  const client = getClient();
-  if (!client) return empty;
-
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - days);
-
-  const { data, error } = await client
-    .from("price_history")
-    .select("price, timestamp")
-    .eq("product_id", productId)
-    .gte("timestamp", since.toISOString())
-    .order("timestamp", { ascending: false })
-    .limit(fetchLimit);
-
-  if (error || !data) {
-    console.error("[catalog] getPriceHistory", error?.message);
-    return empty;
-  }
-
-  const chronological: PricePoint[] = [...data]
-    .reverse()
-    .map((row) => ({
-      price: toNumber(row.price) ?? 0,
-      timestamp: row.timestamp,
-    }));
-
-  const averages = computeMovingAverages(chronological);
-
-  return {
-    points: downsamplePoints(chronological, maxPoints),
-    averagePrice30d: averages.averagePrice30d,
-    averagePrice90d: averages.averagePrice90d,
   };
 }
 

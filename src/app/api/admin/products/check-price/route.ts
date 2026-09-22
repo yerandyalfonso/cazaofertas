@@ -187,11 +187,7 @@ async function syncAsinsFromHtml(asins: string[]) {
         if (updateError) throw new Error(updateError.message);
 
         if (changed) {
-          await client.from("price_history").insert({
-            product_id: product.id,
-            price: nextPrice,
-            source: "amazon",
-          });
+
         }
 
         quotes.push({
@@ -281,11 +277,7 @@ async function syncAsinsFromHtml(asins: string[]) {
       if (updateError) throw new Error(updateError.message);
 
       if (changed) {
-        await client.from("price_history").insert({
-          product_id: product.id,
-          price: nextPrice,
-          source: retailer === "kiabi" ? "kiabi" : "miravia",
-        });
+
       }
 
       quotes.push({

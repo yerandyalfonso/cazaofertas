@@ -568,11 +568,6 @@ export async function runMiraviaDealsCheck(options?: {
           id: insertedRow.id,
         });
 
-        await client.from("price_history").insert({
-          product_id: insertedRow.id,
-          price,
-          source: "miravia",
-        });
       }
 
       if (shouldNotify && insertedRow) {
@@ -669,11 +664,6 @@ export async function runMiraviaDealsCheck(options?: {
 
       if (updateError) throw new Error(updateError.message);
 
-      await client.from("price_history").insert({
-        product_id: row.id,
-        price,
-        source: "miravia",
-      });
       updated += 1;
 
       if (shouldNotify) {

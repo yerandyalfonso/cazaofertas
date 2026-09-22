@@ -472,12 +472,6 @@ export async function runFlashDealsCheck(options?: {
         throw new Error(insertError.message);
       }
 
-      await client.from("price_history").insert({
-        product_id: insertedRow.id,
-        price,
-        source: "amazon",
-      });
-
       catalogByAsin.add(item.asin.toUpperCase());
 
       inserted += 1;

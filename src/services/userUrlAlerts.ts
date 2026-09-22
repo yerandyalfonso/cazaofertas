@@ -288,11 +288,6 @@ export async function runUserUrlAlerts(options?: {
               })
               .eq("id", productId);
 
-            await client.from("price_history").insert({
-              product_id: productId,
-              price: currentPrice,
-              source: retailer as PriceSource,
-            });
           }
         }
       }

@@ -5,14 +5,9 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { JsonLd } from "@/components/JsonLd";
 import { Price } from "@/components/Price";
-import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { ProductStickyBuyBar } from "@/components/ProductStickyBuyBar";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
-import {
-  getActiveProducts,
-  getPriceHistory,
-  getProductBySlug,
-} from "@/lib/catalog";
+import { getActiveProducts, getProductBySlug } from "@/lib/catalog";
 import { formatEuro } from "@/lib/money";
 import { splitProductDescription } from "@/lib/product-description";
 import {
@@ -64,7 +59,7 @@ export async function generateMetadata({
   const title = product.title;
   const description =
     product.description ??
-    `${product.title} · precio actual ${formatEuro(product.currentPrice)} en Amazon España. Historial y deal score en CazaOferta.`;
+    `${product.title} · precio actual ${formatEuro(product.currentPrice)} en Amazon España. Ofertas y alertas en CazaOferta.`;
 
   return buildPageMetadata({
     title,
@@ -79,11 +74,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const history = await getPriceHistory(product.id, { days: 90, maxPoints: 120 });
-  const averagePrice30d =
-    product.averagePrice30d ?? history.averagePrice30d;
-  const averagePrice90d =
-    product.averagePrice90d ?? history.averagePrice90d;
   const savings =
     product.previousPrice !== null
       ? product.previousPrice - product.currentPrice
@@ -262,18 +252,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               </dd>
             </div>
             <div>
-              <dt className="text-stone-500">Media 30 días</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {averagePrice30d !== null ? formatEuro(averagePrice30d) : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-stone-500">Media 90 días</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {averagePrice90d !== null ? formatEuro(averagePrice90d) : "—"}
-              </dd>
-            </div>
-            <div>
               <dt className="text-stone-500">Disponibilidad</dt>
               <dd className="mt-1 font-medium text-ink">
                 {availabilityLabel(product.availability)}
@@ -312,25 +290,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </div>
         </div>
       </div>
-
-      <section className="mt-16">
-        <h2 className="font-display text-2xl tracking-tight text-ink md:text-3xl">
-          Evolución del precio
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          Mínimo, media móvil, máximo y actual. La línea discontinua marca la
-          media del periodo seleccionado.
-        </p>
-        <div className="mt-6">
-          <PriceHistoryChart
-            points={history.points}
-            currentPrice={product.currentPrice}
-            averagePrice30d={averagePrice30d}
-            averagePrice90d={averagePrice90d}
-            allTimeLowest={product.lowestPrice}
-          />
-        </div>
-      </section>
 
       <ProductStickyBuyBar
         productId={product.id}

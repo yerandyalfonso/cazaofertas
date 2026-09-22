@@ -326,12 +326,6 @@ export async function ensureProductFromAmazonUrl(
     throw new Error(insertError.message);
   }
 
-  await client.from("price_history").insert({
-    product_id: inserted.id,
-    price,
-    source: "amazon",
-  });
-
   return {
     id: inserted.id,
     asin: inserted.asin,
@@ -505,12 +499,6 @@ export async function ensureProductFromUrl(
     }
     throw new Error(insertError.message);
   }
-
-  await client.from("price_history").insert({
-    product_id: inserted.id,
-    price,
-    source: retailer,
-  });
 
   return {
     id: inserted.id,

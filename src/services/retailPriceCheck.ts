@@ -277,11 +277,7 @@ export async function runRetailPriceCheck(options?: {
       }
 
       if (changed) {
-        await client.from("price_history").insert({
-          product_id: product.id,
-          price: resolvedPrice,
-          source: priceSourceForRetailer(retailer),
-        });
+
         stats.updated += 1;
       } else {
         stats.unchanged += 1;
