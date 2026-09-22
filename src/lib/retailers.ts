@@ -9,6 +9,8 @@ export const PRODUCT_RETAILERS = [
   "kiabi",
   "carrefour",
   "miravia",
+  "aliexpress",
+  "pccomponentes",
 ] as const;
 export type ProductRetailer = (typeof PRODUCT_RETAILERS)[number];
 
@@ -60,7 +62,58 @@ export const RETAILER_DEFINITIONS: RetailerDefinition[] = [
     externalIdHint: "itemId (números en /p/i…)",
     defaultBrand: "Miravia",
   },
+  {
+    id: "aliexpress",
+    label: "AliExpress",
+    hostPatterns: [/aliexpress\.(com|es|us)/i],
+    urlPlaceholder: "https://es.aliexpress.com/item/XXXXXXXXXXXXX.html",
+    // Ficha renderizada por JS del cliente: sin scrape por fetch (solo vía
+    // navegador headless, únicamente en el chequeo de alertas de usuario).
+    scrapeSupported: false,
+    externalIdHint: "ID numérico en /item/…html",
+  },
+  {
+    id: "pccomponentes",
+    label: "PcComponentes",
+    hostPatterns: [/pccomponentes\.com/i],
+    urlPlaceholder: "https://www.pccomponentes.com/...",
+    // Cloudflare Turnstile bloquea fetch simple y también IP de datacenter:
+    // solo viable con navegador headless desde una IP residencial.
+    scrapeSupported: false,
+    externalIdHint: "slug de la URL",
+  },
 ];
+
+/**
+ * Tiendas donde el scrape normal (fetch ligero, `scrapeSupported`) no
+ * funciona, pero sí un navegador headless puntual. Solo se usan para
+ * comprobar alertas de usuario (bajo volumen) — nunca para el descubrimiento
+ * o recheck masivo de ofertas (`retailPriceCheck`/`previewProductPage`),
+ * que seguiría intentando lanzar un navegador por cada producto del lote.
+ */
+export const ALERT_HEADLESS_RETAILERS: readonly ProductRetailer[] = [
+  "aliexpress",
+  "carrefour",
+  "pccomponentes",
+];
+
+/** ¿Se puede comprobar una alerta de usuario para esta tienda? */
+export function alertRetailerSupported(retailer: ProductRetailer): boolean {
+  return (
+    retailerScrapeSupported(retailer) ||
+    ALERT_HEADLESS_RETAILERS.includes(retailer)
+  );
+}
+
+/**
+ * Tiendas cuyo scrape (aunque sea con navegador headless) solo pasa el
+ * bloqueo anti-bot desde una IP residencial. El bot de Telegram corre en el
+ * VPS, así que para estas no puede crear/verificar el producto al vuelo —
+ * la alerta se guarda "en espera" y el cron local del Mac la completa.
+ */
+export function requiresResidentialIp(retailer: ProductRetailer): boolean {
+  return retailer === "pccomponentes";
+}
 
 export function getRetailerDefinition(
   retailer: ProductRetailer,
@@ -109,6 +162,8 @@ export function syntheticAsinForRetailer(
   if (retailer === "kiabi") return `KB-${clean}`;
   if (retailer === "carrefour") return `CF-${clean}`;
   if (retailer === "miravia") return `MV-${clean}`;
+  if (retailer === "aliexpress") return `AE-${clean}`;
+  if (retailer === "pccomponentes") return `PCC-${clean}`;
   return `RT-${clean}`;
 }
 
@@ -128,6 +183,31 @@ export function extractKiabiProductId(urlOrId: string): string | null {
 
   if (/^P\d+C\d+$/i.test(trimmed)) return trimmed.toUpperCase();
   return null;
+}
+
+export function extractAliexpressProductId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  const fromUrl = trimmed.match(/\/item\/(\d{6,})\.html/i);
+  if (fromUrl?.[1]) return fromUrl[1];
+
+  if (/^\d{6,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+export function extractPcComponentesProductId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  try {
+    const parsed = /^https?:\/\//i.test(trimmed)
+      ? new URL(trimmed)
+      : null;
+    const slug = parsed
+      ? parsed.pathname.replace(/^\/+|\/+$/g, "")
+      : trimmed.replace(/^\/+|\/+$/g, "");
+    if (!slug || slug.length < 3) return null;
+    return slug.slice(0, 80);
+  } catch {
+    return null;
+  }
 }
 
 function extractCarrefourProductId(urlOrId: string): string | null {
@@ -159,6 +239,10 @@ export function extractExternalId(
       return extractCarrefourProductId(trimmed);
     case "miravia":
       return extractMiraviaProductId(trimmed);
+    case "aliexpress":
+      return extractAliexpressProductId(trimmed);
+    case "pccomponentes":
+      return extractPcComponentesProductId(trimmed);
     default:
       return trimmed.length >= 3 ? trimmed : null;
   }
@@ -247,6 +331,8 @@ export const RETAILER_COLORS: Record<string, string> = {
   kiabi: "#E4002B",
   carrefour: "#004E9F",
   miravia: "#6C2BD9",
+  aliexpress: "#FF4747",
+  pccomponentes: "#F26122",
 };
 
 export function retailerColor(retailer: string | null | undefined): string {

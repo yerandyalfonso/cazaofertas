@@ -2,11 +2,11 @@ import { formatEuro, roundMoney, toNumber } from "@/lib/money";
 import { buildOutOfStockUpdate } from "@/lib/out-of-stock-policy";
 import { isRetailBlockedError } from "@/lib/retail-url-utils";
 import {
+  alertRetailerSupported,
   detectRetailerFromUrl,
   extractExternalId,
   getRetailerDefinition,
   resolveProductBuyUrl,
-  retailerScrapeSupported,
   syntheticAsinForRetailer,
   type ProductRetailer,
 } from "@/lib/retailers";
@@ -14,8 +14,14 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
 import { scrapeKiabiProductPage } from "@/providers/retail/kiabi";
 import { scrapeMiraviaProductPage } from "@/providers/retail/miravia";
+import {
+  closeSharedBrowser,
+  scrapeAliexpressProductPage,
+  scrapeCarrefourProductPage,
+  scrapePcComponentesProductPage,
+} from "@/providers/browser";
 import { ensureProductFromUrl } from "@/services/products";
-import { ProductAvailability, type PriceSource } from "@/types";
+import { ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
@@ -92,6 +98,56 @@ async function fetchRetailQuote(
     };
   }
 
+  // Tiendas solo alcanzables vía navegador headless (Cloudflare Turnstile /
+  // ficha renderizada por JS). Nunca usadas por el recheck masivo de ofertas.
+  if (retailer === "aliexpress") {
+    const quote = await scrapeAliexpressProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
+  if (retailer === "carrefour") {
+    const quote = await scrapeCarrefourProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
+  if (retailer === "pccomponentes") {
+    const quote = await scrapePcComponentesProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
   throw new Error(
     `${getRetailerDefinition(retailer).label} aún no soporta el chequeo de alertas.`,
   );
@@ -116,6 +172,12 @@ function escapeHtml(value: string): string {
 export async function runUserUrlAlerts(options?: {
   limit?: number;
   delayMs?: number;
+  /**
+   * Tiendas a comprobar en esta corrida. Por defecto, todas menos
+   * PcComponentes (que exige IP residencial y solo corre desde el cron
+   * local del Mac vía `runUserUrlAlerts({ retailers: ["pccomponentes"] })`).
+   */
+  retailers?: ProductRetailer[];
 }): Promise<UserUrlAlertsResult> {
   const client = createSupabaseServiceClient();
   const limit =
@@ -123,6 +185,9 @@ export async function runUserUrlAlerts(options?: {
       ? (options!.limit as number)
       : 40;
   const delayMs = options?.delayMs ?? 1_400;
+  const allowedRetailers: ProductRetailer[] =
+    options?.retailers ??
+    ["amazon", "kiabi", "miravia", "aliexpress", "carrefour"];
 
   const { data: alerts, error } = await client
     .from("alerts")
@@ -160,7 +225,13 @@ export async function runUserUrlAlerts(options?: {
     }
 
     const retailer = detectRetailerFromUrl(url) ?? "amazon";
-    if (!retailerScrapeSupported(retailer)) {
+    if (!allowedRetailers.includes(retailer)) {
+      // No es esta corrida la que cubre esta tienda (p. ej. PcComponentes
+      // solo se revisa desde el cron del Mac). No cuenta como fallo.
+      result.skipped += 1;
+      continue;
+    }
+    if (!alertRetailerSupported(retailer)) {
       result.failed += 1;
       console.warn(
         `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
@@ -380,6 +451,7 @@ export async function runUserUrlAlerts(options?: {
     if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
   }
 
+  await closeSharedBrowser();
   result.finishedAt = new Date().toISOString();
   return result;
 }

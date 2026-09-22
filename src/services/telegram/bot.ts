@@ -17,11 +17,12 @@ import {
   resolveTelegramTopicId,
 } from "@/lib/telegram-topics";
 import {
+  alertRetailerSupported,
   detectRetailerFromUrl,
   extractExternalId,
   formatRetailerHashtag,
   getRetailerDefinition,
-  retailerScrapeSupported,
+  requiresResidentialIp,
   syntheticAsinForRetailer,
 } from "@/lib/retailers";
 import { isGeneralSubcategorySlug, resolveParentSlug } from "@/lib/category-taxonomy";
@@ -1159,19 +1160,27 @@ async function commitWizardAlert(options: {
   const brand = draft.brand ?? null;
 
   if (draft.mode === "url" && url) {
-    try {
-      const product = await ensureProductFromUrl(client, url);
-      productId = product.id;
-      productTitle = product.title;
-      initialPrice = product.currentPrice;
-      if (!keyword) keyword = product.title.slice(0, 120);
-    } catch (error) {
-      console.error("[telegram] wizard URL product", error);
-      await sendTelegramMessage({
-        chatId,
-        text: "No pude leer ese producto de Amazon. Revisa la URL e inténtalo de nuevo.",
-      });
-      return;
+    const retailer = detectRetailerFromUrl(url) ?? "amazon";
+    if (requiresResidentialIp(retailer)) {
+      // No se puede scrapear desde el VPS (bloqueo Cloudflare); se guarda la
+      // alerta y el cron local del Mac completa producto/precio en su
+      // siguiente ciclo.
+      if (!keyword) keyword = draft.productTitle ?? draft.keyword ?? null;
+    } else {
+      try {
+        const product = await ensureProductFromUrl(client, url, { retailer });
+        productId = product.id;
+        productTitle = product.title;
+        initialPrice = product.currentPrice;
+        if (!keyword) keyword = product.title.slice(0, 120);
+      } catch (error) {
+        console.error("[telegram] wizard URL product", error);
+        await sendTelegramMessage({
+          chatId,
+          text: `No pude leer ese producto de ${getRetailerDefinition(retailer).label}. Revisa la URL e inténtalo de nuevo.`,
+        });
+        return;
+      }
     }
   }
 
@@ -1241,10 +1250,10 @@ async function handleWizardTextInput(
   if (draft.mode === "url") {
     const retailer = detectRetailerFromUrl(rawText);
     const externalId = retailer ? extractExternalId(retailer, rawText) : null;
-    if (!retailer || !retailerScrapeSupported(retailer) || !externalId) {
+    if (!retailer || !alertRetailerSupported(retailer) || !externalId) {
       await sendTelegramMessage({
         chatId,
-        text: "Esa no parece una URL de producto válida (Amazon, Kiabi o Miravia). Pégala de nuevo o cancela con /start.",
+        text: "Esa no parece una URL de producto válida (Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes). Pégala de nuevo o cancela con /start.",
       });
       return true;
     }
@@ -1640,14 +1649,14 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (!rawText) {
     await sendTelegramMessage({
       chatId,
-      text: "Envía una palabra clave o pega una URL de producto (Amazon, Kiabi o Miravia), o usa «Crear alerta» en el menú.",
+      text: "Envía una palabra clave o pega una URL de producto (Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes), o usa «Crear alerta» en el menú.",
     });
     return;
   }
 
   const detectedRetailer = detectRetailerFromUrl(rawText);
   const isUrlAlert = Boolean(
-    detectedRetailer && retailerScrapeSupported(detectedRetailer),
+    detectedRetailer && alertRetailerSupported(detectedRetailer),
   );
   const externalId = isUrlAlert
     ? extractExternalId(detectedRetailer!, rawText)
@@ -1659,7 +1668,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (isUrlAlert && !asin) {
     await sendTelegramMessage({
       chatId,
-      text: "No pude extraer el identificador de esa URL. Pega un enlace de producto de Amazon, Kiabi o Miravia.",
+      text: "No pude extraer el identificador de esa URL. Pega un enlace de producto de Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes.",
     });
     return;
   }
@@ -1704,7 +1713,12 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
     let initialPrice: number | null = null;
     let catalogNote = "";
 
-    if (isUrlAlert && asin && url) {
+    if (isUrlAlert && asin && url && requiresResidentialIp(detectedRetailer!)) {
+      // No se puede scrapear desde el VPS (bloqueo Cloudflare); se guarda la
+      // alerta y el cron local del Mac completa producto/precio en su
+      // siguiente ciclo.
+      catalogNote = "La verificaremos en breve.";
+    } else if (isUrlAlert && asin && url) {
       try {
         const product = await ensureProductFromUrl(client, url, {
           retailer: detectedRetailer!,

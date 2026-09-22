@@ -1,4 +1,6 @@
 import {
+  ALERT_HEADLESS_RETAILERS,
+  alertRetailerSupported,
   detectRetailerFromUrl,
   extractExternalId,
   getRetailerDefinition,
@@ -20,6 +22,11 @@ import {
 import { roundMoney, toNumber } from "@/lib/money";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
+import {
+  scrapeAliexpressProductPage,
+  scrapeCarrefourProductPage,
+  scrapePcComponentesProductPage,
+} from "@/providers/browser";
 import { previewProductPage } from "@/services/productScrape";
 import type { ProductRow } from "@/types/database";
 import { ProductAvailability } from "@/types";
@@ -357,6 +364,59 @@ function slugifyRetailProduct(title: string, asin: string): string {
   return `${base || "producto"}-${asin}`.toLowerCase().replace(/^-+/, "");
 }
 
+interface HeadlessProductPreview {
+  price: number | null;
+  referencePrice: number | null;
+  title: string | null;
+  productUrl: string;
+  imageUrl: string | null;
+  brand: string | null;
+}
+
+/**
+ * Ficha vía navegador headless (AliExpress, Carrefour, PcComponentes) — solo
+ * para alertas de usuario, nunca para el recheck masivo de `retailPriceCheck`.
+ */
+async function fetchHeadlessProductPreview(
+  retailer: ProductRetailer,
+  url: string,
+): Promise<HeadlessProductPreview> {
+  if (retailer === "aliexpress") {
+    const quote = await scrapeAliexpressProductPage(url, { timeoutMs: 20_000 });
+    return {
+      price: quote.price,
+      referencePrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      imageUrl: quote.imageUrl,
+      brand: null,
+    };
+  }
+  if (retailer === "carrefour") {
+    const quote = await scrapeCarrefourProductPage(url, { timeoutMs: 20_000 });
+    return {
+      price: quote.price,
+      referencePrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      imageUrl: quote.imageUrl,
+      brand: quote.brand,
+    };
+  }
+  if (retailer === "pccomponentes") {
+    const quote = await scrapePcComponentesProductPage(url, { timeoutMs: 20_000 });
+    return {
+      price: quote.price,
+      referencePrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      imageUrl: quote.imageUrl,
+      brand: quote.brand,
+    };
+  }
+  throw new Error(`${retailer}: sin scraper headless configurado.`);
+}
+
 /**
  * Igual que `ensureProductFromAmazonUrl` pero para cualquier tienda soportada
  * (Kiabi, Miravia, …). Detecta la tienda por la URL, busca el producto por su
@@ -384,7 +444,7 @@ export async function ensureProductFromUrl(
     };
   }
 
-  if (!retailerScrapeSupported(retailer)) {
+  if (!alertRetailerSupported(retailer)) {
     throw new Error(`${retailer} aún no soporta extracción automática.`);
   }
 
@@ -416,7 +476,9 @@ export async function ensureProductFromUrl(
     };
   }
 
-  const preview = await previewProductPage(url, { retailer, timeoutMs: 18_000 });
+  const preview = ALERT_HEADLESS_RETAILERS.includes(retailer)
+    ? await fetchHeadlessProductPreview(retailer, url)
+    : await previewProductPage(url, { retailer, timeoutMs: 18_000 });
   if (preview.price === null) {
     throw new Error(
       `No se pudo obtener el precio del producto en ${getRetailerDefinition(retailer).label}.`,

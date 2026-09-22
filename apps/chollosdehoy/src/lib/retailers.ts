@@ -3,6 +3,8 @@ export const RETAILER_LABELS: Record<string, string> = {
   kiabi: "Kiabi",
   carrefour: "Carrefour",
   miravia: "Miravia",
+  aliexpress: "AliExpress",
+  pccomponentes: "PcComponentes",
 };
 
 export const RETAILER_COLORS: Record<string, string> = {
@@ -10,6 +12,8 @@ export const RETAILER_COLORS: Record<string, string> = {
   kiabi: "#E4002B",
   carrefour: "#004E9F",
   miravia: "#6C2BD9",
+  aliexpress: "#FF4747",
+  pccomponentes: "#F26122",
 };
 
 export function retailerLabel(id: string | null | undefined): string {

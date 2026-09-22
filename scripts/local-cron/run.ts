@@ -14,6 +14,7 @@ type LocalCronJob =
   | "flash-deals"
   | "miravia-deals"
   | "user-alerts"
+  | "user-alerts-residential"
   | "kiabi-deals"
   | "telegram-flush"
   | "coupons-discover";
@@ -24,6 +25,7 @@ const JOBS: LocalCronJob[] = [
   "flash-deals",
   "miravia-deals",
   "user-alerts",
+  "user-alerts-residential",
   "kiabi-deals",
   "telegram-flush",
   "coupons-discover",
@@ -202,6 +204,23 @@ async function runUserAlerts(): Promise<void> {
   await reviewUserAlertsResult(result);
 }
 
+/**
+ * Alertas de tiendas que solo pasan el bloqueo anti-bot desde IP residencial
+ * (PcComponentes: Cloudflare Turnstile bloquea la IP del VPS aunque se use
+ * navegador headless real). Corre solo desde el Mac.
+ */
+async function runUserAlertsResidential(): Promise<void> {
+  const { runUserUrlAlerts } = await import("@/services/userUrlAlerts");
+  const { reviewUserAlertsResult } = await import("./notify");
+  const result = await runUserUrlAlerts({
+    limit: 10,
+    delayMs: 3_000,
+    retailers: ["pccomponentes"],
+  });
+  console.log(JSON.stringify(result, null, 2));
+  await reviewUserAlertsResult(result);
+}
+
 async function runKiabiDeals(): Promise<void> {
   const { runKiabiDealsCheck } = await import("@/services/kiabiDeals");
   const { reviewKiabiDealsResult } = await import("./notify");
@@ -257,6 +276,9 @@ async function main(): Promise<void> {
       break;
     case "user-alerts":
       await runUserAlerts();
+      break;
+    case "user-alerts-residential":
+      await runUserAlertsResidential();
       break;
     case "kiabi-deals":
       await runKiabiDeals();
