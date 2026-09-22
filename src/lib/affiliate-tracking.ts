@@ -1,4 +1,4 @@
-import { absoluteUrl, getTelegramSiteUrl } from "@/lib/site";
+import { absoluteUrl, marketplaceAbsoluteUrl } from "@/lib/site";
 
 export type AffiliateClickSource =
   | "web"
@@ -36,13 +36,13 @@ export function buildTrackedAffiliatePath(
   return `/api/redirect?${params.toString()}`;
 }
 
-/** URL absoluta (Telegram, emails, etc.). */
+/** URL absoluta (Telegram, Facebook, emails, etc.). */
 export function buildTrackedAffiliateUrl(
   options: TrackedAffiliateOptions,
 ): string {
   const path = buildTrackedAffiliatePath(options);
-  if (options.source === "telegram") {
-    return `${getTelegramSiteUrl()}${path}`;
+  if (options.source === "telegram" || options.source === "facebook") {
+    return marketplaceAbsoluteUrl(path);
   }
   return absoluteUrl(path);
 }
