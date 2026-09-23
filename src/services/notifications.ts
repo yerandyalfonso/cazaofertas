@@ -218,7 +218,7 @@ export interface CappedDigestResult {
   failed: number;
 }
 
-interface CappedRow {
+export interface CappedRow {
   id: string;
   alert_id: string | null;
   discount_percentage: number | string | null;
@@ -266,6 +266,71 @@ function formatDigestLine(row: CappedRow, index: number): string {
   return `${index + 1}. −${discount}% · <b>${price} €</b> · ${label}`;
 }
 
+/** Envía el resumen (álbum con fotos + lista) de estos avisos a un chat. */
+export async function sendCappedDigestMessage(
+  chatId: number | string,
+  rows: CappedRow[],
+): Promise<void> {
+  // Mejor descuento primero; una entrada por producto.
+  const seen = new Set<string>();
+  const unique = [...rows]
+    .sort(
+      (a, b) =>
+        (toNumber(b.discount_percentage) ?? 0) -
+        (toNumber(a.discount_percentage) ?? 0),
+    )
+    .filter((row) => {
+      const key = digestProductKey(row);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  // Con foto primero para que el orden del álbum y de la lista coincida.
+  const withPhoto = unique.filter((row) => row.products?.image_url?.trim());
+  const top = [
+    ...withPhoto,
+    ...unique.filter((row) => !row.products?.image_url?.trim()),
+  ].slice(0, DIGEST_MAX_ITEMS);
+
+  const lines = [
+    `🔔 <b>${unique.length} chollos más para ${escapeHtml(describeAlert(rows[0]!))}</b>`,
+    `Tu alerta superó ${ALERT_MAX_NOTIFICATIONS_PER_24H} avisos en 24 h; aquí van agrupados:`,
+    "",
+    ...top.map(formatDigestLine),
+  ];
+  if (unique.length > top.length) {
+    lines.push("", `…y ${unique.length - top.length} más.`);
+  }
+  const text = lines.join("\n");
+  // El límite de 1024 de Telegram cuenta el texto visible (sin etiquetas/URLs).
+  const visibleLength = text
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(amp|lt|gt|quot);/g, "_").length;
+  const photos = top
+    .map((row) => row.products?.image_url?.trim())
+    .filter((url): url is string => Boolean(url));
+
+  // Telegram: álbum de 2–10 fotos y caption ≤ 1024 caracteres.
+  if (photos.length >= 2 && visibleLength <= 1024) {
+    await sendTelegramMediaGroup({
+      chatId,
+      photos: photos.map((url, index) =>
+        index === 0 ? { url, caption: text } : { url },
+      ),
+    });
+  } else if (photos.length >= 2) {
+    await sendTelegramMediaGroup({
+      chatId,
+      photos: photos.map((url) => ({ url })),
+    });
+    await sendTelegramMessage({ chatId, text });
+  } else if (photos.length === 1 && visibleLength <= 1024) {
+    await sendTelegramPhoto({ chatId, photoUrl: photos[0]!, caption: text });
+  } else {
+    await sendTelegramMessage({ chatId, text });
+  }
+}
+
 /**
  * Envía un único resumen por alerta con los avisos que superaron el tope
  * diario (`capped`): álbum con las fotos y, debajo, la lista numerada en el
@@ -308,65 +373,8 @@ export async function sendCappedAlertDigests(
       continue;
     }
 
-    // Mejor descuento primero; una entrada por producto.
-    const seen = new Set<string>();
-    const unique = [...rows]
-      .sort(
-        (a, b) =>
-          (toNumber(b.discount_percentage) ?? 0) -
-          (toNumber(a.discount_percentage) ?? 0),
-      )
-      .filter((row) => {
-        const key = digestProductKey(row);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    // Con foto primero para que el orden del álbum y de la lista coincida.
-    const withPhoto = unique.filter((row) => row.products?.image_url?.trim());
-    const top = [
-      ...withPhoto,
-      ...unique.filter((row) => !row.products?.image_url?.trim()),
-    ].slice(0, DIGEST_MAX_ITEMS);
-
-    const lines = [
-      `🔔 <b>${unique.length} chollos más para ${escapeHtml(describeAlert(rows[0]!))}</b>`,
-      `Tu alerta superó ${ALERT_MAX_NOTIFICATIONS_PER_24H} avisos en 24 h; aquí van agrupados:`,
-      "",
-      ...top.map(formatDigestLine),
-    ];
-    if (unique.length > top.length) {
-      lines.push("", `…y ${unique.length - top.length} más.`);
-    }
-    const text = lines.join("\n");
-    // El límite de 1024 de Telegram cuenta el texto visible (sin etiquetas/URLs).
-    const visibleLength = text
-      .replace(/<[^>]+>/g, "")
-      .replace(/&(amp|lt|gt|quot);/g, "_").length;
-    const photos = top
-      .map((row) => row.products?.image_url?.trim())
-      .filter((url): url is string => Boolean(url));
-
     try {
-      // Telegram: álbum de 2–10 fotos y caption ≤ 1024 caracteres.
-      if (photos.length >= 2 && visibleLength <= 1024) {
-        await sendTelegramMediaGroup({
-          chatId,
-          photos: photos.map((url, index) =>
-            index === 0 ? { url, caption: text } : { url },
-          ),
-        });
-      } else if (photos.length >= 2) {
-        await sendTelegramMediaGroup({
-          chatId,
-          photos: photos.map((url) => ({ url })),
-        });
-        await sendTelegramMessage({ chatId, text });
-      } else if (photos.length === 1 && visibleLength <= 1024) {
-        await sendTelegramPhoto({ chatId, photoUrl: photos[0]!, caption: text });
-      } else {
-        await sendTelegramMessage({ chatId, text });
-      }
+      await sendCappedDigestMessage(chatId, rows);
       await client
         .from("notifications")
         .update({
