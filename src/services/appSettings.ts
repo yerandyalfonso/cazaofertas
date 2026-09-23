@@ -403,7 +403,7 @@ function mapRow(row: AppSettingsRow): AppSettings {
     miraviaFeedsPerRun: clampSmallInt(
       Number(row.miravia_feeds_per_run ?? env.miraviaFeedsPerRun),
       env.miraviaFeedsPerRun,
-      5,
+      10,
     ),
     kiabiFeedsPerRun: clampSmallInt(
       Number(row.kiabi_feeds_per_run ?? env.kiabiFeedsPerRun),
@@ -732,7 +732,7 @@ export async function updateAppSettings(
         : current.amazonDepartmentFeedsPerRun,
     miraviaFeedsPerRun:
       patch.miraviaFeedsPerRun !== undefined
-        ? clampSmallInt(patch.miraviaFeedsPerRun, current.miraviaFeedsPerRun, 5)
+        ? clampSmallInt(patch.miraviaFeedsPerRun, current.miraviaFeedsPerRun, 10)
         : current.miraviaFeedsPerRun,
     kiabiFeedsPerRun:
       patch.kiabiFeedsPerRun !== undefined
