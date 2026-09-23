@@ -8,10 +8,16 @@ import {
   ShieldCheck,
   TrendingDown,
 } from "lucide-react";
-import { getProductBySlug } from "@/lib/catalog";
+import { cache } from "react";
+import type { Metadata } from "next";
+import { getProductBySlug as fetchProductBySlug } from "@/lib/catalog";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
-import { DealLevel } from "@/lib/types";
+import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import { DealLevel, type MarketplaceProduct } from "@/lib/types";
+
+// generateMetadata y la página comparten una sola consulta por petición.
+const getProductBySlug = cache(fetchProductBySlug);
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -28,14 +34,109 @@ function dealBadgeClass(level: DealLevel): string {
   }
 }
 
-export async function generateMetadata({ params }: ProductPageProps) {
+function truncate(value: string, max: number): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  return clean.length <= max ? clean : `${clean.slice(0, max - 1).trimEnd()}…`;
+}
+
+function productSeoTitle(product: MarketplaceProduct): string {
+  const discount =
+    product.discountPercentage >= 1
+      ? ` −${Math.round(product.discountPercentage)}%`
+      : "";
+  return `${truncate(product.title, 60)}${discount} a ${formatEuro(product.currentPrice)} en ${retailerLabel(product.retailer)}`;
+}
+
+function productSeoDescription(product: MarketplaceProduct): string {
+  const before =
+    product.previousPrice && product.previousPrice > product.currentPrice
+      ? ` (antes ${formatEuro(product.previousPrice)})`
+      : "";
+  const base = `Chollo: ${truncate(product.title, 80)} por ${formatEuro(product.currentPrice)}${before} en ${retailerLabel(product.retailer)}.`;
+  return truncate(`${base} Precio comprobado y enlace directo a la oferta.`, 160);
+}
+
+function isUnavailable(product: MarketplaceProduct): boolean {
+  if (product.availability === "OUT_OF_STOCK") return true;
+  return Boolean(
+    product.expiresAt && new Date(product.expiresAt).getTime() <= Date.now(),
+  );
+}
+
+function productJsonLd(product: MarketplaceProduct, url: string) {
+  const categoryPath = [product.category?.parentName, product.category?.name]
+    .filter((part, i, all): part is string => Boolean(part) && all.indexOf(part) === i);
+  const offer: Record<string, unknown> = {
+    "@type": "Offer",
+    url,
+    price: product.currentPrice.toFixed(2),
+    priceCurrency: "EUR",
+    availability: isUnavailable(product)
+      ? "https://schema.org/OutOfStock"
+      : "https://schema.org/InStock",
+    itemCondition: "https://schema.org/NewCondition",
+    seller: { "@type": "Organization", name: retailerLabel(product.retailer) },
+  };
+  if (product.expiresAt) offer.priceValidUntil = product.expiresAt.slice(0, 10);
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.title,
+      ...(product.imageUrl ? { image: [product.imageUrl] } : {}),
+      ...(product.description ? { description: truncate(product.description, 500) } : {}),
+      ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
+      ...(categoryPath.length ? { category: categoryPath.join(" > ") } : {}),
+      offers: offer,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { name: SITE_NAME, url: absoluteUrl("/") },
+        ...categoryPath.map((name) => ({ name })),
+        { name: truncate(product.title, 80), url },
+      ].map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: item.name,
+        ...("url" in item && item.url ? { item: item.url } : {}),
+      })),
+    },
+  ];
+}
+
+export async function generateMetadata({
+  params,
+}: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Oferta no encontrada" };
+  if (!product) return { title: "Oferta no encontrada", robots: { index: false } };
+
+  const url = absoluteUrl(`/oferta/${product.slug}`);
+  const title = productSeoTitle(product);
+  const description = productSeoDescription(product);
+  const images = product.imageUrl ? [{ url: product.imageUrl, alt: product.title }] : [];
   return {
-    title: product.title,
-    description:
-      product.description ?? `Oferta en ${retailerLabel(product.retailer)}`,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      siteName: SITE_NAME,
+      locale: "es_ES",
+      title,
+      description,
+      images,
+    },
+    twitter: {
+      card: images.length ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: images.map((image) => image.url),
+    },
   };
 }
 
@@ -43,6 +144,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
+  const jsonLd = productJsonLd(product, absoluteUrl(`/oferta/${product.slug}`));
 
   const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
   const savings =
@@ -58,6 +160,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <div className="marketplace-shell bg-[var(--bg)]">
+      <script
+        type="application/ld+json"
+        // JSON escapado para que "</script>" en un título no rompa la página.
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
       <div className="border-b border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-3">
           <Link href="/" className="btn btn-ghost text-sm">

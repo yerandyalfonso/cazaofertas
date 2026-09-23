@@ -7,6 +7,7 @@ export const metadata = {
   title: "Cupones y códigos de descuento",
   description:
     "Cupones activos por tienda: Amazon, Kiabi, Miravia, Carrefour y más.",
+  alternates: { canonical: "/cupones" },
 };
 
 export default async function CuponesPage() {

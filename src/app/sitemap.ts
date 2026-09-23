@@ -1,37 +1,9 @@
 import type { MetadataRoute } from "next";
 import { getCategories } from "@/lib/catalog";
 import { getSiteUrl } from "@/lib/site";
-import { createSupabaseServiceClient } from "@/lib/supabase";
 import { getPublishedArticles } from "@/services/blog";
 
 export const revalidate = 3600;
-
-async function getProductSitemapEntries(): Promise<
-  Array<{ slug: string; lastModified: Date }>
-> {
-  try {
-    const client = createSupabaseServiceClient();
-    const { data, error } = await client
-      .from("products")
-      .select("slug, updated_at, last_checked_at")
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false })
-      .limit(5000);
-
-    if (error || !data) return [];
-
-    return data
-      .filter((row) => Boolean(row.slug))
-      .map((row) => ({
-        slug: row.slug,
-        lastModified: new Date(
-          row.last_checked_at ?? row.updated_at ?? Date.now(),
-        ),
-      }));
-  } catch {
-    return [];
-  }
-}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteUrl();
@@ -71,18 +43,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const [products, categories, articles] = await Promise.all([
-    getProductSitemapEntries(),
+  // Las fichas de producto no van aquí: su URL canónica es la del
+  // marketplace (chollosdhoy.com/oferta/…), que tiene su propio sitemap.
+  const [categories, articles] = await Promise.all([
     getCategories(),
     getPublishedArticles(),
   ]);
-
-  const productRoutes: MetadataRoute.Sitemap = products.map((product) => ({
-    url: `${base}/producto/${product.slug}`,
-    lastModified: product.lastModified,
-    changeFrequency: "hourly",
-    priority: 0.85,
-  }));
 
   const categoryRoutes: MetadataRoute.Sitemap = categories.map((category) => ({
     url: `${base}/categorias/${category.slug}`,
@@ -100,7 +66,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticRoutes,
-    ...productRoutes,
     ...categoryRoutes,
     ...articleRoutes,
   ];

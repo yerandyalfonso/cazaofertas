@@ -44,6 +44,9 @@ type ProductRow = {
   product_url: string | null;
   is_featured: boolean | null;
   created_at: string;
+  updated_at?: string | null;
+  availability?: string | null;
+  deal_expires_at?: string | null;
   category_id: string | null;
   categories?:
     | {
@@ -163,6 +166,9 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     productUrl,
     isFeatured: Boolean(row.is_featured),
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
+    availability: row.availability ?? null,
+    expiresAt: row.deal_expires_at ?? null,
     category: categoryNode
       ? {
           id: categoryNode.id,
@@ -543,4 +549,28 @@ export async function getProductBySlug(
 
   if (error || !data) return null;
   return mapProduct(data as ProductRow);
+}
+
+/** Slugs de productos activos para el sitemap (paginado: PostgREST corta en 1000). */
+export async function listActiveProductSlugs(): Promise<
+  Array<{ slug: string; updatedAt: string }>
+> {
+  const client = getSupabaseServer();
+  const pageSize = 1000;
+  const rows: Array<{ slug: string; updatedAt: string }> = [];
+  for (let from = 0; from < 50_000; from += pageSize) {
+    const { data, error } = await client
+      .from("products")
+      .select("slug, updated_at, created_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`Sitemap: ${error.message}`);
+    for (const row of data ?? []) {
+      if (!row.slug) continue;
+      rows.push({ slug: row.slug, updatedAt: row.updated_at ?? row.created_at });
+    }
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
 }

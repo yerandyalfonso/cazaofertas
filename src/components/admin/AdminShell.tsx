@@ -8,6 +8,7 @@ import { AdminToastProvider } from "@/components/admin/AdminToast";
 
 const NAV = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/estadisticas", label: "Estadísticas" },
   { href: "/admin/products", label: "Productos" },
   { href: "/admin/coupons", label: "Cupones" },
   { href: "/admin/categories", label: "Categorías" },

@@ -30,6 +30,11 @@ export interface MarketplaceProduct {
   productUrl: string;
   isFeatured: boolean;
   createdAt: string;
+  updatedAt: string;
+  /** IN_STOCK | OUT_OF_STOCK | PREORDER | UNKNOWN */
+  availability: string | null;
+  /** Caducidad de la oferta flash, si Amazon la publica. */
+  expiresAt: string | null;
   category: {
     id: string;
     name: string;

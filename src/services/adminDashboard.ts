@@ -202,3 +202,58 @@ export async function getAdminOpsSnapshot(): Promise<{
   ]);
   return { catalog, clicks, pendingTelegram };
 }
+
+export interface TopClickedProduct {
+  productId: string;
+  title: string;
+  slug: string | null;
+  retailer: string | null;
+  clicks: number;
+}
+
+/** Productos con más clics a tienda (sin clics de prueba) en los últimos N días. */
+export async function getTopClickedProducts(
+  days: number,
+  limit = 10,
+): Promise<TopClickedProduct[]> {
+  const client = createSupabaseServiceClient();
+  const since = startOfDaysAgo(days);
+  const counts = new Map<string, number>();
+
+  for (let offset = 0; ; offset += PRODUCT_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("affiliate_clicks")
+      .select("product_id")
+      .eq("is_test", false)
+      // Clics de productos ya borrados quedan con product_id null.
+      .not("product_id", "is", null)
+      .gte("created_at", since)
+      .range(offset, offset + PRODUCT_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      counts.set(row.product_id, (counts.get(row.product_id) ?? 0) + 1);
+    }
+    if (!data || data.length < PRODUCT_PAGE_SIZE) break;
+  }
+
+  const top = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+  if (top.length === 0) return [];
+
+  const { data: products } = await client
+    .from("products")
+    .select("id, title, slug, retailer")
+    .in(
+      "id",
+      top.map(([id]) => id),
+    );
+  const byId = new Map((products ?? []).map((row) => [row.id, row]));
+  return top.map(([productId, clicks]) => ({
+    productId,
+    title: byId.get(productId)?.title ?? "Producto eliminado",
+    slug: byId.get(productId)?.slug ?? null,
+    retailer: byId.get(productId)?.retailer ?? null,
+    clicks,
+  }));
+}

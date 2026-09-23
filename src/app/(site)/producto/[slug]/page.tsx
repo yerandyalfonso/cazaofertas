@@ -15,6 +15,7 @@ import {
   buildPageMetadata,
   productJsonLd,
 } from "@/lib/seo";
+import { marketplaceAbsoluteUrl } from "@/lib/site";
 import { telegramAlertForAsin } from "@/lib/telegram-links";
 import { retailerBuyCtaLabel, retailerLabel } from "@/lib/retailers";
 import { ProductAvailability } from "@/types";
@@ -64,7 +65,9 @@ export async function generateMetadata({
   return buildPageMetadata({
     title,
     description,
-    path: `/producto/${slug}`,
+    // La ficha canónica vive en el marketplace (mismo slug): evita que Google
+    // reparta autoridad entre dos URLs con el mismo contenido.
+    path: marketplaceAbsoluteUrl(`/oferta/${slug}`),
     image: product.imageUrl,
   });
 }
