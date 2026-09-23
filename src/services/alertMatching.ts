@@ -48,6 +48,18 @@ export interface AlertMatch {
   user: UserRow;
 }
 
+/**
+ * Descuento mínimo implícito para alertas amplias (solo categoría y/o marca)
+ * sin mínimo propio: sin él, una alerta de categoría avisa de cualquier
+ * producto que pase por el sistema (p. ej. 134 avisos/24h en «Bebé»).
+ */
+export const DEFAULT_BROAD_ALERT_MIN_DISCOUNT = 15;
+
+/** Alerta de categoría/marca sin producto ni keyword concretos. */
+export function isBroadAlert(alert: AlertRow): boolean {
+  return !alert.product_id && !alert.keyword?.trim();
+}
+
 function normalizeBrand(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -108,7 +120,15 @@ export function alertMatchesDeal(
     return false;
   }
 
-  const minDiscount = toNumber(alert.min_discount_percentage);
+  // Sin bajada real no hay nada que avisar (salvo alertas de producto/URL,
+  // que tienen su propio flujo).
+  if (!alert.product_id && !(deal.discountPercentage > 0)) {
+    return false;
+  }
+
+  const minDiscount =
+    toNumber(alert.min_discount_percentage) ??
+    (isBroadAlert(alert) ? DEFAULT_BROAD_ALERT_MIN_DISCOUNT : null);
   if (minDiscount !== null && deal.discountPercentage < minDiscount) {
     return false;
   }

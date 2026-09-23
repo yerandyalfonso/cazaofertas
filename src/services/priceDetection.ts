@@ -165,6 +165,7 @@ function emptyNotificationStats(): NotificationDispatchResult {
     matched: 0,
     created: 0,
     skippedDuplicates: 0,
+    capped: 0,
     sent: 0,
     failed: 0,
   };
