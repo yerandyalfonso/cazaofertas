@@ -5,7 +5,7 @@ import {
   unauthorizedAdminResponse,
 } from "@/lib/admin-auth";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAdminPage = pathname.startsWith("/admin");
