@@ -7,7 +7,6 @@ import type {
 
 export const DEFAULT_MIRAVIA_FLASH_FEED_URLS = [
   "https://www.miravia.es/flashsale/home",
-  "https://www.miravia.es/",
 ] as const;
 
 const FETCH_TIMEOUT_MS = 20_000;
@@ -280,7 +279,20 @@ export async function fetchMiraviaHtml(
   if (!response.ok) {
     throw new Error(`Miravia HTTP ${response.status} en ${url}`);
   }
-  return response.text();
+  const html = await response.text();
+  // Anti-bot de Alibaba: responde 200 con una página que redirige al captcha.
+  if (isMiraviaCaptchaPage(html)) {
+    throw new Error(`Miravia captcha anti-bot (x5sec) en ${url}`);
+  }
+  return html;
+}
+
+function isMiraviaCaptchaPage(html: string): boolean {
+  return (
+    html.includes("_____tmd_____/punish") ||
+    html.includes("x5secdata=") ||
+    /"action"\s*:\s*"captcha"/.test(html)
+  );
 }
 
 export async function discoverMiraviaDeals(options?: {

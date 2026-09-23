@@ -47,9 +47,9 @@ export const DEFAULT_AMAZON_FLASH_FEED_URLS: readonly string[] = [
   ...AMAZON_CATEGORY_SEARCH_FEEDS,
 ];
 
+// La home carga los productos por JS (0 items en el HTML): solo flashsale.
 export const DEFAULT_MIRAVIA_FEED_URLS: readonly string[] = [
   "https://www.miravia.es/flashsale/home",
-  "https://www.miravia.es/",
 ];
 
 export const DEFAULT_KIABI_FEED_URLS: readonly string[] = [
