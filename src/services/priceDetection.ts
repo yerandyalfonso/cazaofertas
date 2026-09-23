@@ -4,6 +4,10 @@ import {
   buildOutOfStockUpdate,
   inStockAvailabilityPatch,
 } from "@/lib/out-of-stock-policy";
+import {
+  variantInfoForStorage,
+  type ProductVariantInfo,
+} from "@/lib/productVariants";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -19,6 +23,7 @@ import {
 } from "@/services/telegram";
 import { productHasMonitorableUrl } from "@/services/products";
 import { clearAsinScrapeFailure } from "@/services/asinScrapeFailures";
+import { addFlashAsinCooldowns } from "@/services/flashAsinCooldown";
 import {
   MockPriceProvider,
   type MockPriceMode,
@@ -30,7 +35,7 @@ import {
   type PriceProvider,
   type PriceSource,
 } from "@/types";
-import type { ProductRow } from "@/types/database";
+import type { Json, ProductRow } from "@/types/database";
 
 const DEFAULT_BATCH_SIZE = 25;
 
@@ -184,6 +189,17 @@ function mediaBackfillPatch(
     patch.brand = quote.brand.trim();
   }
   return patch;
+}
+
+/** Guarda parent_asin/variantes solo si la ficha las trae (no borra lo previo). */
+function variantPatch(quote: {
+  variantInfo?: ProductVariantInfo | null;
+}): { parent_asin?: string; variant_info?: Json | null } {
+  if (!quote.variantInfo) return {};
+  return {
+    parent_asin: quote.variantInfo.parentAsin,
+    variant_info: variantInfoForStorage(quote.variantInfo),
+  };
 }
 
 const PRICE_PRODUCT_SELECT =
@@ -372,6 +388,7 @@ export async function runPriceDetection(
               updated_at: now,
               ...inStockAvailabilityPatch(availability),
               ...mediaBackfillPatch(product, quote),
+              ...variantPatch(quote),
             })
             .eq("id", product.id);
 
@@ -427,6 +444,7 @@ export async function runPriceDetection(
             updated_at: now,
             ...inStockAvailabilityPatch(availability),
             ...mediaBackfillPatch(product, quote),
+            ...variantPatch(quote),
             ...(quote.dealExpiresAt
               ? { deal_expires_at: quote.dealExpiresAt }
               : {}),
@@ -487,7 +505,17 @@ export async function runPriceDetection(
                 reason.toLowerCase().includes("mínimo histórico"),
               ),
             expiresAt: quote.dealExpiresAt ?? product.deal_expires_at,
+            variants: quote.variantInfo ?? null,
           };
+
+          // Bajada detectada: las demás variantes no deben entrar por flash
+          // en las próximas 24 h (ya se agrupan bajo esta).
+          if (quote.variantInfo?.siblingAsins.length) {
+            await addFlashAsinCooldowns(quote.variantInfo.siblingAsins, {
+              hours: 24,
+              reason: "variant-sibling",
+            });
+          }
 
           if (isDeal) {
             notifications = await notifyMatchingUsers(client, deal);

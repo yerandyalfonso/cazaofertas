@@ -79,3 +79,27 @@ export async function addFlashAsinCooldown(
   };
   await writeFile(data);
 }
+
+/** Igual que addFlashAsinCooldown pero para muchos ASINs en una sola escritura. */
+export async function addFlashAsinCooldowns(
+  asins: string[],
+  options?: { hours?: number; reason?: string },
+): Promise<void> {
+  const keys = asins
+    .map((asin) => asin.trim().toUpperCase())
+    .filter((key) => /^[A-Z0-9]{10}$/.test(key));
+  if (keys.length === 0) return;
+
+  const hours =
+    options?.hours && options.hours > 0 ? options.hours : DEFAULT_HOURS;
+  const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  const reason = options?.reason?.trim() || "no-buybox";
+  const data = pruneExpired(await readFile());
+  for (const key of keys) {
+    // No acortar un cooldown más largo ya existente.
+    const current = data[key];
+    if (current && new Date(current.until).getTime() > Date.parse(until)) continue;
+    data[key] = { until, reason };
+  }
+  await writeFile(data);
+}

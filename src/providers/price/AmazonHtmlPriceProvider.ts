@@ -3,6 +3,10 @@ import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
 import { inferAmazonCategorySlug } from "@/lib/amazon-category";
 import { resolveProxyFetch } from "@/lib/proxyFetch";
 import { formatDescriptionForStorage } from "@/lib/product-description";
+import {
+  extractAmazonVariantInfo,
+  type ProductVariantInfo,
+} from "@/lib/productVariants";
 import type { PriceProvider, ProductPriceData } from "@/providers/price/types";
 import { ProductAvailability } from "@/types";
 
@@ -1135,6 +1139,7 @@ export async function previewAmazonProductPage(
   breadcrumbs?: string[];
   categorySlug?: string;
   dealExpiresAt?: string | null;
+  variantInfo: ProductVariantInfo | null;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -1168,6 +1173,7 @@ export async function previewAmazonProductPage(
     breadcrumbs: extracted.breadcrumbs,
     categorySlug: extracted.categorySlug,
     dealExpiresAt: extracted.dealExpiresAt ?? null,
+    variantInfo: extractAmazonVariantInfo(html, asin),
   };
 }
 
@@ -1182,6 +1188,7 @@ export async function scrapeAmazonProductPage(
   const amazonUrl = amazonEsProductUrl(asin, url);
   const html = await fetchAmazonPageHtml(amazonUrl, options);
   const extracted = extractPriceFromAmazonHtml(html);
+  const variantInfo = extractAmazonVariantInfo(html, asin);
 
   if (extracted.price === null) {
     if (extracted.availability === ProductAvailability.OUT_OF_STOCK) {
@@ -1198,6 +1205,7 @@ export async function scrapeAmazonProductPage(
         discountPercentage: extracted.discountPercentage ?? undefined,
         categorySlug: extracted.categorySlug,
         dealExpiresAt: extracted.dealExpiresAt ?? null,
+        variantInfo,
       };
     }
     throw new Error("No se pudo extraer el precio del HTML de Amazon.");
@@ -1216,6 +1224,7 @@ export async function scrapeAmazonProductPage(
     discountPercentage: extracted.discountPercentage ?? undefined,
     categorySlug: extracted.categorySlug,
     dealExpiresAt: extracted.dealExpiresAt ?? null,
+    variantInfo,
   };
 }
 

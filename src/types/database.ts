@@ -84,6 +84,8 @@ export type Database = {
           last_telegram_notified_price: number | null;
           last_telegram_notified_score: number | null;
           deal_expires_at: string | null;
+          parent_asin: string | null;
+          variant_info: Json | null;
           created_at: string;
           updated_at: string;
           is_active: boolean;
@@ -118,6 +120,8 @@ export type Database = {
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;
           deal_expires_at?: string | null;
+          parent_asin?: string | null;
+          variant_info?: Json | null;
           created_at?: string;
           updated_at?: string;
           is_active?: boolean;
@@ -152,6 +156,8 @@ export type Database = {
           last_telegram_notified_price?: number | null;
           last_telegram_notified_score?: number | null;
           deal_expires_at?: string | null;
+          parent_asin?: string | null;
+          variant_info?: Json | null;
           created_at?: string;
           updated_at?: string;
           is_active?: boolean;

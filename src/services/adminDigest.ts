@@ -50,6 +50,8 @@ interface PersonalAlertsStats {
 interface ChannelStats {
   sentLast24h: number;
   skippedLast24h: number;
+  /** Variantes del mismo producto padre no enviadas (se envió solo una). */
+  skippedVariantLast24h: number;
   pendingTotal: number;
 }
 
@@ -259,9 +261,11 @@ async function buildChannelStats(client: ReturnType<typeof createSupabaseService
 
   let sentLast24h = 0;
   let skippedLast24h = 0;
+  let skippedVariantLast24h = 0;
   for (const row of data ?? []) {
     if (row.status === "sent") sentLast24h += 1;
     else if (row.status === "skipped") skippedLast24h += 1;
+    else if (row.status === "skipped_variant") skippedVariantLast24h += 1;
   }
 
   const { count: pendingTotal } = await client
@@ -269,7 +273,12 @@ async function buildChannelStats(client: ReturnType<typeof createSupabaseService
     .select("id", { count: "exact", head: true })
     .eq("status", "pending");
 
-  return { sentLast24h, skippedLast24h, pendingTotal: pendingTotal ?? 0 };
+  return {
+    sentLast24h,
+    skippedLast24h,
+    skippedVariantLast24h,
+    pendingTotal: pendingTotal ?? 0,
+  };
 }
 
 async function buildUrlAlertsStats(client: ReturnType<typeof createSupabaseServiceClient>): Promise<UrlAlertsStats> {
@@ -440,6 +449,9 @@ export function formatAdminDigestMessage(report: AdminDigestReport): string {
     "",
     "📣 <b>Canal/grupo (24h)</b>",
     `${report.channel.sentLast24h} enviados · ${report.channel.skippedLast24h} saltados` +
+      (report.channel.skippedVariantLast24h > 0
+        ? ` · ${report.channel.skippedVariantLast24h} variantes agrupadas`
+        : "") +
       (report.channel.pendingTotal > 0 ? ` · ${report.channel.pendingTotal} pendientes` : ""),
   );
 

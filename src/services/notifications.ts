@@ -9,7 +9,9 @@ import {
   escapeHtml,
   isTelegramConfigured,
   sendDealAlertMessage,
+  sendTelegramMediaGroup,
   sendTelegramMessage,
+  sendTelegramPhoto,
 } from "@/services/telegram/bot";
 
 /** Avisos sueltos por alerta en 24 h; el resto se agrupa en un resumen. */
@@ -46,6 +48,41 @@ async function hasDuplicateNotification(
   return (data ?? []).some(
     (row) => roundMoney(Number(row.new_price)) === roundMoney(newPrice),
   );
+}
+
+/** ¿Ya avisamos a este usuario de otra variante (talla/color) del mismo padre? */
+async function hasRecentSiblingNotification(
+  client: TypedSupabaseClient,
+  userId: string,
+  productId: string,
+  parentAsin: string,
+): Promise<boolean> {
+  const { data: siblings } = await client
+    .from("products")
+    .select("id")
+    .eq("parent_asin", parentAsin)
+    .neq("id", productId)
+    .limit(500);
+  const siblingIds = (siblings ?? []).map((row) => row.id);
+  if (siblingIds.length === 0) return false;
+
+  const since = new Date(Date.now() - CAP_WINDOW_MS).toISOString();
+  const [{ count: recentSent }, { count: queued }] = await Promise.all([
+    client
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("product_id", siblingIds)
+      .in("status", ["sent", "capped_digest_sent"])
+      .gte("sent_at", since),
+    client
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("product_id", siblingIds)
+      .in("status", ["pending", "capped"]),
+  ]);
+  return (recentSent ?? 0) + (queued ?? 0) > 0;
 }
 
 async function isAlertOverDailyCap(
@@ -90,7 +127,17 @@ export async function notifyMatchingUsers(
       deal.currentPrice,
     );
 
-    if (isDuplicate) {
+    const parentAsin = deal.variants?.parentAsin;
+    if (
+      isDuplicate ||
+      (parentAsin &&
+        (await hasRecentSiblingNotification(
+          client,
+          match.user.id,
+          deal.productId,
+          parentAsin,
+        )))
+    ) {
       result.skippedDuplicates += 1;
       continue;
     }
@@ -176,7 +223,12 @@ interface CappedRow {
   alert_id: string | null;
   discount_percentage: number | string | null;
   new_price: number | string;
-  products: { title: string; slug: string } | null;
+  products: {
+    title: string;
+    slug: string;
+    image_url: string | null;
+    parent_asin: string | null;
+  } | null;
   users: { telegram_id: number | null } | null;
   alerts: {
     brand: string | null;
@@ -192,9 +244,32 @@ function describeAlert(row: CappedRow): string {
   return parts.length > 0 ? parts.join(" · ") : "tu alerta";
 }
 
+/** Mismo producto (variantes o duplicados por título) → una sola entrada. */
+function digestProductKey(row: CappedRow): string {
+  if (row.products?.parent_asin) return `p:${row.products.parent_asin}`;
+  const title = (row.products?.title ?? row.id)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  return `t:${title}`;
+}
+
+function formatDigestLine(row: CappedRow, index: number): string {
+  const discount = Math.round(toNumber(row.discount_percentage) ?? 0);
+  const price = roundMoney(Number(row.new_price)).toFixed(2).replace(".", ",");
+  const title = escapeHtml((row.products?.title ?? "Producto").slice(0, 60));
+  const link = row.products?.slug
+    ? marketplaceAbsoluteUrl(`/oferta/${row.products.slug}`)
+    : null;
+  const label = link ? `<a href="${escapeHtml(link)}">${title}</a>` : title;
+  return `${index + 1}. −${discount}% · <b>${price} €</b> · ${label}`;
+}
+
 /**
- * Envía un único mensaje por alerta con los avisos que superaron el tope
- * diario (`capped`), ordenados por descuento. Corre en el cron user-alerts.
+ * Envía un único resumen por alerta con los avisos que superaron el tope
+ * diario (`capped`): álbum con las fotos y, debajo, la lista numerada en el
+ * mismo orden. Corre en el cron user-alerts.
  */
 export async function sendCappedAlertDigests(
   client: TypedSupabaseClient,
@@ -204,7 +279,7 @@ export async function sendCappedAlertDigests(
   const { data, error } = await client
     .from("notifications")
     .select(
-      "id, alert_id, discount_percentage, new_price, products(title, slug), users(telegram_id), alerts(brand, categories(name))",
+      "id, alert_id, discount_percentage, new_price, products(title, slug, image_url, parent_asin), users(telegram_id), alerts(brand, categories(name))",
     )
     .eq("status", "capped")
     .limit(1000);
@@ -233,35 +308,65 @@ export async function sendCappedAlertDigests(
       continue;
     }
 
-    const top = [...rows]
+    // Mejor descuento primero; una entrada por producto.
+    const seen = new Set<string>();
+    const unique = [...rows]
       .sort(
         (a, b) =>
           (toNumber(b.discount_percentage) ?? 0) -
           (toNumber(a.discount_percentage) ?? 0),
       )
-      .slice(0, DIGEST_MAX_ITEMS);
+      .filter((row) => {
+        const key = digestProductKey(row);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    // Con foto primero para que el orden del álbum y de la lista coincida.
+    const withPhoto = unique.filter((row) => row.products?.image_url?.trim());
+    const top = [
+      ...withPhoto,
+      ...unique.filter((row) => !row.products?.image_url?.trim()),
+    ].slice(0, DIGEST_MAX_ITEMS);
 
     const lines = [
-      `🔔 <b>${rows.length} chollos más para ${escapeHtml(describeAlert(rows[0]!))}</b>`,
+      `🔔 <b>${unique.length} chollos más para ${escapeHtml(describeAlert(rows[0]!))}</b>`,
       `Tu alerta superó ${ALERT_MAX_NOTIFICATIONS_PER_24H} avisos en 24 h; aquí van agrupados:`,
       "",
-      ...top.map((row) => {
-        const discount = Math.round(toNumber(row.discount_percentage) ?? 0);
-        const price = roundMoney(Number(row.new_price)).toFixed(2).replace(".", ",");
-        const title = escapeHtml((row.products?.title ?? "Producto").slice(0, 70));
-        const link = row.products?.slug
-          ? marketplaceAbsoluteUrl(`/oferta/${row.products.slug}`)
-          : null;
-        const label = link ? `<a href="${escapeHtml(link)}">${title}</a>` : title;
-        return `• -${discount}% · ${price} € · ${label}`;
-      }),
+      ...top.map(formatDigestLine),
     ];
-    if (rows.length > top.length) {
-      lines.push("", `…y ${rows.length - top.length} más.`);
+    if (unique.length > top.length) {
+      lines.push("", `…y ${unique.length - top.length} más.`);
     }
+    const text = lines.join("\n");
+    // El límite de 1024 de Telegram cuenta el texto visible (sin etiquetas/URLs).
+    const visibleLength = text
+      .replace(/<[^>]+>/g, "")
+      .replace(/&(amp|lt|gt|quot);/g, "_").length;
+    const photos = top
+      .map((row) => row.products?.image_url?.trim())
+      .filter((url): url is string => Boolean(url));
 
     try {
-      await sendTelegramMessage({ chatId, text: lines.join("\n") });
+      // Telegram: álbum de 2–10 fotos y caption ≤ 1024 caracteres.
+      if (photos.length >= 2 && visibleLength <= 1024) {
+        await sendTelegramMediaGroup({
+          chatId,
+          photos: photos.map((url, index) =>
+            index === 0 ? { url, caption: text } : { url },
+          ),
+        });
+      } else if (photos.length >= 2) {
+        await sendTelegramMediaGroup({
+          chatId,
+          photos: photos.map((url) => ({ url })),
+        });
+        await sendTelegramMessage({ chatId, text });
+      } else if (photos.length === 1 && visibleLength <= 1024) {
+        await sendTelegramPhoto({ chatId, photoUrl: photos[0]!, caption: text });
+      } else {
+        await sendTelegramMessage({ chatId, text });
+      }
       await client
         .from("notifications")
         .update({
@@ -270,7 +375,11 @@ export async function sendCappedAlertDigests(
         })
         .in("id", ids);
       result.sent += 1;
-    } catch {
+    } catch (error) {
+      console.warn(
+        "[capped-digest]",
+        error instanceof Error ? error.message : error,
+      );
       result.failed += 1;
     }
   }

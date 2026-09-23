@@ -1,3 +1,4 @@
+import type { ProductVariantInfo } from "@/lib/productVariants";
 import { ProductAvailability } from "@/types";
 
 export interface ProductPriceData {
@@ -15,6 +16,8 @@ export interface ProductPriceData {
   discountPercentage?: number;
   /** Caducidad de Lightning/flash si Amazon la publica. */
   dealExpiresAt?: string | null;
+  /** Variantes (talla/color) si la ficha es de un producto con variantes. */
+  variantInfo?: ProductVariantInfo | null;
 }
 
 export interface PriceProvider {

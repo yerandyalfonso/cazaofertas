@@ -1,4 +1,5 @@
 import { calculateDiscountPercentage, toNumber } from "@/lib/money";
+import { parseStoredVariantInfo } from "@/lib/productVariants";
 import { resolveProductBuyUrl } from "@/lib/retailers";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { resolveParentSlug } from "@/lib/category-taxonomy";
@@ -16,6 +17,46 @@ import { sendChannelDealAlert } from "@/services/telegram/bot";
 import { DealLevel, ProductAvailability } from "@/types";
 
 const SEND_DELAY_MS = 1_200;
+/** Sin repetir otra variante (talla/color) del mismo producto padre. */
+const VARIANT_WINDOW_MS = 24 * 3_600_000;
+/** …salvo que el nuevo descuento supere al ya enviado en estos puntos. */
+const VARIANT_MIN_IMPROVEMENT_POINTS = 5;
+
+type FlushClient = ReturnType<typeof createSupabaseServiceClient>;
+
+/**
+ * ¿Ya se envió hace poco otra variante del mismo padre con un descuento
+ * parecido? Evita p. ej. 21 mensajes de las mismas zapatillas en 24 h.
+ */
+async function recentlySentSiblingVariant(
+  client: FlushClient,
+  productId: string,
+  parentAsin: string,
+  discount: number,
+): Promise<boolean> {
+  const { data: siblings } = await client
+    .from("products")
+    .select("id")
+    .eq("parent_asin", parentAsin)
+    .neq("id", productId)
+    .limit(500);
+  const siblingIds = (siblings ?? []).map((row) => row.id);
+  if (siblingIds.length === 0) return false;
+
+  const since = new Date(Date.now() - VARIANT_WINDOW_MS).toISOString();
+  const { data: sent } = await client
+    .from("channel_notifications")
+    .select("discount_percentage")
+    .in("product_id", siblingIds)
+    .eq("status", "sent")
+    .gte("sent_at", since);
+  if (!sent || sent.length === 0) return false;
+
+  const bestSent = Math.max(
+    ...sent.map((row) => toNumber(row.discount_percentage) ?? 0),
+  );
+  return discount < bestSent + VARIANT_MIN_IMPROVEMENT_POINTS;
+}
 
 export interface TelegramFlushResult {
   ok: true;
@@ -30,6 +71,8 @@ export interface TelegramFlushResult {
   skippedExpired: number;
   skippedLowScore: number;
   skippedUnavailable: number;
+  /** Otras variantes del mismo producto padre (se envía solo una). */
+  skippedVariant: number;
   failed: number;
   finishedAt: string;
 }
@@ -193,6 +236,7 @@ export async function flushPendingChannelNotifications(options?: {
       skippedExpired: 0,
       skippedLowScore: 0,
       skippedUnavailable: 0,
+      skippedVariant: 0,
       failed: 0,
       finishedAt,
     };
@@ -245,6 +289,7 @@ export async function flushPendingChannelNotifications(options?: {
       skippedExpired: 0,
       skippedLowScore: 0,
       skippedUnavailable: 0,
+      skippedVariant: 0,
       failed: 0,
       finishedAt,
     };
@@ -298,10 +343,46 @@ export async function flushPendingChannelNotifications(options?: {
   let skippedExpired = 0;
   let skippedLowScore = 0;
   let skippedUnavailable = 0;
+  let skippedVariant = 0;
   let failed = 0;
 
-  for (let index = 0; index < uniqueRows.length; index += 1) {
-    const row = uniqueRows[index]!;
+  // Varias variantes del mismo padre en el lote → solo la de mayor descuento.
+  const { data: variantRows } = await client
+    .from("products")
+    .select("id, parent_asin, discount_percentage")
+    .in(
+      "id",
+      uniqueRows.map((row) => row.product_id),
+    )
+    .not("parent_asin", "is", null);
+  const parentByProduct = new Map<string, string>();
+  const bestByParent = new Map<string, { productId: string; discount: number }>();
+  for (const row of variantRows ?? []) {
+    if (!row.parent_asin) continue;
+    parentByProduct.set(row.id, row.parent_asin);
+    const discount = toNumber(row.discount_percentage) ?? 0;
+    const best = bestByParent.get(row.parent_asin);
+    if (!best || discount > best.discount) {
+      bestByParent.set(row.parent_asin, { productId: row.id, discount });
+    }
+  }
+  const batchRows = [];
+  for (const row of uniqueRows) {
+    const parent = parentByProduct.get(row.product_id);
+    if (parent && bestByParent.get(parent)?.productId !== row.product_id) {
+      await client
+        .from("channel_notifications")
+        .update({ status: "skipped_variant" })
+        .eq("id", row.id)
+        .in("status", ["pending", "failed"]);
+      skippedVariant += 1;
+      continue;
+    }
+    batchRows.push(row);
+  }
+
+  for (let index = 0; index < batchRows.length; index += 1) {
+    const row = batchRows[index]!;
 
     // Claim atómico: evita que dos flush concurrentes envíen el mismo chollo.
     const { data: claimed, error: claimError } = await client
@@ -320,7 +401,7 @@ export async function flushPendingChannelNotifications(options?: {
       const { data: product, error: productError } = await client
         .from("products")
         .select(
-          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, category_id, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
+          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, parent_asin, variant_info, category_id, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
         )
         .eq("id", row.product_id)
         .maybeSingle();
@@ -395,6 +476,23 @@ export async function flushPendingChannelNotifications(options?: {
         continue;
       }
 
+      if (
+        product.parent_asin &&
+        (await recentlySentSiblingVariant(
+          client,
+          product.id,
+          product.parent_asin,
+          discount,
+        ))
+      ) {
+        await client
+          .from("channel_notifications")
+          .update({ status: "skipped_variant" })
+          .eq("id", row.id);
+        skippedVariant += 1;
+        continue;
+      }
+
       const deal: DealCandidate = {
         productId: product.id,
         asin: product.asin,
@@ -425,6 +523,7 @@ export async function flushPendingChannelNotifications(options?: {
         nearHistoricalLow: scoring.level === DealLevel.HISTORICAL_LOW,
         detectedAt: row.created_at,
         expiresAt: expiresAt,
+        variants: parseStoredVariantInfo(product.variant_info),
       };
 
       const message = await sendChannelDealAlert(deal);
@@ -462,7 +561,7 @@ export async function flushPendingChannelNotifications(options?: {
         .eq("id", product.id);
 
       sent += 1;
-      if (index < uniqueRows.length - 1) await sleep(SEND_DELAY_MS);
+      if (index < batchRows.length - 1) await sleep(SEND_DELAY_MS);
     } catch (error) {
       console.warn(
         "[telegram-flush]",
@@ -511,6 +610,7 @@ export async function flushPendingChannelNotifications(options?: {
     skippedExpired,
     skippedLowScore,
     skippedUnavailable,
+    skippedVariant,
     failed,
     finishedAt,
   };

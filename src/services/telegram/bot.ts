@@ -6,6 +6,7 @@ import {
   getTelegramPublicChannelId,
 } from "@/lib/env";
 import { formatEuro, requireNumber, toNumber } from "@/lib/money";
+import { formatVariantLines } from "@/lib/productVariants";
 import { marketplaceAbsoluteUrl } from "@/lib/site";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
@@ -211,6 +212,24 @@ export async function sendTelegramPhoto(options: {
   });
 }
 
+/** Álbum de 2–10 fotos; el caption del primer ítem se ve bajo el álbum. */
+export async function sendTelegramMediaGroup(options: {
+  chatId: number | string;
+  photos: Array<{ url: string; caption?: string }>;
+  parseMode?: "HTML" | "MarkdownV2";
+}): Promise<TelegramMessage[]> {
+  return callTelegramApi<TelegramMessage[]>("sendMediaGroup", {
+    chat_id: options.chatId,
+    media: options.photos.slice(0, 10).map((photo) => ({
+      type: "photo",
+      media: photo.url,
+      ...(photo.caption
+        ? { caption: photo.caption, parse_mode: options.parseMode ?? "HTML" }
+        : {}),
+    })),
+  });
+}
+
 export async function editTelegramMessage(options: {
   chatId: number;
   messageId: number;
@@ -365,6 +384,11 @@ export function buildDealAlertText(
     `🏷️ Antes: <s>${formatEuro(deal.previousPrice)}</s>`,
     `📉 Descuento: <b>−${Math.round(deal.discountPercentage)}%</b>`,
   );
+
+  const variantLines = formatVariantLines(deal.variants);
+  if (variantLines.length > 0) {
+    lines.push("", ...variantLines.map(escapeHtml));
+  }
 
   if (deal.detectedAt) {
     lines.push(`📅 Publicada: ${formatDealStamp(deal.detectedAt)}`);

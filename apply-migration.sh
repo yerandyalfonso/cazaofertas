@@ -29,7 +29,7 @@ echo "== Copiando $NAME al VPS =="
 scp "$FILE" "vps:/tmp/$NAME"
 
 echo "== Aplicando contra Postgres (dentro del contenedor supabase-db) =="
-ssh vps "docker cp /tmp/$NAME supabase-db:/tmp/$NAME && docker exec supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/$NAME"
+ssh vps "docker cp /tmp/$NAME supabase-db:/tmp/$NAME && docker exec supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -f /tmp/$NAME"
 
 ssh vps "docker exec supabase-db psql -U postgres -d postgres -c \"insert into public._migrations_applied (name) values ('$NAME');\"" > /dev/null
 

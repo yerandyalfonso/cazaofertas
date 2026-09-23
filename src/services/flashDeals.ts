@@ -8,6 +8,10 @@ import {
 } from "@/lib/categories";
 import { inferProductSubcategorySlug } from "@/lib/product-category-inference";
 import { roundMoney } from "@/lib/money";
+import {
+  variantInfoForStorage,
+  type ProductVariantInfo,
+} from "@/lib/productVariants";
 import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
 import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import {
@@ -25,6 +29,7 @@ import { notifyMatchingUsers } from "@/services/notifications";
 import type { DealCandidate } from "@/services/alertMatching";
 import {
   addFlashAsinCooldown,
+  addFlashAsinCooldowns,
   getActiveFlashAsinCooldowns,
 } from "@/services/flashAsinCooldown";
 import { DealLevel, ProductAvailability } from "@/types";
@@ -98,6 +103,7 @@ async function maybeNotifyFlashChannel(
     imageUrl?: string | null;
     summary?: string | null;
     expiresAt?: string | null;
+    variants?: ProductVariantInfo | null;
   },
 ): Promise<"sent" | "skipped" | "failed" | "queued"> {
   const deal: DealCandidate = {
@@ -127,6 +133,7 @@ async function maybeNotifyFlashChannel(
     }),
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
     expiresAt: options.expiresAt ?? null,
+    variants: options.variants ?? null,
   };
 
   try {
@@ -279,6 +286,7 @@ export async function runFlashDealsCheck(options?: {
   const cooldowns = await getActiveFlashAsinCooldowns();
   const eligible: DiscoveredListingItem[] = [];
   let skippedCooldown = 0;
+  const variantSiblingsThisRun = new Set<string>();
   for (const item of newCandidates) {
     if (cooldowns.has(item.asin)) {
       skippedCooldown += 1;
@@ -311,6 +319,11 @@ export async function runFlashDealsCheck(options?: {
       unchanged += 1;
       continue;
     }
+    // Otra variante (talla/color) de un producto que ya entró en esta pasada.
+    if (variantSiblingsThisRun.has(item.asin.toUpperCase())) {
+      skippedCooldown += 1;
+      continue;
+    }
 
     try {
       let title =
@@ -328,6 +341,7 @@ export async function runFlashDealsCheck(options?: {
       let categorySlugHint: string | undefined;
       let categoryBreadcrumbs: string[] | undefined;
       let dealExpiresAt: string | null = null;
+      let variantInfo: ProductVariantInfo | null = null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
 
@@ -349,6 +363,7 @@ export async function runFlashDealsCheck(options?: {
             categoryBreadcrumbs = preview.breadcrumbs;
           }
           if (preview.dealExpiresAt) dealExpiresAt = preview.dealExpiresAt;
+          variantInfo = preview.variantInfo;
 
           if (
             price == null &&
@@ -480,6 +495,8 @@ export async function runFlashDealsCheck(options?: {
           last_checked_at: now,
           updated_at: now,
           deal_expires_at: dealExpiresAt,
+          parent_asin: variantInfo?.parentAsin ?? null,
+          variant_info: variantInfoForStorage(variantInfo),
         })
         .select("id, asin, title, slug")
         .single();
@@ -497,6 +514,18 @@ export async function runFlashDealsCheck(options?: {
       }
 
       catalogByAsin.add(item.asin.toUpperCase());
+
+      // Al detectar la bajada ya conocemos las demás variantes: se bloquean
+      // 24 h para no insertarlas ni notificarlas después una a una.
+      if (variantInfo?.siblingAsins.length) {
+        for (const sibling of variantInfo.siblingAsins) {
+          variantSiblingsThisRun.add(sibling);
+        }
+        await addFlashAsinCooldowns(variantInfo.siblingAsins, {
+          hours: 24,
+          reason: "variant-sibling",
+        });
+      }
 
       inserted += 1;
       newLows += 1;
@@ -523,6 +552,7 @@ export async function runFlashDealsCheck(options?: {
           imageUrl,
           summary: description || brand,
           expiresAt: dealExpiresAt,
+          variants: variantInfo,
         });
         if (channelStatus === "queued") channelNotificationsQueued += 1;
         if (channelStatus === "sent") channelNotificationsSent += 1;

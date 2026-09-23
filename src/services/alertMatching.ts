@@ -1,4 +1,5 @@
 import { toNumber } from "@/lib/money";
+import type { ProductVariantInfo } from "@/lib/productVariants";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import type { DealLevel } from "@/types";
 import type { Database } from "@/types/database";
@@ -41,6 +42,8 @@ export interface DealCandidate {
   detectedAt?: string | null;
   /** Caducidad Amazon si existe. */
   expiresAt?: string | null;
+  /** Variantes (talla/color) del producto padre, si las tiene. */
+  variants?: ProductVariantInfo | null;
 }
 
 export interface AlertMatch {
