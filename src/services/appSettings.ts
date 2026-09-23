@@ -363,14 +363,14 @@ function mapRow(row: AppSettingsRow): AppSettings {
     miraviaFlashLimit: clampSmallInt(
       Number(row.miravia_flash_limit ?? env.miraviaFlashLimit),
       env.miraviaFlashLimit,
-      5,
+      10,
     ),
     miraviaFlashUpdateLimit: clampSmallInt(
       Number(
         row.miravia_flash_update_limit ?? env.miraviaFlashUpdateLimit,
       ),
       env.miraviaFlashUpdateLimit,
-      5,
+      10,
     ),
     kiabiDealsEnabled: row.kiabi_deals_enabled ?? env.kiabiDealsEnabled,
     kiabiMinDiscountPercent: clampPercent(
@@ -682,14 +682,14 @@ export async function updateAppSettings(
         : current.miraviaDiscoveryMaxItems,
     miraviaFlashLimit:
       patch.miraviaFlashLimit !== undefined
-        ? clampSmallInt(patch.miraviaFlashLimit, current.miraviaFlashLimit, 5)
+        ? clampSmallInt(patch.miraviaFlashLimit, current.miraviaFlashLimit, 10)
         : current.miraviaFlashLimit,
     miraviaFlashUpdateLimit:
       patch.miraviaFlashUpdateLimit !== undefined
         ? clampSmallInt(
             patch.miraviaFlashUpdateLimit,
             current.miraviaFlashUpdateLimit,
-            5,
+            10,
           )
         : current.miraviaFlashUpdateLimit,
     kiabiDealsEnabled: patch.kiabiDealsEnabled ?? current.kiabiDealsEnabled,
