@@ -204,12 +204,6 @@ async function runUserAlerts(): Promise<void> {
   });
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);
-
-  // Resumen de los avisos que superaron el tope diario por alerta.
-  const { sendCappedAlertDigests } = await import("@/services/notifications");
-  const { createSupabaseServiceClient } = await import("@/lib/supabase");
-  const digests = await sendCappedAlertDigests(createSupabaseServiceClient());
-  console.log(JSON.stringify({ cappedDigests: digests }, null, 2));
 }
 
 /**

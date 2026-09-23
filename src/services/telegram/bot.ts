@@ -212,24 +212,6 @@ export async function sendTelegramPhoto(options: {
   });
 }
 
-/** Álbum de 2–10 fotos; el caption del primer ítem se ve bajo el álbum. */
-export async function sendTelegramMediaGroup(options: {
-  chatId: number | string;
-  photos: Array<{ url: string; caption?: string }>;
-  parseMode?: "HTML" | "MarkdownV2";
-}): Promise<TelegramMessage[]> {
-  return callTelegramApi<TelegramMessage[]>("sendMediaGroup", {
-    chat_id: options.chatId,
-    media: options.photos.slice(0, 10).map((photo) => ({
-      type: "photo",
-      media: photo.url,
-      ...(photo.caption
-        ? { caption: photo.caption, parse_mode: options.parseMode ?? "HTML" }
-        : {}),
-    })),
-  });
-}
-
 export async function editTelegramMessage(options: {
   chatId: number;
   messageId: number;
@@ -262,7 +244,7 @@ export async function answerCallbackQuery(options: {
   return Boolean(result);
 }
 
-export function escapeHtml(value: string): string {
+function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
