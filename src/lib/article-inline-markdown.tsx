@@ -52,13 +52,14 @@ export function renderArticleInlineText(text: string): ReactNode[] {
     } else if (match[0].startsWith("**")) {
       nodes.push(
         <strong key={`bold-${key++}`} className="font-semibold text-ink">
-          {match[1]}
+          {/* Grupos del regex combinado: 1–2 enlace, 3 negrita, 4 cursiva. */}
+          {match[3]}
         </strong>,
       );
     } else {
       nodes.push(
         <em key={`italic-${key++}`} className="italic">
-          {match[1]}
+          {match[4]}
         </em>,
       );
     }
