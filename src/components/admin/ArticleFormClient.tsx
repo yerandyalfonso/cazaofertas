@@ -41,6 +41,8 @@ const CATEGORIES = [
   "Guías",
   "Tecnología",
   "Hogar",
+  "Belleza",
+  "Deportes",
   "Ofertas",
   "Análisis",
 ] as const;
@@ -394,6 +396,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         <ArticleQuickImport
           activeBlogTemplate={template}
           onApply={applyQuickImport}
+          defaultCollapsed={isEdit}
         />
 
         <ArticleStyleGuide activeTemplate={template} />
@@ -484,7 +487,14 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
               onChange={(event) => setCategory(event.target.value)}
               className="admin-input mt-2"
             >
-              {CATEGORIES.map((item) => (
+              {/* Incluye la categoría actual aunque no esté en la lista: si no,
+                  el select mostraría la primera opción y la guardaría sin avisar. */}
+              {[
+                ...(category && !(CATEGORIES as readonly string[]).includes(category)
+                  ? [category]
+                  : []),
+                ...CATEGORIES,
+              ].map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>

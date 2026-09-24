@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { AlertTriangle, ArrowRight, CheckCircle2, Info } from "lucide-react";
 import { createSupabaseServiceClient } from "@/lib/supabase";
-import { retailerLabel } from "@/lib/retailers";
+import { formatFullDateTime, formatRelativeTime } from "@/lib/relative-time";
 import {
   getAdminCatalogStats,
   getAdminClickStats,
 } from "@/services/adminDashboard";
+import {
+  getAdminAttentionItems,
+  type AttentionItem,
+} from "@/services/adminAttention";
 import { countPendingChannelNotifications } from "@/services/telegramFlush";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +40,9 @@ export default async function AdminDashboardPage({
   let loadError: string | null = null;
   let clicksError: string | null = null;
   let recentClicks: ClickRow[] = [];
+  const attention: AttentionItem[] | null = await getAdminAttentionItems().catch(
+    () => null,
+  );
 
   try {
     const [catalogStats, clickStats, telegramPending] = await Promise.all([
@@ -90,13 +98,15 @@ export default async function AdminDashboardPage({
         </p>
       </header>
 
+      {attention ? <AttentionPanel items={attention} /> : null}
+
       {loadError ? (
         <p className="mt-8 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {loadError}
         </p>
       ) : catalog ? (
         <>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <StatCard label="Productos activos" value={String(catalog.activeProducts)} />
             <StatCard
               label="Amazon monitorizable"
@@ -120,9 +130,10 @@ export default async function AdminDashboardPage({
               label="Última revisión"
               value={
                 catalog.lastCheckedAt
-                  ? new Date(catalog.lastCheckedAt).toLocaleString("es-ES")
+                  ? formatRelativeTime(catalog.lastCheckedAt)
                   : "Sin datos"
               }
+              hint={formatFullDateTime(catalog.lastCheckedAt) || undefined}
             />
             <StatCard
               label="Telegram pendientes"
@@ -131,38 +142,13 @@ export default async function AdminDashboardPage({
             />
           </div>
 
-          {catalog.byRetailer.length > 0 ? (
-            <div className="admin-card mt-6 max-w-xl p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
-                Por tienda
-              </p>
-              <ul className="mt-3 divide-y divide-stone-100">
-                {catalog.byRetailer.map((row) => {
-                  const total = catalog.activeProducts || 1;
-                  const pct = Math.round((row.count / total) * 100);
-                  return (
-                    <li
-                      key={row.retailer}
-                      className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
-                    >
-                      <span className="w-24 shrink-0 text-sm font-medium text-ink">
-                        {retailerLabel(row.retailer)}
-                      </span>
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-stone-100">
-                        <div
-                          className="h-full rounded-full bg-[var(--primary)]"
-                          style={{ width: `${Math.max(pct, 4)}%` }}
-                        />
-                      </div>
-                      <span className="w-16 shrink-0 text-right text-sm tabular-nums text-stone-600">
-                        {row.count.toLocaleString("es-ES")}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
+          <p className="mt-4 text-xs text-[var(--text-muted)]">
+            Cobertura por tienda y detalle de vigilancia en{" "}
+            <Link href="/admin/cron" className="font-semibold text-[var(--primary)] hover:underline">
+              Operaciones
+            </Link>
+            .
+          </p>
         </>
       ) : null}
 
@@ -343,6 +329,59 @@ export default async function AdminDashboardPage({
         </Link>
       </div>
     </div>
+  );
+}
+
+function AttentionPanel({ items }: { items: AttentionItem[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="admin-card mt-8 flex items-center gap-3 p-4 text-sm text-[var(--text-muted)]">
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+        Todo en orden: no hay tareas pendientes.
+      </div>
+    );
+  }
+  return (
+    <section className="mt-8" aria-labelledby="attention-title">
+      <h2
+        id="attention-title"
+        className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+      >
+        Requiere atención
+      </h2>
+      <ul className="mt-3 grid gap-3 lg:grid-cols-2">
+        {items.map((item) => {
+          const warning = item.tone === "warning";
+          const Icon = warning ? AlertTriangle : Info;
+          return (
+            <li
+              key={item.id}
+              className={`admin-card flex items-start gap-3 p-4 ${
+                warning ? "border-amber-300 bg-amber-50/60" : ""
+              }`}
+            >
+              <Icon
+                className={`mt-0.5 h-5 w-5 shrink-0 ${
+                  warning ? "text-amber-600" : "text-[var(--primary)]"
+                }`}
+                aria-hidden
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--text)]">{item.title}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">{item.detail}</p>
+              </div>
+              <Link
+                href={item.href}
+                className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--primary)] hover:underline"
+              >
+                {item.cta}
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

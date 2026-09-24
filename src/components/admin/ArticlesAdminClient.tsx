@@ -8,9 +8,12 @@ import {
   ArrowUp,
   ArrowUpDown,
   ExternalLink,
+  Eye,
   Loader2,
+  Package,
   Pencil,
   Plus,
+  Send,
   Trash2,
 } from "lucide-react";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
@@ -91,12 +94,53 @@ function sortArticles(
   return dir === "asc" ? sorted : sorted.reverse();
 }
 
-export function ArticlesAdminClient() {
+function SortButton({
+  column,
+  label,
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  column: SortKey;
+  label: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  const active = sortKey === column;
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(column)}
+      className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-[var(--text)] ${
+        active ? "text-[var(--text)]" : "text-[var(--text-muted)]"
+      }`}
+    >
+      {label}
+      {active ? (
+        sortDir === "asc" ? (
+          <ArrowUp className="h-3 w-3" aria-hidden />
+        ) : (
+          <ArrowDown className="h-3 w-3" aria-hidden />
+        )
+      ) : (
+        <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden />
+      )}
+    </button>
+  );
+}
+
+export function ArticlesAdminClient({
+  initialStatus = "all",
+}: {
+  initialStatus?: StatusFilter;
+} = {}) {
   const router = useRouter();
   const toast = useAdminToast();
   const [articles, setArticles] = useState<AdminArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +149,7 @@ export function ArticlesAdminClient() {
   const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
   const [categoryFilter, setCategoryFilter] = useState("");
 
   const load = useCallback(async () => {
@@ -176,6 +220,8 @@ export function ArticlesAdminClient() {
     setCategoryFilter("");
   }
 
+  const sortProps = { sortKey, sortDir, onToggle: toggleSort };
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -207,6 +253,30 @@ export function ArticlesAdminClient() {
       }
       return next;
     });
+  }
+
+  async function onPublish(article: AdminArticle) {
+    setPublishingId(article.id);
+    try {
+      const res = await fetch(`/api/admin/articles/${article.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      });
+      const data = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        toast.error(data.error ?? "No se pudo publicar.");
+        return;
+      }
+      setArticles((prev) =>
+        prev.map((a) => (a.id === article.id ? { ...a, status: "published" } : a)),
+      );
+      setMessage(`Publicado: ${article.title}`);
+    } catch {
+      toast.error("Error de red al publicar.");
+    } finally {
+      setPublishingId(null);
+    }
   }
 
   async function onDelete(article: AdminArticle) {
@@ -288,36 +358,6 @@ export function ArticlesAdminClient() {
     () => articles.find((item) => item.id === associateId) ?? null,
     [articles, associateId],
   );
-
-  function SortButton({
-    column,
-    label,
-  }: {
-    column: SortKey;
-    label: string;
-  }) {
-    const active = sortKey === column;
-    return (
-      <button
-        type="button"
-        onClick={() => toggleSort(column)}
-        className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-[var(--text)] ${
-          active ? "text-[var(--text)]" : "text-[var(--text-muted)]"
-        }`}
-      >
-        {label}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-3 w-3" aria-hidden />
-          ) : (
-            <ArrowDown className="h-3 w-3" aria-hidden />
-          )
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden />
-        )}
-      </button>
-    );
-  }
 
   return (
     <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col md:min-h-[calc(100dvh-5rem)]">
@@ -490,19 +530,19 @@ export function ArticlesAdminClient() {
                 />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="title" label="Título" />
+                <SortButton {...sortProps} column="title" label="Título" />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="updatedAt" label="Fecha" />
+                <SortButton {...sortProps} column="updatedAt" label="Fecha" />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="status" label="Estado" />
+                <SortButton {...sortProps} column="status" label="Estado" />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="category" label="Categoría" />
+                <SortButton {...sortProps} column="category" label="Categoría" />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="products" label="Productos" />
+                <SortButton {...sortProps} column="products" label="Productos" />
               </th>
               <th className="px-4 py-3 font-semibold">Acciones</th>
             </tr>
@@ -568,14 +608,39 @@ export function ArticlesAdminClient() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
+                      {article.status === "draft" ? (
+                        <button
+                          type="button"
+                          title="Publicar ahora"
+                          aria-label="Publicar ahora"
+                          disabled={publishingId === article.id}
+                          onClick={() => void onPublish(article)}
+                          className="admin-btn admin-btn-primary inline-flex h-8 items-center gap-1 px-2.5 text-xs"
+                        >
+                          {publishingId === article.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          Publicar
+                        </button>
+                      ) : null}
+                      <Link
+                        href={`/admin/articles/${article.id}/preview`}
+                        title="Vista previa"
+                        aria-label="Vista previa"
+                        className="admin-icon-btn"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Link>
                       <button
                         type="button"
-                        title="Asociar / ver productos"
-                        aria-label="Asociar productos"
+                        title="Productos del artículo"
+                        aria-label="Productos del artículo"
                         onClick={() => setAssociateId(article.id)}
                         className="admin-icon-btn"
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Package className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"

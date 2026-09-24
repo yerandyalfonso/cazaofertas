@@ -30,7 +30,7 @@
 
 .admin-shell .admin-nav-link {
   border-radius: var(--radius-sm);
-  padding: 0.65rem 0.85rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 600;
   transition: background 0.15s ease, color 0.15s ease;
@@ -287,16 +287,19 @@
 }
 
 .admin-shell .admin-products-table col.col-title {
-  width: 30%;
+  width: 24%;
 }
 
 .admin-shell .admin-products-table col.col-store {
   width: 11%;
 }
 
-.admin-shell .admin-products-table col.col-price,
+.admin-shell .admin-products-table col.col-price {
+  width: 9%;
+}
+
 .admin-shell .admin-products-table col.col-reference {
-  width: 8%;
+  width: 10%;
 }
 
 .admin-shell .admin-products-table col.col-score {
@@ -312,7 +315,12 @@
 }
 
 .admin-shell .admin-products-table col.col-actions {
-  width: 4.75rem;
+  width: 7rem;
+}
+
+/* Cabeceras ordenables sin partirse ni montarse sobre la columna vecina. */
+.admin-shell .admin-products-table thead th button {
+  white-space: nowrap;
 }
 
 .admin-shell .admin-products-table tbody.is-reloading {

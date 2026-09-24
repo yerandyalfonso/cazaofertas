@@ -352,6 +352,9 @@ async function loadArticleBySlug(
         const products = await mergeProducts(post, productsFromArticleJoin(row));
         return { post, products, source: "supabase" };
       }
+      // La BD respondió y no está publicado (borrador/archivado/inexistente):
+      // no servir el mock del código, que resucitaría artículos archivados.
+      return null;
     } catch (error) {
       console.error(
         "[blog] getArticleBySlug aborted/failed",
@@ -369,6 +372,33 @@ async function loadArticleBySlug(
   } catch {
     return { post: fallback, products: [], source: "fallback" };
   }
+}
+
+/** Vista previa del admin: cualquier estado, sin caché. */
+export async function getArticleForPreview(
+  id: string,
+): Promise<(BlogArticleResult & { status: string }) | null> {
+  const client = getClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from("articles")
+    .select(
+      `
+      *,
+      article_products (
+        position,
+        products (*, categories(id, name, slug))
+      )
+    `,
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as ArticleQueryRow;
+  const post = mapArticleRow(row);
+  const products = await mergeProducts(post, productsFromArticleJoin(row));
+  const status = (row as { status?: string }).status ?? "draft";
+  return { post, products, source: "supabase", status };
 }
 
 export const getArticleBySlug = cache((slug: string) =>

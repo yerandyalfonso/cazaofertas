@@ -253,6 +253,36 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
 }
 
+/** Cambio rápido de estado desde la lista (publicar/archivar) sin reenviar el artículo. */
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const denied = requireAdminApi(request);
+    if (denied) return denied;
+    const { id } = await context.params;
+    const body = (await request.json()) as { status?: string };
+    if (!["draft", "published", "archived"].includes(body.status ?? "")) {
+      return NextResponse.json(
+        { ok: false, error: "Estado no válido." },
+        { status: 400 },
+      );
+    }
+    const client = createSupabaseServiceClient();
+    const { data: article, error } = await client
+      .from("articles")
+      .update({ status: body.status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id, slug, status")
+      .single();
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ ok: true, article });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: formatEnvError(error) },
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const denied = requireAdminApi(request);

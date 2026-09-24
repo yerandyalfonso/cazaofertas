@@ -36,6 +36,7 @@ import {
   retailerScrapeSupported,
   type ProductRetailer,
 } from "@/lib/retailers";
+import { formatFullDateTime, formatRelativeTime } from "@/lib/relative-time";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import {
   AdminPageHeader,
@@ -139,20 +140,20 @@ function freshnessMeta(lastCheckedAt: string | null): {
   const hours = ageMs / 3_600_000;
   if (hours < 6) {
     return {
-      label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+      label: formatRelativeTime(lastCheckedAt),
       className: "text-teal-800",
       hours,
     };
   }
   if (hours < 48) {
     return {
-      label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+      label: formatRelativeTime(lastCheckedAt),
       className: "text-amber-800",
       hours,
     };
   }
   return {
-    label: new Date(lastCheckedAt).toLocaleString("es-ES"),
+    label: formatRelativeTime(lastCheckedAt),
     className: "text-rose-700",
     hours,
   };
@@ -1832,6 +1833,7 @@ export default function ProductsAdminClient() {
                       return (
                         <span
                           className={`text-xs leading-snug ${fresh.className}`}
+                          title={formatFullDateTime(product.lastCheckedAt)}
                         >
                           {fresh.label}
                         </span>

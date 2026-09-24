@@ -16,6 +16,19 @@ function hasAdminTrackingCookie(request: NextRequest): boolean {
 }
 
 /**
+ * Rastreadores que abren los enlaces para generar vistas previas o indexar
+ * (p. ej. facebookexternalhit, que llegó a registrar ~290 «clics»/min).
+ * Se les redirige igual, pero no cuentan como clic.
+ */
+const BOT_USER_AGENT =
+  /bot|crawl|spider|slurp|facebookexternalhit|facebot|meta-externalagent|whatsapp|telegrambot|twitterbot|linkedinbot|discordbot|skypeuripreview|embedly|preview|headless|python-requests|curl|wget|go-http-client|axios|node-fetch/i;
+
+function isBotRequest(request: NextRequest): boolean {
+  const userAgent = request.headers.get("user-agent") ?? "";
+  return !userAgent || BOT_USER_AGENT.test(userAgent);
+}
+
+/**
  * Tracking de clics de afiliado.
  * GET /api/redirect?product=<uuid>&source=web&article=<uuid>&test=true
  */
@@ -79,9 +92,9 @@ export async function GET(request: NextRequest) {
       is_test: isTest,
     };
 
-    const { error: insertError } = await client
-      .from("affiliate_clicks")
-      .insert(clickRow);
+    const { error: insertError } = isBotRequest(request)
+      ? { error: null }
+      : await client.from("affiliate_clicks").insert(clickRow);
 
     if (insertError) {
       // Fallback si la migración 0009 aún no está aplicada (sin is_test/article_id).

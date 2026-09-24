@@ -3,22 +3,58 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import {
+  BarChart3,
+  FileText,
+  FolderTree,
+  GalleryHorizontal,
+  LayoutDashboard,
+  Menu,
+  MessageSquare,
+  Package,
+  Settings2,
+  Share2,
+  Tag,
+  Ticket,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { AdminToastProvider } from "@/components/admin/AdminToast";
 
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/estadisticas", label: "Estadísticas" },
-  { href: "/admin/products", label: "Productos" },
-  { href: "/admin/coupons", label: "Cupones" },
-  { href: "/admin/categories", label: "Categorías" },
-  { href: "/admin/keywords", label: "Keywords" },
-  { href: "/admin/articles", label: "Artículos" },
-  { href: "/admin/comments", label: "Comentarios" },
-  { href: "/admin/cron", label: "Operaciones" },
-  { href: "/admin/social", label: "Redes / Tarjetas" },
-  { href: "/admin/carousels", label: "Carruseles" },
-] as const;
+const NAV_GROUPS: Array<{
+  title: string;
+  items: Array<{ href: string; label: string; icon: LucideIcon }>;
+}> = [
+  {
+    title: "Resumen",
+    items: [
+      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Catálogo",
+    items: [
+      { href: "/admin/products", label: "Productos", icon: Package },
+      { href: "/admin/coupons", label: "Cupones", icon: Ticket },
+      { href: "/admin/categories", label: "Categorías", icon: FolderTree },
+      { href: "/admin/keywords", label: "Keywords", icon: Tag },
+    ],
+  },
+  {
+    title: "Contenido",
+    items: [
+      { href: "/admin/articles", label: "Artículos", icon: FileText },
+      { href: "/admin/comments", label: "Comentarios", icon: MessageSquare },
+      { href: "/admin/social", label: "Redes / Tarjetas", icon: Share2 },
+      { href: "/admin/carousels", label: "Carruseles", icon: GalleryHorizontal },
+    ],
+  },
+  {
+    title: "Sistema",
+    items: [{ href: "/admin/cron", label: "Operaciones", icon: Settings2 }],
+  },
+];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,32 +73,46 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function isActive(href: string): boolean {
+    if (href === "/admin") return pathname === "/admin";
+    if (href === "/admin/social") {
+      return pathname.startsWith("/admin/social") || pathname.startsWith("/admin/videos");
+    }
+    if (href === "/admin/cron") {
+      return pathname.startsWith("/admin/cron") || pathname.startsWith("/admin/settings");
+    }
+    return pathname.startsWith(href);
+  }
+
   const nav = (
-    <nav className="flex flex-1 flex-col gap-1 p-3">
-      {NAV.map((item) => {
-        const active =
-          item.href === "/admin"
-            ? pathname === "/admin"
-            : item.href === "/admin/social"
-              ? pathname.startsWith("/admin/social") ||
-                pathname.startsWith("/admin/videos")
-              : item.href === "/admin/cron"
-                ? pathname.startsWith("/admin/cron") ||
-                  pathname.startsWith("/admin/settings")
-                : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setOpen(false)}
-            className={`admin-nav-link ${
-              active ? "admin-nav-link--active" : "text-[var(--text-muted)]"
-            }`}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3" aria-label="Admin">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.title}>
+          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            {group.title}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {group.items.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={active ? "page" : undefined}
+                  className={`admin-nav-link flex items-center gap-2.5 ${
+                    active ? "admin-nav-link--active" : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 
