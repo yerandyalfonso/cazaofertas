@@ -1154,7 +1154,7 @@ async function commitWizardAlert(options: {
   let productId: string | null = null;
   let productTitle: string | null = null;
   let initialPrice: number | null = null;
-  let url = draft.url ?? null;
+  const url = draft.url ?? null;
   let keyword = draft.keyword ?? null;
   const brand = draft.brand ?? null;
 

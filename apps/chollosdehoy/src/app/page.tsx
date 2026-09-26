@@ -2,7 +2,6 @@ import { getMarketplaceBootstrap } from "@/lib/catalog";
 import { MarketplaceApp } from "@/components/MarketplaceApp";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
 export const revalidate = 120;
 
 export const metadata = {

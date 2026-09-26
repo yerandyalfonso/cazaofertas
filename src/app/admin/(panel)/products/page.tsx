@@ -9,9 +9,6 @@ import {
   useState,
 } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   ChevronUp,
   Eye,
   ExternalLink,
@@ -20,7 +17,6 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  X,
 } from "lucide-react";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import { availabilityLabel } from "@/lib/out-of-stock-policy";
@@ -42,6 +38,7 @@ import {
   AdminPageHeader,
   AdminRetailerBadge,
   AdminSearchField,
+  AdminSortButton,
 } from "@/components/admin/AdminListChrome";
 import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
 import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
@@ -415,36 +412,6 @@ export default function ProductsAdminClient() {
     }
     setSortKey(key);
     setSortDir(key === "title" || key === "asin" || key === "category" ? "asc" : "desc");
-  }
-
-  function SortButton({
-    column,
-    label,
-  }: {
-    column: SortKey;
-    label: string;
-  }) {
-    const active = sortKey === column;
-    return (
-      <button
-        type="button"
-        onClick={() => toggleSort(column)}
-        className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-ink ${
-          active ? "text-ink" : "text-stone-500"
-        }`}
-      >
-        {label}
-        {active ? (
-          sortDir === "asc" ? (
-            <ArrowUp className="h-3 w-3" aria-hidden />
-          ) : (
-            <ArrowDown className="h-3 w-3" aria-hidden />
-          )
-        ) : (
-          <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden />
-        )}
-      </button>
-    );
   }
 
   function clearFilters() {
@@ -1677,25 +1644,60 @@ export default function ProductsAdminClient() {
                 />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="title" label="Título" />
+                <AdminSortButton
+                  label="Título"
+                  active={sortKey === "title"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("title")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="asin" label="Tienda / ID" />
+                <AdminSortButton
+                  label="Tienda / ID"
+                  active={sortKey === "asin"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("asin")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="currentPrice" label="Precio" />
+                <AdminSortButton
+                  label="Precio"
+                  active={sortKey === "currentPrice"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("currentPrice")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="referencePrice" label="Referencia" />
+                <AdminSortButton
+                  label="Referencia"
+                  active={sortKey === "referencePrice"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("referencePrice")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="dealScore" label="Score" />
+                <AdminSortButton
+                  label="Score"
+                  active={sortKey === "dealScore"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("dealScore")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="category" label="Categoría" />
+                <AdminSortButton
+                  label="Categoría"
+                  active={sortKey === "category"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("category")}
+                />
               </th>
               <th className="px-4 py-3">
-                <SortButton column="lastCheckedAt" label="Última revisión" />
+                <AdminSortButton
+                  label="Última revisión"
+                  active={sortKey === "lastCheckedAt"}
+                  direction={sortDir}
+                  onClick={() => toggleSort("lastCheckedAt")}
+                />
               </th>
               <th className="sticky right-0 z-20 bg-stone-50 px-4 py-3 font-semibold shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
                 Acciones

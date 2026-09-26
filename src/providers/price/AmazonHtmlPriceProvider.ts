@@ -762,7 +762,7 @@ export function extractPriceFromAmazonHtml(html: string): {
       ["#priceblock_dealprice", "#priceblock_saleprice", "#priceblock_ourprice"],
     ),
   );
-  let price =
+  const price =
     priceFromOneTimeBuyBox($) ??
     payCandidates[0] ??
     priceFromWholeFraction(

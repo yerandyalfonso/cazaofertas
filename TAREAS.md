@@ -23,13 +23,13 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Ofertas caducadas/agotadas: aviso en la ficha + alternativas en vez del botón de compra.
 - [ ] Historial de precio en la ficha y «precio comprobado hace X min».
 - [ ] Enlaces a crear alerta / canal de Telegram desde ficha y categorías.
-- [ ] Migrar `apps/chollosdehoy/src/middleware.ts` a `proxy.ts` (Next 16).
-- [ ] Portada: quitar `force-dynamic` (contradice `revalidate = 120`).
+- [x] Migrar `apps/chollosdehoy/src/middleware.ts` a `proxy.ts` (Next 16). 2026-09-26
+- [x] Portada: quitar `force-dynamic` (contradice `revalidate = 120`). 2026-09-26
 
 ## Admin
 
 - [x] Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`). 2026-09-26
-- [ ] Productos: sacar `SortButton` fuera del componente (mismo arreglo que en Artículos) y quitar el import `X` sin usar.
+- [x] Productos: usar `AdminSortButton` compartido y quitar el import `X` sin usar. 2026-09-26
 - [ ] Unificar la carga de datos del admin (23 avisos `react-hooks/set-state-in-effect`).
 - [ ] Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).
 - [ ] Guardar user-agent en `affiliate_clicks` para poder auditar clics (los de Facebook hasta 2026-09-24 están inflados por el rastreador).
@@ -46,4 +46,4 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Túnel Mac → VPS (`com.cazaofertas.vps-tunnel`) sale con código 255.
 - [ ] Borrar los LaunchAgents sobrantes del Mac (`check-prices`, `flash-deals`, …): duplicarían al VPS si se reinstalan.
 - [ ] Actualizar `scripts/local-cron/schedules.md` con el reparto real VPS/Mac.
-- [ ] Errores de lint antiguos: `src/services/telegram/bot.ts` (`prefer-const`), `src/services/flashDeals.ts` (`updated`), `src/providers/price/AmazonHtmlPriceProvider.ts` (`price`).
+- [x] Errores de lint antiguos (`prefer-const` en bot.ts, flashDeals.ts, AmazonHtmlPriceProvider.ts). 2026-09-26

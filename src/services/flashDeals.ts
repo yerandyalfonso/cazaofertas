@@ -302,7 +302,7 @@ export async function runFlashDealsCheck(options?: {
   const products: FlashDealProductReport[] = [];
   const errors: Array<{ asin: string; message: string }> = [];
   let inserted = 0;
-  let updated = 0;
+  const updated = 0;
   let unchanged = 0;
   let newLows = 0;
   let catalogScanned = 0;
