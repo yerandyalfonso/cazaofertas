@@ -44,6 +44,8 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 
 ## Infraestructura / mantenimiento
 
+- [ ] Instalar en el Mac el relé de Miravia (respaldo del VPS si WARP da captcha): `scripts/local-cron/install-miravia-relay.sh`. El VPS ya lo tiene en `MIRAVIA_EGRESS` (WARP → Mac → directo).
+
 - [x] 2026-09-26 Túnel Mac → VPS con código 255 (y `check-prices` con código 1): era una caída de red del Mac, no un fallo. El túnel ya tiene `ServerAliveInterval` y `KeepAlive`, así que launchd lo relanza al volver la red.
 - [x] 2026-09-26 Actualizar `scripts/local-cron/schedules.md` con el reparto real VPS/Mac. Los LaunchAgents del Mac que repiten jobs del VPS se quedan: es intencionado (IP residencial = más productos y menos bloqueos).
 - [x] Errores de lint antiguos (`prefer-const` en bot.ts, flashDeals.ts, AmazonHtmlPriceProvider.ts). 2026-09-26
