@@ -11,6 +11,7 @@ import { useAdminToast } from "@/components/admin/AdminToast";
 import { AdminSkeleton } from "@/components/admin/AdminSkeleton";
 import {
   ARTICLE_TEMPLATE_OPTIONS,
+  articleSeoIssues,
   blogBlocksToEditor,
   buildArticleDocument,
   createBlankEditorBlocks,
@@ -270,6 +271,15 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
       product.asin.toLowerCase().includes(q) ||
       product.slug.toLowerCase().includes(q)
     );
+  });
+
+  const seoIssues = articleSeoIssues({
+    title,
+    excerpt,
+    seoTitle,
+    seoDescription,
+    featuredImage,
+    blocks,
   });
 
   async function onSave(event: React.FormEvent) {
@@ -616,6 +626,17 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
               className="admin-input mt-2"
             />
           </label>
+          {seoIssues.length > 0 ? (
+            <ul className="space-y-1 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 md:col-span-2">
+              {seoIssues.map((issue) => (
+                <li key={issue}>⚠️ {issue}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 md:col-span-2">
+              ✓ SEO correcto: título, descripción, imagen destacada y alt de las imágenes.
+            </p>
+          )}
         </section>
 
         <section className="admin-card p-6">

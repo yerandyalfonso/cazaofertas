@@ -7,9 +7,9 @@ const TELEGRAM_BOT_URL = (
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "https://t.me/cazandor_de_ofertas_bot"
 ).replace(/\/$/, "");
 
-/** Canal público de difusión (el grupo con temas es privado). */
-export const TELEGRAM_CHANNEL_URL =
-  process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL ?? "https://t.me/cazador_de_ofertas";
+/** Grupo público con temas por categoría (@chollosdhoy). */
+export const TELEGRAM_GROUP_URL =
+  process.env.NEXT_PUBLIC_TELEGRAM_GROUP_URL ?? "https://t.me/chollosdhoy";
 
 function botUrl(startPayload: string): string {
   return `${TELEGRAM_BOT_URL}?start=${encodeURIComponent(startPayload)}`;

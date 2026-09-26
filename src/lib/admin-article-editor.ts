@@ -625,3 +625,58 @@ export function estimateBlocksReadingTime(blocks: BlogBlock[]): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 200));
 }
+
+/**
+ * Avisos de SEO del editor (no bloquean el guardado). El título y la
+ * descripción SEO caen en el título y el extracto si están vacíos — ver
+ * `generateMetadata` de /blog/[slug] —, así que se mide lo que se publicará.
+ */
+export function articleSeoIssues(article: {
+  title: string;
+  excerpt: string;
+  seoTitle: string;
+  seoDescription: string;
+  featuredImage: string;
+  blocks: EditorBlock[];
+}): string[] {
+  const issues: string[] = [];
+  const title = article.seoTitle.trim() || article.title.trim();
+  const description = article.seoDescription.trim() || article.excerpt.trim();
+
+  if (!title) {
+    issues.push("Falta el título.");
+  } else if (title.length > 60) {
+    issues.push(
+      `El título SEO tiene ${title.length} caracteres: Google corta a partir de ~60.`,
+    );
+  }
+
+  if (!description) {
+    issues.push("Falta la descripción SEO (o el extracto).");
+  } else if (description.length < 70) {
+    issues.push(
+      `La descripción SEO tiene ${description.length} caracteres: mejor entre 70 y 160.`,
+    );
+  } else if (description.length > 160) {
+    issues.push(
+      `La descripción SEO tiene ${description.length} caracteres: Google corta a partir de ~160.`,
+    );
+  }
+
+  if (!article.featuredImage.trim()) {
+    issues.push("Falta la imagen destacada (se usa al compartir en redes).");
+  }
+
+  const imagesWithoutAlt = article.blocks.filter(
+    (block) => block.type === "image" && block.src.trim() && !block.alt.trim(),
+  ).length;
+  if (imagesWithoutAlt > 0) {
+    issues.push(
+      imagesWithoutAlt === 1
+        ? "Hay 1 imagen sin texto alternativo (alt)."
+        : `Hay ${imagesWithoutAlt} imágenes sin texto alternativo (alt).`,
+    );
+  }
+
+  return issues;
+}

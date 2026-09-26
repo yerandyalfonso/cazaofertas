@@ -1,5 +1,5 @@
 import { BellRing, Send } from "lucide-react";
-import { TELEGRAM_CHANNEL_URL } from "@/lib/telegram";
+import { TELEGRAM_GROUP_URL } from "@/lib/telegram";
 
 interface TelegramCtaProps {
   /** Deep link al bot con el producto o la categoría ya elegidos. */
@@ -9,7 +9,7 @@ interface TelegramCtaProps {
   className?: string;
 }
 
-/** «Avísame si baja» (bot) + «Únete al canal» (canal público de Telegram). */
+/** «Avísame si baja» (bot) + «Únete al grupo» (grupo público de Telegram con temas). */
 export function TelegramCta({ alertHref, title, text, className = "" }: TelegramCtaProps) {
   return (
     <section
@@ -28,13 +28,13 @@ export function TelegramCta({ alertHref, title, text, className = "" }: Telegram
           Avísame si baja
         </a>
         <a
-          href={TELEGRAM_CHANNEL_URL}
+          href={TELEGRAM_GROUP_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-ghost border border-[var(--border)] text-sm"
         >
           <Send className="h-4 w-4" />
-          Únete al canal
+          Únete al grupo
         </a>
       </div>
     </section>
