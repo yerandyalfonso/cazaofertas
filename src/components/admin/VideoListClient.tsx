@@ -11,6 +11,7 @@ import {
   formatVideoProjectDate,
   loadVideoProjects,
   removeVideoProject,
+  syncVideoProjects,
   type VideoProject,
 } from "@/lib/video-projects";
 
@@ -32,14 +33,15 @@ export function VideoListClient() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
+    await syncVideoProjects();
     setProjects(loadVideoProjects());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   function onDelete(project: VideoProject) {

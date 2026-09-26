@@ -25,6 +25,7 @@ import {
 import {
   getSocialCardProject,
   loadSocialCardProjects,
+  syncSocialCardProjects,
   type SocialCardProject,
 } from "@/lib/social-card-projects";
 import { formatEuro } from "@/lib/money";
@@ -33,6 +34,7 @@ import {
   DEFAULT_VIDEO_CARD_STYLE,
   getVideoProject,
   projectFromVideoSnapshot,
+  syncVideoProjects,
   upsertVideoProject,
   type VideoCardStyle,
   type VideoSourceMode,
@@ -157,6 +159,7 @@ export function VideosAdminClient({
     (async () => {
       setLoading(true);
       try {
+        await Promise.all([syncSocialCardProjects(), syncVideoProjects()]);
         const response = await fetch("/api/admin/products");
         if (!response.ok) throw new Error("No se pudieron cargar productos");
         const data = (await response.json()) as { products?: AdminProduct[] };

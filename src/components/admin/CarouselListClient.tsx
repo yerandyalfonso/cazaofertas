@@ -16,6 +16,7 @@ import {
   formatProjectDate,
   loadCarouselProjects,
   removeCarouselProject,
+  syncCarouselProjects,
   type CarouselProject,
 } from "@/lib/carousel-projects";
 
@@ -40,14 +41,15 @@ export function CarouselListClient() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
+    await syncCarouselProjects();
     setProjects(loadCarouselProjects());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   function onDelete(project: CarouselProject) {

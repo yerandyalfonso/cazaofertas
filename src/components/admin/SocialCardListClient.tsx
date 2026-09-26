@@ -11,6 +11,7 @@ import {
   formatSocialProjectDate,
   loadSocialCardProjects,
   removeSocialCardProject,
+  syncSocialCardProjects,
   type SocialCardProject,
 } from "@/lib/social-card-projects";
 
@@ -39,14 +40,15 @@ export function SocialCardListClient() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
+    await syncSocialCardProjects();
     setProjects(loadSocialCardProjects());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   function onDelete(project: SocialCardProject) {

@@ -1,3 +1,8 @@
+import {
+  pullDesignProjects,
+  queueDesignProjectDelete,
+  queueDesignProjectUpsert,
+} from "@/lib/design-projects-sync";
 import type {
   SocialCardFormatId,
   SocialCardImageFit,
@@ -122,13 +127,20 @@ export function upsertVideoProject(project: VideoProject): VideoProject[] {
     ? all.map((item) => (item.id === project.id ? project : item))
     : [project, ...all];
   saveVideoProjects(next);
+  queueDesignProjectUpsert("video", STORAGE_KEY, project);
   return next;
 }
 
 export function removeVideoProject(id: string): VideoProject[] {
   const next = loadVideoProjects().filter((item) => item.id !== id);
   saveVideoProjects(next);
+  queueDesignProjectDelete("video", STORAGE_KEY, id);
   return next;
+}
+
+/** Trae los proyectos guardados en el servidor; llamar antes de leer. */
+export function syncVideoProjects(): Promise<void> {
+  return pullDesignProjects("video", STORAGE_KEY);
 }
 
 export function saveVideoProjects(projects: VideoProject[]): void {

@@ -864,6 +864,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      design_projects: {
+        Row: {
+          id: string;
+          kind: string;
+          name: string;
+          data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          kind: string;
+          name: string;
+          data: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          kind?: string;
+          name?: string;
+          data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

@@ -1,3 +1,8 @@
+import {
+  pullDesignProjects,
+  queueDesignProjectDelete,
+  queueDesignProjectUpsert,
+} from "@/lib/design-projects-sync";
 import type {
   CarouselDisplayOptions,
   CarouselFormatId,
@@ -70,13 +75,20 @@ export function upsertCarouselProject(project: CarouselProject): CarouselProject
     ? all.map((item) => (item.id === project.id ? project : item))
     : [project, ...all];
   saveCarouselProjects(next);
+  queueDesignProjectUpsert("carousel", STORAGE_KEY, project);
   return next;
 }
 
 export function removeCarouselProject(id: string): CarouselProject[] {
   const next = loadCarouselProjects().filter((item) => item.id !== id);
   saveCarouselProjects(next);
+  queueDesignProjectDelete("carousel", STORAGE_KEY, id);
   return next;
+}
+
+/** Trae los proyectos guardados en el servidor; llamar antes de leer. */
+export function syncCarouselProjects(): Promise<void> {
+  return pullDesignProjects("carousel", STORAGE_KEY);
 }
 
 export function saveCarouselProjects(projects: CarouselProject[]): void {

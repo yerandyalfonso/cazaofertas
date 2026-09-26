@@ -13,6 +13,7 @@ import {
   formatSocialProjectDate,
   getSocialCardProject,
   projectFromSnapshot,
+  syncSocialCardProjects,
   upsertSocialCardProject,
   type PulseThemeId,
 } from "@/lib/social-card-projects";
@@ -752,15 +753,21 @@ export function SocialAdminClient({
 
   useEffect(() => {
     if (projectId) {
-      const project = getSocialCardProject(projectId);
-      if (!project) {
-        toast.error("Tarjeta no encontrada.");
-        router.replace("/admin/social");
-        return;
-      }
-      applyProject(project);
-      setEditorReady(true);
-      return;
+      let cancelled = false;
+      void syncSocialCardProjects().then(() => {
+        if (cancelled) return;
+        const project = getSocialCardProject(projectId);
+        if (!project) {
+          toast.error("Tarjeta no encontrada.");
+          router.replace("/admin/social");
+          return;
+        }
+        applyProject(project);
+        setEditorReady(true);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     setCurrentProjectId(null);

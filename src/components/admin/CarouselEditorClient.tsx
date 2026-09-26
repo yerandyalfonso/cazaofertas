@@ -43,6 +43,7 @@ import {
   formatProjectDate,
   getCarouselProject,
   projectFromSnapshot,
+  syncCarouselProjects,
   upsertCarouselProject,
   type CarouselProject,
 } from "@/lib/carousel-projects";
@@ -287,15 +288,21 @@ export function CarouselEditorClient({
 
   useEffect(() => {
     if (projectId) {
-      const project = getCarouselProject(projectId);
-      if (!project) {
-        toast.error("Carrusel no encontrado.");
-        router.replace("/admin/carousels");
-        return;
-      }
-      applyProject(project);
-      setEditorReady(true);
-      return;
+      let cancelled = false;
+      void syncCarouselProjects().then(() => {
+        if (cancelled) return;
+        const project = getCarouselProject(projectId);
+        if (!project) {
+          toast.error("Carrusel no encontrado.");
+          router.replace("/admin/carousels");
+          return;
+        }
+        applyProject(project);
+        setEditorReady(true);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     setCurrentProjectId(null);

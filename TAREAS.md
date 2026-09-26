@@ -28,7 +28,7 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 
 ## Admin
 
-- [ ] Redes / Tarjetas: guardar los diseños en la base de datos (hoy solo en el navegador; se pierden al cambiar de equipo).
+- [x] Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`). 2026-09-26
 - [ ] Productos: sacar `SortButton` fuera del componente (mismo arreglo que en Artículos) y quitar el import `X` sin usar.
 - [ ] Unificar la carga de datos del admin (23 avisos `react-hooks/set-state-in-effect`).
 - [ ] Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).

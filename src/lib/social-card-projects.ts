@@ -1,4 +1,9 @@
 import {
+  pullDesignProjects,
+  queueDesignProjectDelete,
+  queueDesignProjectUpsert,
+} from "@/lib/design-projects-sync";
+import {
   getPulseTheme,
   type PulseThemeId,
 } from "@/lib/pulse-themes";
@@ -136,13 +141,20 @@ export function upsertSocialCardProject(
     ? all.map((item) => (item.id === project.id ? project : item))
     : [project, ...all];
   saveSocialCardProjects(next);
+  queueDesignProjectUpsert("card", STORAGE_KEY, project);
   return next;
 }
 
 export function removeSocialCardProject(id: string): SocialCardProject[] {
   const next = loadSocialCardProjects().filter((item) => item.id !== id);
   saveSocialCardProjects(next);
+  queueDesignProjectDelete("card", STORAGE_KEY, id);
   return next;
+}
+
+/** Trae los proyectos guardados en el servidor; llamar antes de leer. */
+export function syncSocialCardProjects(): Promise<void> {
+  return pullDesignProjects("card", STORAGE_KEY);
 }
 
 export function saveSocialCardProjects(projects: SocialCardProject[]): void {
