@@ -1,22 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { BLOG_CATEGORIES } from "@/lib/taxonomy";
 import type { CategoryFilterNode } from "@/lib/types";
-import type { MarketplaceFilters } from "@/lib/filters";
+import { categoryHref } from "@/lib/links";
 
 interface CategoryHeroProps {
   categories: CategoryFilterNode[];
-  filters: MarketplaceFilters;
-  onSelectCategory: (parentSlug: string) => void;
 }
 
-export function CategoryHero({
-  categories,
-  filters,
-  onSelectCategory,
-}: CategoryHeroProps) {
+export function CategoryHero({ categories }: CategoryHeroProps) {
   const parents = categories
     .filter((c) => !c.parentId && c.productCount > 0)
     .sort((a, b) => b.productCount - a.productCount)
@@ -34,25 +28,19 @@ export function CategoryHero({
           ¿Qué estás buscando hoy?
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Toca una categoría para filtrar las mejores ofertas al instante.
+          Elige una categoría para ver sus mejores ofertas.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
         {parents.map((cat) => {
           const meta = metaBySlug.get(cat.slug);
-          const isActive = filters.parentSlug === cat.slug;
 
           return (
-            <button
+            <Link
               key={cat.id}
-              type="button"
-              onClick={() => onSelectCategory(cat.slug)}
-              className={`group relative overflow-hidden rounded-[var(--radius-sm)] border text-left transition ${
-                isActive
-                  ? "border-[var(--primary)] ring-2 ring-[var(--primary-soft)]"
-                  : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]"
-              }`}
+              href={categoryHref(cat.slug)}
+              className="group relative overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border)] text-left transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]"
             >
               <div className="relative aspect-[16/10] bg-[var(--surface-muted)]">
                 {meta?.image_url ? (
@@ -70,23 +58,11 @@ export function CategoryHero({
                   <p className="text-xs text-white/80">{cat.productCount} ofertas</p>
                 </div>
               </div>
-            </button>
+            </Link>
           );
         })}
       </div>
 
-      {filters.parentSlug && (
-        <div className="border-t border-[var(--border)] px-4 py-3">
-          <button
-            type="button"
-            onClick={() => onSelectCategory("")}
-            className="btn btn-ghost text-sm"
-          >
-            Ver todas las categorías
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
     </section>
   );
 }

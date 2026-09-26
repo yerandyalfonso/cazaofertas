@@ -18,7 +18,8 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Dar de alta en Google Search Console (propiedad de dominio, TXT en el DNS) y enviar `sitemap.xml`.
 - [ ] Dar de alta en Bing Webmaster (importar desde Google).
 - [ ] Implementar IndexNow para avisar a Bing de productos nuevos/cambiados.
-- [ ] Páginas de categoría y tienda renderizadas en servidor (`/categoria/[slug]`, `/tienda/[retailer]`).
+- [x] 2026-09-26 Páginas de categoría, subcategoría y tienda (`/categoria/hogar[/cocina][/pagina/N]`, `/tienda/amazon`), ISR 5 min, en sitemap y enlazadas desde portada, fichas y pie.
+- [ ] Productos de Miravia con título «Producto Miravia <id>» (se ven en los listados): revisar el scraper/importación.
 - [ ] Agrupar variantes (una tarjeta por `parent_asin`) y mostrar las opciones en la ficha.
 - [x] 2026-09-26 Ofertas caducadas/agotadas/retiradas: aviso en la ficha + alternativas en vez del botón de compra (retiradas: 200 con noindex en vez de 404).
 - [ ] Historial de precio en la ficha y «precio comprobado hace X min».

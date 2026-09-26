@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   type MarketplaceFilters,
   countActiveFilters,
 } from "@/lib/filters";
+import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { MARKETPLACE_RETAILERS, retailerLabel } from "@/lib/retailers";
 import type { CategoryFilterNode } from "@/lib/types";
 
@@ -58,20 +60,6 @@ export function FilterSidebar({
     });
   }
 
-  function selectParent(slug: string) {
-    patch({
-      parentSlug: filters.parentSlug === slug ? null : slug,
-      subcategorySlug: null,
-    });
-  }
-
-  function selectSub(slug: string, parentSlug: string) {
-    patch({
-      parentSlug,
-      subcategorySlug: filters.subcategorySlug === slug ? null : slug,
-    });
-  }
-
   function toggleRetailer(id: string) {
     const set = new Set(filters.retailers);
     if (set.has(id)) set.delete(id);
@@ -110,10 +98,7 @@ export function FilterSidebar({
           <ul className="space-y-1">
             {parents.map((parent) => {
               const subs = subsByParent.get(parent.id) ?? [];
-              const expanded =
-                expandedParents.has(parent.slug) ||
-                filters.parentSlug === parent.slug;
-              const isActive = filters.parentSlug === parent.slug;
+              const expanded = expandedParents.has(parent.slug);
 
               return (
                 <li key={parent.id}>
@@ -130,38 +115,33 @@ export function FilterSidebar({
                         />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => selectParent(parent.slug)}
-                      className={`flex flex-1 items-center justify-between rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm transition ${
-                        isActive
-                          ? "bg-[var(--primary-soft)] font-semibold text-[var(--primary)]"
-                          : "hover:bg-[var(--surface-muted)]"
-                      }`}
+                    <Link
+                      href={categoryHref(parent.slug)}
+                      className="flex flex-1 items-center justify-between rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm transition hover:bg-[var(--surface-muted)]"
                     >
                       <span>{parent.name}</span>
                       <span className="text-xs text-[var(--text-muted)]">
                         {parent.productCount}
                       </span>
-                    </button>
+                    </Link>
                   </div>
 
                   {expanded && subs.length > 0 && (
                     <ul className="ml-6 mt-1 space-y-0.5 border-l border-[var(--border)] pl-2">
                       {subs.map((sub) => (
                         <li key={sub.id}>
-                          <button
-                            type="button"
-                            onClick={() => selectSub(sub.slug, parent.slug)}
-                            className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2 py-1 text-left text-sm transition ${
-                              filters.subcategorySlug === sub.slug
-                                ? "bg-[var(--primary-soft)] font-medium text-[var(--primary)]"
-                                : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
-                            }`}
+                          {/* Sin página propia (General o pocas ofertas): va al padre. */}
+                          <Link
+                            href={
+                              subcategoryHasPage(sub, parent.slug)
+                                ? categoryHref(parent.slug, sub.slug)
+                                : categoryHref(parent.slug)
+                            }
+                            className="flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2 py-1 text-left text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
                           >
                             <span>{sub.name}</span>
                             <span className="text-xs">{sub.productCount}</span>
-                          </button>
+                          </Link>
                         </li>
                       ))}
                     </ul>

@@ -12,10 +12,13 @@ import {
 import { cache } from "react";
 import type { Metadata } from "next";
 import { ProductCard } from "@/components/ProductCard";
+import { SiteFooter } from "@/components/SiteFooter";
 import {
   getAlternativeProducts,
+  getCategoryNodes,
   getProductBySlug as fetchProductBySlug,
 } from "@/lib/catalog";
+import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -114,6 +117,30 @@ function productJsonLd(product: MarketplaceProduct, url: string) {
   ];
 }
 
+/** Migas de la ficha: categoría y subcategoría, enlazadas si tienen página. */
+async function productBreadcrumbs(
+  product: MarketplaceProduct,
+): Promise<Array<{ name: string; href: string | null }>> {
+  const category = product.category;
+  if (!category) return [];
+  if (!category.parentSlug || category.parentSlug === category.slug) {
+    return [{ name: category.name, href: categoryHref(category.slug) }];
+  }
+
+  const parentSlug = category.parentSlug;
+  const node = (await getCategoryNodes()).find((n) => n.id === category.id);
+  return [
+    { name: category.parentName ?? category.name, href: categoryHref(parentSlug) },
+    {
+      name: category.name,
+      href:
+        node && subcategoryHasPage(node, parentSlug)
+          ? categoryHref(parentSlug, category.slug)
+          : null,
+    },
+  ].filter((item, i, all) => all.findIndex((x) => x.name === item.name) === i);
+}
+
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
@@ -162,12 +189,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     product.previousPrice && product.previousPrice > product.currentPrice
       ? product.previousPrice - product.currentPrice
       : null;
-  const categoryPath = product.category
-    ? [
-        product.category.parentName ?? product.category.name,
-        product.category.parentName ? product.category.name : null,
-      ].filter(Boolean)
-    : [];
+  const categoryPath = await productBreadcrumbs(product);
 
   return (
     <div className="marketplace-shell bg-[var(--bg)]">
@@ -190,9 +212,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
               aria-label="Categoría"
             >
               {categoryPath.map((part, i) => (
-                <span key={part} className="flex items-center gap-1">
+                <span key={part.name} className="flex items-center gap-1">
                   {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
-                  <span className="truncate">{part}</span>
+                  {part.href ? (
+                    <Link href={part.href} className="truncate hover:text-[var(--text)]">
+                      {part.name}
+                    </Link>
+                  ) : (
+                    <span className="truncate">{part.name}</span>
+                  )}
                 </span>
               ))}
             </nav>
@@ -349,6 +377,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </section>
         )}
       </main>
+
+      <SiteFooter />
 
       {/* CTA fijo en móvil */}
       {!unavailable && (

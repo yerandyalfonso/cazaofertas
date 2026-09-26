@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CategoryHero } from "@/components/CategoryHero";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { MarketplaceHeader } from "@/components/MarketplaceHeader";
@@ -20,9 +20,11 @@ import type { ViewMode } from "@/lib/types";
 
 interface MarketplaceAppProps {
   bootstrap: MarketplaceBootstrap;
+  /** Pie renderizado en servidor (SiteFooter). */
+  footer: ReactNode;
 }
 
-export function MarketplaceApp({ bootstrap }: MarketplaceAppProps) {
+export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
   const [filters, setFilters] = useState<MarketplaceFilters>(DEFAULT_FILTERS);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -75,14 +77,6 @@ export function MarketplaceApp({ bootstrap }: MarketplaceAppProps) {
     setPage(1);
   }
 
-  function selectCategory(parentSlug: string) {
-    updateFilters({
-      ...filters,
-      parentSlug: parentSlug || null,
-      subcategorySlug: null,
-    });
-  }
-
   function goToPage(nextPage: number) {
     setPage(nextPage);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -116,11 +110,7 @@ export function MarketplaceApp({ bootstrap }: MarketplaceAppProps) {
 
         <main className="min-w-0 space-y-5">
           {showHero && (
-            <CategoryHero
-              categories={bootstrap.categories}
-              filters={filters}
-              onSelectCategory={selectCategory}
-            />
+            <CategoryHero categories={bootstrap.categories} />
           )}
 
           {loading && (
@@ -206,14 +196,7 @@ export function MarketplaceApp({ bootstrap }: MarketplaceAppProps) {
         </div>
       )}
 
-      <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-8">
-        <div className="mx-auto max-w-[1600px] px-4 text-center text-sm text-[var(--text-muted)]">
-          <p className="font-semibold text-[var(--text)]">Chollos de Hoy</p>
-          <p className="mt-1">
-            Marketplace de ofertas · Actualizado en tiempo real
-          </p>
-        </div>
-      </footer>
+      {footer}
     </div>
   );
 }

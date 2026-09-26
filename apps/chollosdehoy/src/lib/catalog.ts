@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { MARKETPLACE_RETAILERS } from "@/lib/retailers";
 import { resolveParentSlug } from "@/lib/taxonomy";
 import {
   calculateDiscountPercentage,
@@ -251,7 +253,9 @@ export async function queryMarketplaceProducts(
     return { items: [], page, pageSize, total: 0, totalPages: 0 };
   }
 
-  const needsScoreSort = filters.sort === "score" || filters.onlyTopDeals;
+  // onlyTopDeals filtra por dealScore (calculado en JS): se trae una ventana
+  // y se pagina en memoria. El resto pagina en la BD con el total real.
+  const needsScoreSort = filters.onlyTopDeals;
   const fetchSize = needsScoreSort ? Math.min(page * pageSize * 3, 1200) : pageSize;
   const from = needsScoreSort ? 0 : (page - 1) * pageSize;
   const to = needsScoreSort ? fetchSize - 1 : from + pageSize - 1;
@@ -349,6 +353,11 @@ export async function queryMarketplaceProducts(
     };
   }
 
+  if (filters.sort === "score") {
+    // La BD ordena por descuento; dentro de la página, por calidad de oferta.
+    items = sortProducts(items, "score");
+  }
+
   const total = count ?? items.length;
   return {
     items,
@@ -359,21 +368,36 @@ export async function queryMarketplaceProducts(
   };
 }
 
-async function fetchCategoryNodes(): Promise<CategoryFilterNode[]> {
+/** category_id de todos los productos activos (paginado: PostgREST corta en 1000). */
+async function fetchActiveCategoryIds(): Promise<string[]> {
   const client = getSupabaseServer();
-  const [categoriesRes, productsRes] = await Promise.all([
-    client.from("categories").select("id, name, slug, parent_id").order("name"),
-    client
+  const pageSize = 1000;
+  const ids: string[] = [];
+  for (let from = 0; from < 50_000; from += pageSize) {
+    const { data, error } = await client
       .from("products")
       .select("category_id")
       .eq("is_active", true)
-      .not("category_id", "is", null),
+      .not("category_id", "is", null)
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`Categorías: ${error.message}`);
+    for (const row of data ?? []) ids.push(row.category_id as string);
+    if (!data || data.length < pageSize) break;
+  }
+  return ids;
+}
+
+async function fetchCategoryNodes(): Promise<CategoryFilterNode[]> {
+  const client = getSupabaseServer();
+  const [categoriesRes, productCategoryIds] = await Promise.all([
+    client.from("categories").select("id, name, slug, parent_id").order("name"),
+    fetchActiveCategoryIds(),
   ]);
 
   const rows = (categoriesRes.data ?? []) as CategoryRow[];
   const counts = new Map<string, number>();
-  for (const row of productsRes.data ?? []) {
-    const id = row.category_id as string;
+  for (const id of productCategoryIds) {
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
@@ -497,7 +521,7 @@ export async function getMarketplaceBootstrap(
   pageSize = MARKETPLACE_PAGE_SIZE,
 ): Promise<MarketplaceBootstrap> {
   const [categories, stats, spotlight, initialPage, coupons] = await Promise.all([
-    fetchCategoryNodes(),
+    getCategoryNodes(),
     fetchStats(),
     fetchSpotlight(),
     queryMarketplaceProducts(
@@ -587,6 +611,29 @@ export async function getAlternativeProducts(
 
   return sortProducts(rows.map(mapProduct), "score").slice(0, limit);
 }
+
+/** Árbol de categorías con recuento (una consulta por petición). */
+export const getCategoryNodes = cache(fetchCategoryNodes);
+
+/** Productos activos por tienda (solo tiendas con al menos uno). */
+export const getRetailerCounts = cache(
+  async (): Promise<Array<{ id: string; count: number }>> => {
+    const client = getSupabaseServer();
+    const results = await Promise.all(
+      MARKETPLACE_RETAILERS.map(async (id) => {
+        const { count } = await client
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true)
+          .eq("retailer", id);
+        return { id, count: count ?? 0 };
+      }),
+    );
+    return results
+      .filter((item) => item.count > 0)
+      .sort((a, b) => b.count - a.count);
+  },
+);
 
 /** Slugs de productos activos para el sitemap (paginado: PostgREST corta en 1000). */
 export async function listActiveProductSlugs(): Promise<

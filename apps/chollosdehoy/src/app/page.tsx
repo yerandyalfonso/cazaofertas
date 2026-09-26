@@ -1,5 +1,6 @@
 import { getMarketplaceBootstrap } from "@/lib/catalog";
 import { MarketplaceApp } from "@/components/MarketplaceApp";
+import { SiteFooter } from "@/components/SiteFooter";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
 export const revalidate = 120;
@@ -32,7 +33,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
-      <MarketplaceApp bootstrap={bootstrap} />
+      <MarketplaceApp bootstrap={bootstrap} footer={<SiteFooter />} />
     </>
   );
 }
