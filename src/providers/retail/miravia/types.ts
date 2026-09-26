@@ -20,4 +20,6 @@ export interface MiraviaProductQuote {
   listPrice: number | null;
   discountPercentage: number | null;
   availability: "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
+  /** og:description / meta description / JSON-LD de la ficha. */
+  description?: string | null;
 }

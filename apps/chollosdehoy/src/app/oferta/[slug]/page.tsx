@@ -24,6 +24,7 @@ import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { telegramAlertForAsin } from "@/lib/telegram";
+import { flashDealLabel } from "@/lib/flash";
 import { DealLevel, type MarketplaceProduct } from "@/lib/types";
 
 // generateMetadata y la página comparten una sola consulta por petición.
@@ -287,6 +288,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {product.brand && (
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Marca: {product.brand}
+                </p>
+              )}
+
+              {!unavailable && flashDealLabel(product.expiresAt) && (
+                <p className="mt-3 inline-block rounded-[var(--radius-sm)] bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800">
+                  {flashDealLabel(product.expiresAt)}
                 </p>
               )}
 

@@ -386,6 +386,42 @@ export function isPlaceholderMiraviaTitle(title: string | null | undefined): boo
 /**
  * Lectura ligera de ficha Miravia (og:* + clickTrackInfo del itemId).
  */
+/**
+ * Descripción de la ficha: JSON-LD Product, og:description o meta description
+ * (en ese orden). Descarta textos genéricos de la tienda.
+ */
+function extractMiraviaDescription(html: string): string | null {
+  const $ = cheerio.load(html);
+  const candidates: string[] = [];
+
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const parsed: unknown = JSON.parse($(el).text());
+      const nodes = Array.isArray(parsed) ? parsed : [parsed];
+      for (const node of nodes) {
+        const record = node as { "@type"?: unknown; description?: unknown };
+        if (record?.["@type"] === "Product" && typeof record.description === "string") {
+          candidates.push(record.description);
+        }
+      }
+    } catch {
+      // JSON-LD roto: se ignora.
+    }
+  });
+  candidates.push(
+    $('meta[property="og:description"]').attr("content") ?? "",
+    $('meta[name="description"]').attr("content") ?? "",
+  );
+
+  for (const raw of candidates) {
+    const text = raw.replace(/\s+/g, " ").trim();
+    if (text.length < 30) continue;
+    if (/^(compra|descubre|encuentra).{0,80}miravia/i.test(text)) continue;
+    return text.slice(0, 2_000);
+  }
+  return null;
+}
+
 export async function scrapeMiraviaProductPage(
   urlOrId: string,
   options?: { timeoutMs?: number },
@@ -488,5 +524,6 @@ export async function scrapeMiraviaProductPage(
         ? roundMoney(((listPrice - sale) / listPrice) * 100)
         : null,
     availability: sale != null ? "IN_STOCK" : "UNKNOWN",
+    description: extractMiraviaDescription(html),
   };
 }

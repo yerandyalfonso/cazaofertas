@@ -183,6 +183,7 @@ export async function previewProductPage(
       imageUrl: quote.imageUrl ?? null,
       categorySlug: null,
       breadcrumbs: [],
+      description: quote.description ?? null,
       partial: quote.price == null,
       warning:
         quote.price == null

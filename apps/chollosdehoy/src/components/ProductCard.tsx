@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { flashDealLabel } from "@/lib/flash";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
 import { DealLevel, type MarketplaceProduct } from "@/lib/types";
@@ -28,6 +29,7 @@ const imageWrapClass =
 
 export function ProductCard({ product, view }: ProductCardProps) {
   const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
+  const flashLabel = flashDealLabel(product.expiresAt);
 
   if (view === "list") {
     return (
@@ -76,6 +78,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
                 </span>
               )}
             </p>
+          )}
+
+          {flashLabel && (
+            <p className="text-xs font-semibold text-amber-700">{flashLabel}</p>
           )}
 
           <div className="mt-auto flex flex-wrap items-end justify-between gap-3">
@@ -171,6 +177,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
               </span>
             )}
           </p>
+        )}
+
+        {flashLabel && (
+          <p className="text-xs font-semibold text-amber-700">{flashLabel}</p>
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">

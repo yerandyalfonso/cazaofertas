@@ -293,6 +293,22 @@ function formatDealStamp(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** «27/9 a las 14:00» (hora de Madrid): las ofertas flash vencen en horas. */
+function formatExpiryStamp(iso: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("es-ES", {
+      timeZone: "Europe/Madrid",
+      day: "numeric",
+      month: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .formatToParts(new Date(iso))
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.day}/${parts.month} a las ${parts.hour}:${parts.minute}`;
+}
+
 /** Normaliza un fragmento a hashtag Telegram (#bebe). */
 function toTelegramHashtag(raw: string): string | null {
   const tag = raw
@@ -376,7 +392,7 @@ export function buildDealAlertText(
     lines.push(`📅 Publicada: ${formatDealStamp(deal.detectedAt)}`);
   }
   if (deal.expiresAt && new Date(deal.expiresAt).getTime() > Date.now()) {
-    lines.push(`⏳ Vence: ${formatDealStamp(deal.expiresAt)}`);
+    lines.push(`⚡ Oferta flash · vence el ${formatExpiryStamp(deal.expiresAt)}`);
   }
 
   if (options?.includeCopyLinks) {
