@@ -749,16 +749,20 @@ async function startWizardFromDeepLink(
 ): Promise<void> {
   if (payload.type === "asin") {
     const asin = payload.value;
-    const url = generateAmazonUrl(asin);
+    let url = generateAmazonUrl(asin);
     let title: string | null = null;
     try {
       const client = createSupabaseServiceClient();
       const { data } = await client
         .from("products")
-        .select("title")
+        .select("title, retailer, product_url")
         .eq("asin", asin)
         .maybeSingle();
       title = data?.title ?? null;
+      // Miravia, Kiabi…: el «asin» es un id propio (MV-…, KB-…), no de Amazon.
+      if (data && data.retailer !== "amazon" && data.product_url) {
+        url = data.product_url;
+      }
     } catch (error) {
       console.error("[telegram] deep-link product title", error);
     }
@@ -779,7 +783,7 @@ async function startWizardFromDeepLink(
         "",
         "¿A partir de qué descuento quieres que te avise?",
       ].join("\n"),
-      replyMarkup: buildWizardDiscountMarkup(),
+      replyMarkup: buildWizardDiscountMarkup("url"),
     });
     return;
   }
@@ -805,7 +809,7 @@ async function startWizardFromDeepLink(
         "",
         "¿A partir de qué descuento quieres que te avise?",
       ].join("\n"),
-      replyMarkup: buildWizardDiscountMarkup(),
+      replyMarkup: buildWizardDiscountMarkup("category"),
     });
     return;
   }
@@ -824,7 +828,7 @@ async function startWizardFromDeepLink(
       "",
       "¿A partir de qué descuento quieres que te avise?",
     ].join("\n"),
-    replyMarkup: buildWizardDiscountMarkup(),
+    replyMarkup: buildWizardDiscountMarkup("keyword"),
   });
 }
 
@@ -866,7 +870,7 @@ async function advanceWizardAfterTarget(
       "",
       "¿A partir de qué descuento quieres que te avise?",
     ].join("\n"),
-    replyMarkup: buildWizardDiscountMarkup(),
+    replyMarkup: buildWizardDiscountMarkup(draft.mode),
   });
 }
 
@@ -964,7 +968,7 @@ async function handleWizardBack(
             "",
             "¿A partir de qué descuento quieres que te avise?",
           ].join("\n"),
-          replyMarkup: buildWizardDiscountMarkup(),
+          replyMarkup: buildWizardDiscountMarkup(draft.mode),
         });
       }
       return;

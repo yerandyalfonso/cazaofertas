@@ -177,6 +177,7 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     title: row.title,
     slug: row.slug,
     description: row.description,
+    asin: row.asin,
     imageUrl: row.image_url,
     brand: row.brand,
     retailer: row.retailer ?? "amazon",

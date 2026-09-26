@@ -3,6 +3,7 @@ import { absoluteUrl, getSiteUrl } from "@/lib/site";
 import { formatEuro } from "@/lib/money";
 import type { CatalogProduct } from "@/lib/catalog";
 import type { BlogPost } from "@/lib/blog";
+import { stripArticleInlineMarkdown } from "@/lib/article-inline-markdown";
 import { ProductAvailability } from "@/types";
 
 export const SITE_NAME = "CazaOferta";
@@ -142,6 +143,28 @@ export function productJsonLd(product: CatalogProduct) {
         name: "Amazon",
       },
     },
+  };
+}
+
+/** `FAQPage` con los bloques de preguntas frecuentes; null si no hay. */
+export function faqJsonLd(post: BlogPost) {
+  const items = post.body
+    .flatMap((block) => (block.type === "faq" ? block.items : []))
+    .map((item) => ({
+      question: stripArticleInlineMarkdown(item.question),
+      answer: stripArticleInlineMarkdown(item.answer),
+    }))
+    .filter((item) => item.question && item.answer);
+  if (items.length === 0) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
   };
 }
 

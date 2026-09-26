@@ -10,6 +10,7 @@ import { ProsCons } from "@/components/blog/ProsCons";
 import { TelegramCategoryCta } from "@/components/blog/TelegramCategoryCta";
 import { ArticleComments } from "@/components/blog/ArticleComments";
 import type { BlogPost } from "@/lib/blog";
+import { resolveArticleMarketplaceCategory } from "@/lib/blog-marketplace";
 import { BLOG_IMAGES } from "@/lib/blog-images";
 import type { CatalogProduct } from "@/lib/catalog";
 import {
@@ -27,6 +28,7 @@ export function BlogArticleView({ post, products }: BlogArticleViewProps) {
   const productsBySlug = new Map(
     products.map((product) => [product.slug, product]),
   );
+  const marketplaceCategory = resolveArticleMarketplaceCategory(products);
 
   return (
     <article className="pb-20">
@@ -83,7 +85,28 @@ export function BlogArticleView({ post, products }: BlogArticleViewProps) {
 
         <div className="mt-14 space-y-8">
           <EditorialDivider />
-          <TelegramCategoryCta category={post.category} />
+          {marketplaceCategory ? (
+            <a
+              href={marketplaceCategory.href}
+              className="flex items-center justify-between gap-4 border border-stone-300 bg-paper px-6 py-5 transition hover:border-ink"
+            >
+              <span>
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-800">
+                  Chollos de hoy
+                </span>
+                <span className="mt-1 block font-display text-xl text-ink">
+                  Ver ofertas de {marketplaceCategory.name.toLowerCase()}
+                </span>
+              </span>
+              <span aria-hidden className="text-2xl text-ink">
+                →
+              </span>
+            </a>
+          ) : null}
+          <TelegramCategoryCta
+            category={marketplaceCategory?.name ?? post.category}
+            categorySlug={marketplaceCategory?.slug}
+          />
           <ArticleContextNote
             reviewedAt={presentation.reviewedAt}
             publishedAt={post.publishedAt}

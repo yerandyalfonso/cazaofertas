@@ -289,7 +289,7 @@ async function fetchPublishedArticles(): Promise<ArticleQueryRow[]> {
       *,
       article_products (
         position,
-        products (*, categories(id, name, slug))
+        products (*, categories(id, name, slug, parent:parent_id(id, name, slug)))
       )
     `,
     )
@@ -334,7 +334,7 @@ async function loadArticleBySlug(
         *,
         article_products (
           position,
-          products (*, categories(id, name, slug))
+          products (*, categories(id, name, slug, parent:parent_id(id, name, slug)))
         )
       `,
           )
@@ -387,7 +387,7 @@ export async function getArticleForPreview(
       *,
       article_products (
         position,
-        products (*, categories(id, name, slug))
+        products (*, categories(id, name, slug, parent:parent_id(id, name, slug)))
       )
     `,
     )

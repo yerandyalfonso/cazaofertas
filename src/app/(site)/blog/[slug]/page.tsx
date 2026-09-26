@@ -7,6 +7,7 @@ import { collectProductSlugs } from "@/lib/blog";
 import {
   articleJsonLd,
   breadcrumbJsonLd,
+  faqJsonLd,
   buildPageMetadata,
 } from "@/lib/seo";
 import { getArticleBySlug } from "@/services/blog";
@@ -49,6 +50,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   if (!result) notFound();
 
   const { post, products } = result;
+  const faq = faqJsonLd(post);
   const expectedProductSlugs = collectProductSlugs(post);
   const needsDataRefresh =
     expectedProductSlugs.length > 0 && products.length === 0;
@@ -64,6 +66,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             { name: "Blog", path: "/blog" },
             { name: post.title, path: `/blog/${post.slug}` },
           ]),
+          ...(faq ? [faq] : []),
         ]}
       />
       <BlogArticleView post={post} products={products} />

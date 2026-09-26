@@ -2,10 +2,12 @@ import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
+import { TelegramCta } from "@/components/TelegramCta";
 import { withPage } from "@/lib/links";
 import type { Listing } from "@/lib/listing";
 import { pageNumbers } from "@/lib/pagination";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import { telegramAlertForCategory } from "@/lib/telegram";
 
 function listingJsonLd(listing: Listing) {
   const url = absoluteUrl(withPage(listing.basePath, listing.page));
@@ -118,11 +120,44 @@ export function ListingPage({ listing }: { listing: Listing }) {
           </nav>
         )}
 
+        {listing.alertCategorySlug && (
+          <TelegramCta
+            alertHref={telegramAlertForCategory(listing.alertCategorySlug)}
+            title={`Alertas de ${listing.h1.replace(/^Ofertas de /, "")} en Telegram`}
+            text="Te avisamos de los nuevos chollos de esta categoría en cuanto aparecen."
+          />
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {data.items.map((product) => (
             <ProductCard key={product.id} product={product} view="grid" />
           ))}
         </div>
+
+        {listing.guides && listing.guides.length > 0 && (
+          <section className="card p-5">
+            <h2 className="text-base font-semibold text-[var(--text)]">
+              Guías relacionadas
+            </h2>
+            <ul className="mt-3 grid gap-3 md:grid-cols-3">
+              {listing.guides.map((guide) => (
+                <li key={guide.href}>
+                  <a
+                    href={guide.href}
+                    className="block h-full rounded-[var(--radius-sm)] border border-[var(--border)] p-3 transition hover:border-[var(--border-strong)]"
+                  >
+                    <span className="block text-sm font-medium text-[var(--text)]">
+                      {guide.title}
+                    </span>
+                    <span className="mt-1 line-clamp-2 block text-xs text-[var(--text-muted)]">
+                      {guide.excerpt}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {data.totalPages > 1 && (
           <nav

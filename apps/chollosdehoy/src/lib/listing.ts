@@ -8,6 +8,7 @@ import {
 } from "@/lib/links";
 import type { PaginatedProducts } from "@/lib/marketplace-types";
 import { RETAILER_LABELS } from "@/lib/retailers";
+import { getGuidesForCategory, type GuideLink } from "@/lib/guides";
 import { BLOG_CATEGORIES } from "@/lib/taxonomy";
 
 export interface ListingLink {
@@ -26,6 +27,10 @@ export interface Listing {
   breadcrumbs: ListingLink[];
   /** Subcategorías con página propia (solo en categorías padre). */
   subLinks: ListingLink[];
+  /** Categoría para el deep link de alertas de Telegram (no en tiendas). */
+  alertCategorySlug?: string;
+  /** Guías del blog relacionadas (solo en categorías). */
+  guides?: GuideLink[];
   data: PaginatedProducts;
 }
 
@@ -73,10 +78,13 @@ export async function resolveCategoryListing(
   const page = parsePage(isSubPath ? rest : path.slice(1));
   if (page === null) return null;
 
-  const data = await loadPage(
-    { ...DEFAULT_FILTERS, parentSlug: parent.slug, subcategorySlug: sub?.slug ?? null },
-    page,
-  );
+  const [data, guides] = await Promise.all([
+    loadPage(
+      { ...DEFAULT_FILTERS, parentSlug: parent.slug, subcategorySlug: sub?.slug ?? null },
+      page,
+    ),
+    getGuidesForCategory(parent.slug),
+  ]);
   if (!data) return null;
 
   const parentLink = { name: parent.name, href: categoryHref(parent.slug) };
@@ -88,6 +96,8 @@ export async function resolveCategoryListing(
       page,
       breadcrumbs: [parentLink, { name: sub.name, href: categoryHref(parent.slug, sub.slug) }],
       subLinks: [],
+      alertCategorySlug: sub.slug,
+      guides,
       data,
     };
   }
@@ -103,6 +113,8 @@ export async function resolveCategoryListing(
       href: categoryHref(parent.slug, n.slug),
       count: n.productCount,
     })),
+    alertCategorySlug: parent.slug,
+    guides,
     data,
   };
 }

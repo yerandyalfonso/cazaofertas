@@ -16,6 +16,8 @@ export type ViewMode = "grid" | "list";
 
 export interface MarketplaceProduct {
   id: string;
+  /** ASIN de Amazon o id propio de la tienda (MV-…, KB-…). */
+  asin: string;
   title: string;
   slug: string;
   description: string | null;

@@ -13,6 +13,15 @@ function isSafeUrl(url: string): boolean {
   }
 }
 
+/** Quita el markdown inline (enlaces → su texto, negrita, cursiva). Para JSON-LD. */
+export function stripArticleInlineMarkdown(text: string): string {
+  return text
+    .replace(LINK_RE, "$1")
+    .replace(BOLD_RE, "$1")
+    .replace(ITALIC_RE, "$1")
+    .trim();
+}
+
 /** Convierte markdown inline ligero (enlaces, negrita, cursiva) a nodos React. */
 export function renderArticleInlineText(text: string): ReactNode[] {
   if (!text) return [];

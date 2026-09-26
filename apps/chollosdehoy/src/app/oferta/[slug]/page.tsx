@@ -13,6 +13,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
+import { TelegramCta } from "@/components/TelegramCta";
 import {
   getAlternativeProducts,
   getCategoryNodes,
@@ -23,6 +24,7 @@ import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import { telegramAlertForAsin } from "@/lib/telegram";
 import { DealLevel, type MarketplaceProduct } from "@/lib/types";
 
 // generateMetadata y la página comparten una sola consulta por petición.
@@ -353,6 +355,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   </p>
                 </>
               )}
+
+              <TelegramCta
+                className="mt-6"
+                alertHref={telegramAlertForAsin(product.asin)}
+                title={unavailable ? "¿Te interesaba este producto?" : "¿Esperas a que baje más?"}
+                text="Crea una alerta en Telegram y te avisamos cuando baje de precio."
+              />
             </div>
           </div>
 

@@ -5,6 +5,7 @@
 import { resolveCategoryIdBySlug } from "@/lib/categories";
 import { WIZARD_CATEGORY_OPTIONS } from "@/lib/site-categories";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { DEFAULT_BROAD_ALERT_MIN_DISCOUNT } from "@/services/alertMatching";
 import type { Json } from "@/types/database";
 
 type InlineKeyboardButton =
@@ -211,7 +212,19 @@ export function buildWizardCategoryMarkup(): InlineKeyboardMarkup {
   return { inline_keyboard: rows };
 }
 
-export function buildWizardDiscountMarkup(): InlineKeyboardMarkup {
+/**
+ * Alertas de categoría/marca: sin descuento mínimo se aplica igualmente
+ * `DEFAULT_BROAD_ALERT_MIN_DISCOUNT` (ver `alertMatching`), así que se dice.
+ */
+function noMinDiscountLabel(mode: WizardMode | undefined): string {
+  return mode === "category" || mode === "brand"
+    ? `Sin mínimo (−${DEFAULT_BROAD_ALERT_MIN_DISCOUNT}%)`
+    : "Sin mínimo";
+}
+
+export function buildWizardDiscountMarkup(
+  mode?: WizardMode,
+): InlineKeyboardMarkup {
   const rows: InlineKeyboardMarkup["inline_keyboard"] = [];
   for (let i = 0; i < DISCOUNT_OPTIONS.length; i += 2) {
     const a = DISCOUNT_OPTIONS[i]!;
@@ -220,7 +233,7 @@ export function buildWizardDiscountMarkup(): InlineKeyboardMarkup {
     if (b) row.push({ text: b.label, callback_data: `wiz:disc:${b.value}` });
     rows.push(row);
   }
-  rows.push([{ text: "Sin mínimo", callback_data: "wiz:disc:any" }]);
+  rows.push([{ text: noMinDiscountLabel(mode), callback_data: "wiz:disc:any" }]);
   rows.push(navRow(true));
   return { inline_keyboard: rows };
 }
@@ -280,7 +293,9 @@ export function formatWizardSummary(draft: AlertWizardDraft): string {
 
   lines.push(
     `📉 Descuento mín.: <b>${
-      draft.minDiscount != null ? `−${draft.minDiscount}%` : "Sin mínimo"
+      draft.minDiscount != null
+        ? `−${draft.minDiscount}%`
+        : noMinDiscountLabel(draft.mode)
     }</b>`,
   );
   lines.push(
