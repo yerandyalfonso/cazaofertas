@@ -6,7 +6,6 @@ import {
   ChevronRight,
   CircleAlert,
   ExternalLink,
-  ShieldCheck,
   TrendingDown,
 } from "lucide-react";
 import { cache } from "react";
@@ -308,15 +307,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-[var(--primary)]">
                     <TrendingDown className="h-4 w-4" />
                     Ahorras {formatEuro(savings)}
-                  </p>
-                )}
-
-                {product.lowestPrice && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                    <ShieldCheck className="h-3.5 w-3.5 text-[var(--primary)]" />
-                    Mínimo registrado: {formatEuro(product.lowestPrice)}
-                    {product.currentPrice <= product.lowestPrice * 1.02 &&
-                      " — precio histórico"}
                   </p>
                 )}
               </div>

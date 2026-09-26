@@ -121,6 +121,17 @@ function categoryOf(product: ProductWithCategory): CategoryEmbed | null {
   return category;
 }
 
+/**
+ * Una bajada de más del 80 % en una sola revisión casi siempre es una lectura
+ * mala de la ficha (Amazon sirve a veces otra variante del HTML: una TV de
+ * 1.129 € se guardó a 35,02 €). Se relee y solo se acepta si coincide.
+ */
+const SUSPICIOUS_DROP_RATIO = 0.2;
+
+function isSuspiciousDrop(storedPrice: number, nextPrice: number): boolean {
+  return storedPrice > 0 && nextPrice < storedPrice * SUSPICIOUS_DROP_RATIO;
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const batches: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -357,6 +368,24 @@ export async function runPriceDetection(
         await clearAsinScrapeFailure(product.asin);
         const storedPrice = requireNumber(product.current_price);
         const nextPrice = roundMoney(quote.price);
+
+        if (isSuspiciousDrop(storedPrice, nextPrice)) {
+          const [recheck] = await provider.getProducts([product.asin]);
+          const recheckPrice =
+            recheck?.price != null ? roundMoney(recheck.price) : null;
+          const confirmed =
+            recheckPrice != null &&
+            Math.abs(recheckPrice - nextPrice) <= nextPrice * 0.01;
+          if (!confirmed) {
+            await touchLastCheckedOnScrapeMiss(client, product.id, now);
+            stats.errors.push({
+              asin: product.asin,
+              message: `Bajada sospechosa descartada: ${storedPrice} → ${nextPrice} € (relectura: ${recheckPrice ?? "sin precio"}).`,
+            });
+            continue;
+          }
+        }
+
         const amazonList = toNumber(quote.previousPrice ?? null);
         const storedPrevious = toNumber(product.previous_price);
         const referencePrice = resolveReferencePrice({

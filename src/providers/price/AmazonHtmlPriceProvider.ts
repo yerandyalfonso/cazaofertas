@@ -394,6 +394,8 @@ function firstPriceFromSelectors(
   for (const selector of selectors) {
     const nodes = $(selector);
     for (let i = 0; i < nodes.length; i += 1) {
+      const el = nodes.get(i);
+      if (el && isSecondaryOfferPriceNode($, el)) continue;
       const text = nodes.eq(i).text();
       const price = parseAmazonPriceText(text);
       if (price !== null) return price;
@@ -477,7 +479,9 @@ function isSecondaryOfferPriceNode(
     .map((node) => `${node.attr("id") ?? ""} ${node.attr("class") ?? ""}`)
     .join(" ")
     .toLowerCase();
-  return /sns|subscribe|subscription|usedaccordion|apex_desktop_used|apex_desktop_sns|tiered-price/.test(
+  // paymentoptions / price-block-container: cuota de financiación («O 35,02 €
+  // / x24 con Openbank Pay»), que Amazon mete a veces dentro del buy box.
+  return /sns|subscribe|subscription|usedaccordion|apex_desktop_used|apex_desktop_sns|tiered-price|paymentoptions|price-block-container|installment/.test(
     chain,
   );
 }
