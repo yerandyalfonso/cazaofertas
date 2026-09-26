@@ -130,10 +130,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const metaPatch: {
+      postingEnabled?: boolean;
       minDiscountPercent?: number;
       postIntervalMinutes?: number;
       batchSize?: number;
     } = {};
+    const metaPostingEnabled = parseOptionalBoolean(body.metaPostingEnabled);
+    if (metaPostingEnabled !== undefined) {
+      metaPatch.postingEnabled = metaPostingEnabled;
+    }
     const metaMinDiscount = parseOptionalNumber(
       body.metaMinDiscountPercent,
       "metaMinDiscountPercent",

@@ -10,6 +10,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import { APP_SETTINGS_ID } from "@/services/appSettings";
 
 export interface MetaSocialSettings {
+  /** Si es false no se publica (la cola sigue llenándose). */
+  postingEnabled: boolean;
   minDiscountPercent: number;
   postIntervalMinutes: number;
   /** Nº de chollos por publicación (carrusel Facebook + Instagram). */
@@ -40,6 +42,7 @@ function clampBatchSize(value: number, fallback: number): number {
 
 function envDefaults(): Omit<MetaSocialSettings, "lastPostAt"> {
   return {
+    postingEnabled: false,
     minDiscountPercent: clampPercent(
       Number.parseFloat(process.env.META_MIN_DISCOUNT_PERCENT ?? "70"),
       DEFAULT_MIN_DISCOUNT_PERCENT,
@@ -62,7 +65,7 @@ export async function getMetaSocialSettings(): Promise<MetaSocialSettings> {
   const { data, error } = await client
     .from("app_settings")
     .select(
-      "meta_min_discount_percent, meta_post_interval_minutes, meta_batch_size, last_meta_post_at",
+      "meta_posting_enabled, meta_min_discount_percent, meta_post_interval_minutes, meta_batch_size, last_meta_post_at",
     )
     .eq("id", APP_SETTINGS_ID)
     .maybeSingle();
@@ -73,6 +76,7 @@ export async function getMetaSocialSettings(): Promise<MetaSocialSettings> {
   }
 
   return {
+    postingEnabled: data.meta_posting_enabled ?? env.postingEnabled,
     minDiscountPercent: clampPercent(
       Number(data.meta_min_discount_percent ?? env.minDiscountPercent),
       env.minDiscountPercent,
@@ -103,8 +107,9 @@ export async function isMetaPostIntervalElapsed(
   return elapsedMs >= resolved.postIntervalMinutes * 60_000;
 }
 
-/** Guarda desde el admin el umbral de descuento, el espaciado y/o el tamaño de lote. */
+/** Guarda desde el admin el interruptor, el umbral de descuento, el espaciado y/o el tamaño de lote. */
 export async function updateMetaSocialSettings(patch: {
+  postingEnabled?: boolean;
   minDiscountPercent?: number;
   postIntervalMinutes?: number;
   batchSize?: number;
@@ -114,10 +119,14 @@ export async function updateMetaSocialSettings(patch: {
 
   const update: {
     updated_at: string;
+    meta_posting_enabled?: boolean;
     meta_min_discount_percent?: number;
     meta_post_interval_minutes?: number;
     meta_batch_size?: number;
   } = { updated_at: new Date().toISOString() };
+  if (patch.postingEnabled !== undefined) {
+    update.meta_posting_enabled = patch.postingEnabled;
+  }
   if (patch.minDiscountPercent !== undefined) {
     update.meta_min_discount_percent = clampPercent(
       patch.minDiscountPercent,
@@ -155,5 +164,17 @@ export async function recordMetaPostSent(): Promise<void> {
     .eq("id", APP_SETTINGS_ID);
   if (error) {
     console.warn("[meta-social-settings] no se pudo guardar last_meta_post_at", error.message);
+  }
+}
+
+/** Apaga la publicación en Meta (p. ej. tras un bloqueo 368). */
+export async function disableMetaPosting(): Promise<void> {
+  const client = createSupabaseServiceClient();
+  const { error } = await client
+    .from("app_settings")
+    .update({ meta_posting_enabled: false, updated_at: new Date().toISOString() })
+    .eq("id", APP_SETTINGS_ID);
+  if (error) {
+    console.warn("[meta-social-settings] no se pudo desactivar Meta", error.message);
   }
 }

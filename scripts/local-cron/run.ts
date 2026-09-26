@@ -67,6 +67,14 @@ async function runCheckPrices(): Promise<void> {
   const telegramFlush = await maybeFlushTelegramBatch();
   console.log(JSON.stringify({ telegramFlush }, null, 2));
 
+  // Solo en una máquina (el VPS): Mac y VPS corren check-prices a la vez y
+  // publicarían el mismo lote en Facebook/Instagram.
+  if (process.env.CAZAOFERTAS_META_FLUSH === "1") {
+    const { maybeFlushMetaBatch } = await import("@/services/metaPostQueue");
+    const metaFlush = await maybeFlushMetaBatch();
+    console.log(JSON.stringify({ metaFlush }, null, 2));
+  }
+
   await reviewCheckPricesResult(amazon);
   await reviewRetailPricesResult(retail);
 }

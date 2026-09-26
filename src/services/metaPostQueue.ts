@@ -6,7 +6,9 @@ import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { postDealBatchToFacebookPage } from "@/services/facebook";
 import { postDealBatchToInstagram } from "@/services/instagram";
+import { notifyCronAlert } from "@/services/cronNotify";
 import {
+  disableMetaPosting,
   getMetaSocialSettings,
   isMetaPostIntervalElapsed,
   recordMetaPostSent,
@@ -22,6 +24,33 @@ export interface MetaBatchFlushResult {
   posted: number;
   facebookOk: boolean;
   instagramOk: boolean;
+}
+
+/** Pendientes más viejos que esto se descartan: el precio ya no es fiable. */
+const META_QUEUE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Bloqueo de Meta por volumen/spam: Facebook 368, Instagram 9. El error
+ * formateado termina en «(código)» — ver `formatGraphError`.
+ */
+function isMetaBlockError(error: string | undefined): boolean {
+  return !!error && /\((?:368|9)\)\s*$/.test(error);
+}
+
+/** Marca `skipped` los pendientes demasiado viejos. Devuelve cuántos. */
+async function expireStaleMetaPosts(client: TypedSupabaseClient): Promise<number> {
+  const cutoff = new Date(Date.now() - META_QUEUE_MAX_AGE_MS).toISOString();
+  const { data, error } = await client
+    .from("meta_post_queue")
+    .update({ status: "skipped" })
+    .eq("status", "pending")
+    .lt("created_at", cutoff)
+    .select("id");
+  if (error) {
+    console.warn("[meta-post-queue] no se pudieron caducar pendientes", error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
 }
 
 /**
@@ -72,7 +101,7 @@ async function countPendingMetaPosts(
 async function loadPendingDeals(
   client: TypedSupabaseClient,
   limit: number,
-): Promise<{ queueIds: string[]; deals: DealCandidate[] }> {
+): Promise<{ queueIds: string[]; droppedIds: string[]; deals: DealCandidate[] }> {
   const { data: rows, error } = await client
     .from("meta_post_queue")
     .select("id, product_id, old_price, new_price, created_at")
@@ -80,9 +109,10 @@ async function loadPendingDeals(
     .order("created_at", { ascending: true })
     .limit(limit);
 
-  if (error || !rows?.length) return { queueIds: [], deals: [] };
+  if (error || !rows?.length) return { queueIds: [], droppedIds: [], deals: [] };
 
   const queueIds: string[] = [];
+  const droppedIds: string[] = [];
   const deals: DealCandidate[] = [];
 
   for (const row of rows) {
@@ -100,13 +130,13 @@ async function loadPendingDeals(
       !product.is_active ||
       product.availability === ProductAvailability.OUT_OF_STOCK
     ) {
-      queueIds.push(row.id);
+      droppedIds.push(row.id);
       continue;
     }
 
     const expiresAt = product.deal_expires_at;
     if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-      queueIds.push(row.id);
+      droppedIds.push(row.id);
       continue;
     }
 
@@ -167,7 +197,7 @@ async function loadPendingDeals(
     });
   }
 
-  return { queueIds, deals };
+  return { queueIds, droppedIds, deals };
 }
 
 /**
@@ -175,12 +205,31 @@ async function loadPendingDeals(
  * cola (`batchSize`, por defecto 10) y ya pasó el espaciado mínimo desde el
  * último lote. Un carrusel por red en vez de un post por chollo — reduce
  * drásticamente el nº de llamadas a la API de Meta.
+ *
+ * No hace nada si `meta_posting_enabled` está apagado. Si fallan las dos
+ * redes el lote vuelve a `pending`; si el fallo es un bloqueo de Meta, además
+ * se apaga la publicación y se avisa al admin.
  */
 export async function maybeFlushMetaBatch(options?: {
   force?: boolean;
 }): Promise<MetaBatchFlushResult> {
   const client = createSupabaseServiceClient();
   const settings = await getMetaSocialSettings();
+
+  if (!settings.postingEnabled) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: "Publicación en Meta desactivada (admin → Ajustes).",
+      pendingBefore: await countPendingMetaPosts(client),
+      batchSize: settings.batchSize,
+      posted: 0,
+      facebookOk: false,
+      instagramOk: false,
+    };
+  }
+
+  await expireStaleMetaPosts(client);
   const pendingBefore = await countPendingMetaPosts(client);
 
   if (pendingBefore === 0) {
@@ -222,13 +271,26 @@ export async function maybeFlushMetaBatch(options?: {
     };
   }
 
-  const { queueIds, deals } = await loadPendingDeals(client, settings.batchSize);
+  const { queueIds, droppedIds, deals } = await loadPendingDeals(
+    client,
+    settings.batchSize,
+  );
 
-  if (queueIds.length > 0) {
+  if (droppedIds.length > 0) {
+    await client
+      .from("meta_post_queue")
+      .update({ status: "skipped" })
+      .in("id", droppedIds);
+  }
+
+  // Se reservan antes de publicar para que otra ejecución no coja el mismo
+  // lote; si falla todo, se devuelven a `pending` más abajo.
+  const dealIds = queueIds.filter((id) => !droppedIds.includes(id));
+  if (dealIds.length > 0) {
     await client.from("meta_post_queue").update({
       status: "posted",
       posted_at: new Date().toISOString(),
-    }).in("id", queueIds);
+    }).in("id", dealIds);
   }
 
   if (deals.length === 0) {
@@ -256,6 +318,24 @@ export async function maybeFlushMetaBatch(options?: {
 
   if (facebook.ok || instagram.ok) {
     await recordMetaPostSent();
+  } else {
+    await client
+      .from("meta_post_queue")
+      .update({ status: "pending", posted_at: null })
+      .in("id", dealIds);
+
+    const blockError = [facebook.error, instagram.error].find(isMetaBlockError);
+    if (blockError) {
+      await disableMetaPosting();
+      await notifyCronAlert({
+        job: "meta-batch",
+        headline: "Meta bloqueó la publicación: Facebook/Instagram desactivado",
+        lines: [
+          blockError,
+          "La cola se conserva. Reactívalo en admin → Ajustes cuando Meta levante el bloqueo.",
+        ],
+      });
+    }
   }
 
   return {
@@ -263,7 +343,7 @@ export async function maybeFlushMetaBatch(options?: {
     skipped: false,
     pendingBefore,
     batchSize: settings.batchSize,
-    posted: deals.length,
+    posted: facebook.ok || instagram.ok ? deals.length : 0,
     facebookOk: facebook.ok,
     instagramOk: instagram.ok,
   };

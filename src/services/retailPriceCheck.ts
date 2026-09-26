@@ -82,6 +82,16 @@ export async function runRetailPriceCheck(options?: {
     last_checked_at: string | null;
   };
 
+  // p. ej. RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia en el VPS: desde su IP
+  // Miravia da captcha y ya lo revisa el Mac (IP residencial).
+  const skipRetailers = (process.env.RETAIL_PRICE_CHECK_SKIP_RETAILERS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const retailers = ["miravia", "kiabi", "carrefour"].filter(
+    (retailer) => !skipRetailers.includes(retailer),
+  );
+
   let monitorable: RetailRow[] = [];
 
   if (requested?.length) {
@@ -112,7 +122,7 @@ export async function runRetailPriceCheck(options?: {
         .from("products")
         .select(RETAIL_SELECT)
         .eq("is_active", true)
-        .in("retailer", ["miravia", "kiabi", "carrefour"])
+        .in("retailer", retailers)
         .order("last_checked_at", { ascending: true, nullsFirst: true })
         .range(offset, offset + pageSize - 1);
       if (error) {
@@ -294,7 +304,18 @@ export async function runRetailPriceCheck(options?: {
         continue;
       }
 
-      stats.errors.push({ asin: product.asin, message });
+      if (isRetailBlockedError(message)) {
+        // Captcha/anti-bot: rotar al siguiente en vez de reintentar siempre
+        // los mismos (acaparaban el lote y no se revisaba el resto).
+        const now = new Date().toISOString();
+        await client
+          .from("products")
+          .update({ last_checked_at: now, updated_at: now })
+          .eq("id", product.id);
+        stats.skippedBlocked += 1;
+      } else {
+        stats.errors.push({ asin: product.asin, message });
+      }
     }
 
     if (index < queue.length - 1 && delayMs > 0) {

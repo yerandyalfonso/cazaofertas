@@ -8,6 +8,7 @@ import type { AppSettings } from "@/services/appSettings";
 import type { MetaSocialSettings } from "@/services/metaSocialSettings";
 
 type SettingsForm = {
+  metaPostingEnabled: boolean;
   metaMinDiscountPercent: string;
   metaPostIntervalMinutes: string;
   metaBatchSize: string;
@@ -40,6 +41,7 @@ function settingsToForm(
   metaSocial: MetaSocialSettings,
 ): SettingsForm {
   return {
+    metaPostingEnabled: metaSocial.postingEnabled,
     metaMinDiscountPercent: String(metaSocial.minDiscountPercent),
     metaPostIntervalMinutes: String(metaSocial.postIntervalMinutes),
     metaBatchSize: String(metaSocial.batchSize),
@@ -117,6 +119,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          metaPostingEnabled: form.metaPostingEnabled,
           metaMinDiscountPercent: Number(form.metaMinDiscountPercent),
           metaPostIntervalMinutes: Number(form.metaPostIntervalMinutes),
           metaBatchSize: Number(form.metaBatchSize),
@@ -237,6 +240,20 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
           juntos en un solo carrusel (una publicación en Facebook + una en
           Instagram, con foto propia por producto). El espaciado se comprueba
           entre lotes, no por chollo individual.
+        </p>
+        <label className="mt-4 flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={form.metaPostingEnabled}
+            onChange={(e) => patch("metaPostingEnabled", e.target.checked)}
+            className="h-4 w-4 accent-teal-800"
+          />
+          Publicar en Facebook/Instagram
+        </label>
+        <p className="mt-1 text-xs text-stone-500">
+          Apagado, la cola se sigue llenando pero no se publica. Se apaga solo
+          si Meta bloquea la página (368); los pendientes de más de 48 h se
+          descartan al publicar.
         </p>
         <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
           <AdminField

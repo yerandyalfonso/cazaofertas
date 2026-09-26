@@ -765,6 +765,7 @@ export type Database = {
           meta_min_discount_percent: number;
           meta_post_interval_minutes: number;
           meta_batch_size: number;
+          meta_posting_enabled: boolean;
           last_meta_post_at: string | null;
           updated_at: string;
         };
@@ -800,6 +801,7 @@ export type Database = {
           meta_min_discount_percent?: number;
           meta_post_interval_minutes?: number;
           meta_batch_size?: number;
+          meta_posting_enabled?: boolean;
           last_meta_post_at?: string | null;
           updated_at?: string;
         };
@@ -835,6 +837,7 @@ export type Database = {
           meta_min_discount_percent?: number;
           meta_post_interval_minutes?: number;
           meta_batch_size?: number;
+          meta_posting_enabled?: boolean;
           last_meta_post_at?: string | null;
           updated_at?: string;
         };
