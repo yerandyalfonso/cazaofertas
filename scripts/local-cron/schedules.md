@@ -22,7 +22,7 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 | `admin-digest` | 09:00, 15:00, 21:00 | — | |
 | backup | 03:00 | 04:00 (`pullbackup`, copia al Mac) | |
 
-Miravia desde el VPS: sale por Cloudflare WARP en modo proxy (`warp-cli`, `127.0.0.1:40000`, servicio `warp-svc`) con `MIRAVIA_PROXY_URL`; la IP del VPS recibe captcha. El modo proxy no cambia rutas ni DNS: **nunca** poner WARP en modo normal (desviaría todo el tráfico y podría cortar SSH).
+Miravia desde el VPS: `MIRAVIA_EGRESS=http://127.0.0.1:40000,http://127.0.0.1:8901,direct` = Cloudflare WARP en modo proxy (`warp-cli`, servicio `warp-svc`) → relé del Mac por túnel inverso (IP residencial; `scripts/local-cron/install-miravia-relay.sh`, solo si el Mac está encendido) → IP del VPS (suele dar captcha). Es respaldo, no rotación: una salida por petición y se pasa a la siguiente solo si da captcha o error. El modo proxy no cambia rutas ni DNS: **nunca** poner WARP en modo normal (desviaría todo el tráfico y podría cortar SSH).
 
 `com.cazaofertas.vps-tunnel` (Mac) mantiene un túnel SSH al VPS; si el Mac
 pierde la red sale con código 255 y launchd lo relanza.

@@ -263,37 +263,102 @@ export function parseMiraviaFlashHtml(
 }
 
 /**
- * MIRAVIA_PROXY_URL (p. ej. http://127.0.0.1:40000, Cloudflare WARP en modo
- * proxy en el VPS): Miravia da captcha a la IP del VPS, no a la de WARP.
+ * Salidas para Miravia, en orden de preferencia (MIRAVIA_EGRESS, separadas por
+ * comas): una URL de proxy HTTP o «direct». En el VPS, p. ej.
+ * `http://127.0.0.1:40000,http://127.0.0.1:8901,direct` = Cloudflare WARP →
+ * Mac por el túnel (IP residencial) → IP del VPS. Sin la variable: directo
+ * (o MIRAVIA_PROXY_URL, formato anterior de una sola salida).
+ *
+ * Es un respaldo, no rotación: cada petición usa una sola salida, y solo pasa
+ * a la siguiente si esa da captcha, bloqueo o error de red.
  */
-function miraviaFetch(): typeof fetch {
-  return createProxyFetch(fetch, process.env.MIRAVIA_PROXY_URL?.trim() || null);
+function miraviaEgressRoutes(): string[] {
+  const raw =
+    process.env.MIRAVIA_EGRESS?.trim() ||
+    process.env.MIRAVIA_PROXY_URL?.trim() ||
+    "direct";
+  const routes = raw
+    .split(",")
+    .map((route) => route.trim())
+    .filter(Boolean);
+  return routes.length > 0 ? routes : ["direct"];
+}
+
+/** Salidas que ya dieron captcha/bloqueo en este proceso: no se reintentan. */
+const blockedMiraviaRoutes = new Set<string>();
+
+class MiraviaRouteError extends Error {}
+
+async function fetchMiraviaHtmlVia(
+  route: string,
+  url: string,
+  timeoutMs: number,
+): Promise<string> {
+  const fetchImpl =
+    route === "direct" ? fetch : createProxyFetch(fetch, route);
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      method: "GET",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "es-ES,es;q=0.9",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    // Proxy caído (Mac apagado, WARP desconectado) o timeout: probar otra.
+    throw new MiraviaRouteError(
+      `red: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (response.status === 403 || response.status === 429 || response.status >= 500) {
+    throw new MiraviaRouteError(`HTTP ${response.status}`);
+  }
+  if (!response.ok) {
+    // 404 y similares son de la ficha, no de la salida: no cambiar de salida.
+    throw new Error(`Miravia HTTP ${response.status} en ${url}`);
+  }
+  const html = await response.text();
+  // Anti-bot de Alibaba: responde 200 con una página que redirige al captcha.
+  if (isMiraviaCaptchaPage(html)) {
+    throw new MiraviaRouteError("captcha");
+  }
+  return html;
 }
 
 export async function fetchMiraviaHtml(
   url: string,
   options?: { timeoutMs?: number },
 ): Promise<string> {
-  const response = await miraviaFetch()(url, {
-    method: "GET",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Accept-Language": "es-ES,es;q=0.9",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    signal: AbortSignal.timeout(options?.timeoutMs ?? FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`Miravia HTTP ${response.status} en ${url}`);
+  const routes = miraviaEgressRoutes();
+  const available = routes.filter((route) => !blockedMiraviaRoutes.has(route));
+  const failures: string[] = [];
+
+  for (const route of available) {
+    try {
+      return await fetchMiraviaHtmlVia(
+        route,
+        url,
+        options?.timeoutMs ?? FETCH_TIMEOUT_MS,
+      );
+    } catch (error) {
+      if (!(error instanceof MiraviaRouteError)) throw error;
+      blockedMiraviaRoutes.add(route);
+      failures.push(`${route === "direct" ? "directo" : route}: ${error.message}`);
+    }
   }
-  const html = await response.text();
-  // Anti-bot de Alibaba: responde 200 con una página que redirige al captcha.
-  if (isMiraviaCaptchaPage(html)) {
-    throw new Error(`Miravia captcha anti-bot (x5sec) en ${url}`);
-  }
-  return html;
+
+  // Se mantiene «captcha anti-bot» en el texto: isRetailBlockedError lo usa
+  // para tratarlo como bloqueo (rotar el producto, no desactivarlo).
+  throw new Error(
+    `Miravia captcha anti-bot (x5sec) en ${url} — salidas: ${
+      failures.join("; ") || "todas bloqueadas antes en este proceso"
+    }`,
+  );
 }
 
 function isMiraviaCaptchaPage(html: string): boolean {
