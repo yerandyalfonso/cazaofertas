@@ -378,6 +378,11 @@ export async function discoverMiraviaDeals(options?: {
   return { feedsFetched, feedErrors, items };
 }
 
+/** Título de relleno cuando la ficha no trae og:title (no mostrar ni guardar). */
+export function isPlaceholderMiraviaTitle(title: string | null | undefined): boolean {
+  return !title?.trim() || /^Producto Miravia \d+$/.test(title.trim());
+}
+
 /**
  * Lectura ligera de ficha Miravia (og:* + clickTrackInfo del itemId).
  */

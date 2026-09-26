@@ -10,6 +10,7 @@ import { getAppSettings, resolveMiraviaFeedUrlsForRun } from "@/services/appSett
 import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import {
   discoverMiraviaDeals,
+  isPlaceholderMiraviaTitle,
   scrapeMiraviaProductPage,
   type MiraviaDiscoveredItem,
 } from "@/providers/retail/miravia";
@@ -362,10 +363,12 @@ export async function runMiraviaDealsCheck(options?: {
       let { price, listPrice, discount } = prices;
 
       // Verificar ficha: el feed a veces trae céntimos/badge mal parseados.
+      let pageTitle: string | null = null;
       try {
         const quote = await scrapeMiraviaProductPage(item.productUrl, {
           timeoutMs: 14_000,
         });
+        if (!isPlaceholderMiraviaTitle(quote.title)) pageTitle = quote.title;
         if (quote.price != null && quote.price > 0) {
           price = roundMoney(quote.price);
           if (quote.listPrice != null && quote.listPrice > price) {
@@ -381,8 +384,13 @@ export async function runMiraviaDealsCheck(options?: {
         /* mantener precios del feed */
       }
 
-      const title =
-        item.titleHint?.trim() || `Producto Miravia ${item.externalId}`;
+      // Sin nombre (ni en el listado ni en la ficha) no se da de alta: saldría
+      // como «Producto Miravia <id>» en la web y en los canales.
+      const title = item.titleHint?.trim() || pageTitle;
+      if (!title) {
+        errors.push({ externalId: item.externalId, message: "Sin título" });
+        continue;
+      }
       const productUrl = item.productUrl;
       const syntheticAsin = syntheticAsinForRetailer("miravia", item.externalId);
       const subcategorySlug = inferProductSubcategorySlug({ title });
