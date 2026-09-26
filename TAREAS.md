@@ -20,7 +20,7 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Implementar IndexNow para avisar a Bing de productos nuevos/cambiados.
 - [x] 2026-09-26 Páginas de categoría, subcategoría y tienda (`/categoria/hogar[/cocina][/pagina/N]`, `/tienda/amazon`), ISR 5 min, en sitemap y enlazadas desde portada, fichas y pie.
 - [ ] Productos de Miravia con título «Producto Miravia <id>»: importador corregido (2026-09-26); quedan ~214 por corregir con `scripts/fix-miravia-titles.ts --apply --delay=45` (Miravia da captcha si se va rápido).
-- [ ] Agrupar variantes (una tarjeta por `parent_asin`) y mostrar las opciones en la ficha.
+- [x] 2026-09-26 Agrupar variantes (vista `marketplace_products`: una tarjeta por `parent_asin`, «N opciones») y opciones en la ficha.
 - [x] 2026-09-26 Ofertas caducadas/agotadas/retiradas: aviso en la ficha + alternativas en vez del botón de compra (retiradas: 200 con noindex en vez de 404).
 - [ ] Historial de precio en la ficha y «precio comprobado hace X min».
 - [ ] Enlaces a crear alerta / canal de Telegram desde ficha y categorías.

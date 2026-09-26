@@ -17,6 +17,7 @@ import {
   getAlternativeProducts,
   getCategoryNodes,
   getProductBySlug as fetchProductBySlug,
+  getProductVariants,
 } from "@/lib/catalog";
 import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { formatDiscount, formatEuro } from "@/lib/money";
@@ -181,7 +182,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
   const unavailable = isUnavailable(product);
-  const alternatives = unavailable ? await getAlternativeProducts(product) : [];
+  const [alternatives, { items: variants, total: variantTotal }] = await Promise.all([
+    unavailable ? getAlternativeProducts(product) : [],
+    getProductVariants(product),
+  ]);
   const jsonLd = productJsonLd(product, absoluteUrl(`/oferta/${product.slug}`));
 
   const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
@@ -351,6 +355,52 @@ export default async function ProductPage({ params }: ProductPageProps) {
               )}
             </div>
           </div>
+
+          {variants.length > 0 && (
+            <div className="border-t border-[var(--border)] px-6 py-6 md:px-8">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Opciones disponibles (
+                {variants.length < variantTotal
+                  ? `${variants.length} de ${variantTotal}`
+                  : variantTotal}
+                )
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {variants.map((variant) => {
+                  const current = variant.id === product.id;
+                  const label = variant.variantLabel ?? truncate(variant.title, 40);
+                  const className = `flex flex-col rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm transition ${
+                    current
+                      ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]"
+                  }`;
+                  const body = (
+                    <>
+                      <span className="font-medium text-[var(--text)]">{label}</span>
+                      <span className="text-xs text-[var(--primary)]">
+                        {formatEuro(variant.currentPrice)}
+                        {variant.discountPercentage >= 1 &&
+                          ` · ${formatDiscount(variant.discountPercentage)}`}
+                      </span>
+                    </>
+                  );
+                  return (
+                    <li key={variant.id}>
+                      {current ? (
+                        <span className={className} aria-current="true">
+                          {body}
+                        </span>
+                      ) : (
+                        <Link href={`/oferta/${variant.slug}`} className={className}>
+                          {body}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {product.description && (
             <div className="border-t border-[var(--border)] px-6 py-6 md:px-8">

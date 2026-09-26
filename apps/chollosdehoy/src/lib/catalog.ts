@@ -18,6 +18,13 @@ import {
   type SortOption,
 } from "@/lib/types";
 
+/**
+ * Vista con una fila por producto (la variante con más descuento de cada
+ * parent_asin) y variant_count. Solo productos activos. Las fichas siguen
+ * leyendo de products: cada variante conserva su URL.
+ */
+const LISTING_TABLE = "marketplace_products";
+
 const CATEGORY_SELECT =
   "*, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))";
 
@@ -46,6 +53,10 @@ type ProductRow = {
   product_url: string | null;
   is_featured: boolean | null;
   is_active?: boolean | null;
+  /** Solo en marketplace_products. */
+  variant_count?: number | null;
+  parent_asin?: string | null;
+  variant_info?: unknown;
   created_at: string;
   updated_at?: string | null;
   availability?: string | null;
@@ -119,6 +130,14 @@ function scoreProduct(input: {
   };
 }
 
+/** variant_info.own → «Azul · XL». */
+function variantLabel(info: unknown): string | null {
+  const own = (info as { own?: unknown } | null)?.own;
+  if (!Array.isArray(own)) return null;
+  const label = own.filter((v) => typeof v === "string" && v.trim()).join(" · ");
+  return label || null;
+}
+
 export function mapProduct(row: ProductRow): MarketplaceProduct {
   const categoryRaw = row.categories;
   const categoryNode = Array.isArray(categoryRaw)
@@ -173,6 +192,9 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     availability: row.availability ?? null,
     expiresAt: row.deal_expires_at ?? null,
     isActive: row.is_active !== false,
+    variantCount: row.variant_count ?? 1,
+    parentAsin: row.parent_asin ?? null,
+    variantLabel: variantLabel(row.variant_info),
     category: categoryNode
       ? {
           id: categoryNode.id,
@@ -261,7 +283,7 @@ export async function queryMarketplaceProducts(
   const to = needsScoreSort ? fetchSize - 1 : from + pageSize - 1;
 
   let query = client
-    .from("products")
+    .from(LISTING_TABLE)
     .select(CATEGORY_SELECT, { count: "exact" })
     .eq("is_active", true);
 
@@ -375,7 +397,7 @@ async function fetchActiveCategoryIds(): Promise<string[]> {
   const ids: string[] = [];
   for (let from = 0; from < 50_000; from += pageSize) {
     const { data, error } = await client
-      .from("products")
+      .from(LISTING_TABLE)
       .select("category_id")
       .eq("is_active", true)
       .not("category_id", "is", null)
@@ -429,22 +451,18 @@ async function fetchCategoryNodes(): Promise<CategoryFilterNode[]> {
 
 async function fetchStats(): Promise<MarketplaceStats> {
   const client = getSupabaseServer();
-  const [countRes, discountRes, retailerRes] = await Promise.all([
+  const [countRes, discountRes, retailerCounts] = await Promise.all([
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select("*", { count: "exact", head: true })
       .eq("is_active", true),
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select("discount_percentage")
       .eq("is_active", true)
       .gt("discount_percentage", 0)
       .limit(300),
-    client
-      .from("products")
-      .select("retailer")
-      .eq("is_active", true)
-      .not("retailer", "is", null),
+    getRetailerCounts(),
   ]);
 
   const discounts = (discountRes.data ?? [])
@@ -457,21 +475,12 @@ async function fetchStats(): Promise<MarketplaceStats> {
         )
       : 0;
 
-  const retailerCounts = new Map<string, number>();
-  for (const row of retailerRes.data ?? []) {
-    const id = String(row.retailer);
-    retailerCounts.set(id, (retailerCounts.get(id) ?? 0) + 1);
-  }
-  const topRetailer = [...retailerCounts.entries()].sort(
-    (a, b) => b[1] - a[1],
-  )[0];
+  const topRetailer = retailerCounts[0];
 
   return {
     totalProducts: countRes.count ?? 0,
     avgDiscount,
-    topRetailer: topRetailer
-      ? { id: topRetailer[0], count: topRetailer[1] }
-      : null,
+    topRetailer: topRetailer ?? null,
   };
 }
 
@@ -479,20 +488,20 @@ async function fetchSpotlight(): Promise<MarketplaceBootstrap["spotlight"]> {
   const client = getSupabaseServer();
   const [topRes, trendRes, latestRes] = await Promise.all([
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select(CATEGORY_SELECT)
       .eq("is_active", true)
       .gte("discount_percentage", 30)
       .order("discount_percentage", { ascending: false, nullsFirst: false })
       .limit(12),
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select(CATEGORY_SELECT)
       .eq("is_active", true)
       .order("discount_percentage", { ascending: false, nullsFirst: false })
       .limit(12),
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select(CATEGORY_SELECT)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
@@ -576,6 +585,26 @@ export async function getProductBySlug(
   return mapProduct(data as ProductRow);
 }
 
+/** Variantes activas del mismo producto (incluida esta), por precio. */
+export async function getProductVariants(
+  product: MarketplaceProduct,
+  limit = 40,
+): Promise<{ items: MarketplaceProduct[]; total: number }> {
+  if (!product.parentAsin) return { items: [], total: 0 };
+  const { data, count } = await getSupabaseServer()
+    .from("products")
+    .select(CATEGORY_SELECT, { count: "exact" })
+    .eq("parent_asin", product.parentAsin)
+    .eq("is_active", true)
+    .order("current_price", { ascending: true })
+    .limit(limit);
+  const items = ((data ?? []) as ProductRow[]).map(mapProduct);
+  // La variante que se está viendo siempre aparece, aunque no esté entre las más baratas.
+  if (!items.some((item) => item.id === product.id)) items.push(product);
+  const total = count ?? items.length;
+  return total > 1 ? { items, total } : { items: [], total: 0 };
+}
+
 /**
  * Alternativas para la ficha de una oferta retirada o agotada: productos
  * activos de la misma subcategoría (o, si no hay, las mejores del catálogo).
@@ -587,7 +616,7 @@ export async function getAlternativeProducts(
   const client = getSupabaseServer();
   const base = () =>
     client
-      .from("products")
+      .from(LISTING_TABLE)
       .select(CATEGORY_SELECT)
       .eq("is_active", true)
       .neq("id", product.id)
@@ -622,7 +651,7 @@ export const getRetailerCounts = cache(
     const results = await Promise.all(
       MARKETPLACE_RETAILERS.map(async (id) => {
         const { count } = await client
-          .from("products")
+          .from(LISTING_TABLE)
           .select("id", { count: "exact", head: true })
           .eq("is_active", true)
           .eq("retailer", id);
@@ -644,7 +673,7 @@ export async function listActiveProductSlugs(): Promise<
   const rows: Array<{ slug: string; updatedAt: string }> = [];
   for (let from = 0; from < 50_000; from += pageSize) {
     const { data, error } = await client
-      .from("products")
+      .from(LISTING_TABLE)
       .select("slug, updated_at, created_at")
       .eq("is_active", true)
       .order("created_at", { ascending: false })

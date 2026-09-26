@@ -69,6 +69,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
           {product.category && (
             <p className="text-xs text-[var(--text-muted)]">
               {product.category.parentName ?? product.category.name}
+              {product.variantCount > 1 && (
+                <span className="font-medium text-[var(--primary)]">
+                  {" · "}
+                  {product.variantCount} opciones
+                </span>
+              )}
             </p>
           )}
 
@@ -158,6 +164,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
         {product.category && (
           <p className="text-xs text-[var(--text-muted)]">
             {product.category.parentName ?? product.category.name}
+            {product.variantCount > 1 && (
+              <span className="font-medium text-[var(--primary)]">
+                {" · "}
+                {product.variantCount} opciones
+              </span>
+            )}
           </p>
         )}
 
