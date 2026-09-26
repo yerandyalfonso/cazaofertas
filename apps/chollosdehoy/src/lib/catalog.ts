@@ -43,6 +43,7 @@ type ProductRow = {
   amazon_url: string | null;
   product_url: string | null;
   is_featured: boolean | null;
+  is_active?: boolean | null;
   created_at: string;
   updated_at?: string | null;
   availability?: string | null;
@@ -169,6 +170,7 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     updatedAt: row.updated_at ?? row.created_at,
     availability: row.availability ?? null,
     expiresAt: row.deal_expires_at ?? null,
+    isActive: row.is_active !== false,
     category: categoryNode
       ? {
           id: categoryNode.id,
@@ -544,11 +546,46 @@ export async function getProductBySlug(
     .from("products")
     .select(CATEGORY_SELECT)
     .eq("slug", slug)
-    .eq("is_active", true)
     .maybeSingle();
 
   if (error || !data) return null;
   return mapProduct(data as ProductRow);
+}
+
+/**
+ * Alternativas para la ficha de una oferta retirada o agotada: productos
+ * activos de la misma subcategoría (o, si no hay, las mejores del catálogo).
+ */
+export async function getAlternativeProducts(
+  product: MarketplaceProduct,
+  limit = 4,
+): Promise<MarketplaceProduct[]> {
+  const client = getSupabaseServer();
+  const base = () =>
+    client
+      .from("products")
+      .select(CATEGORY_SELECT)
+      .eq("is_active", true)
+      .neq("id", product.id)
+      .or("availability.is.null,availability.neq.OUT_OF_STOCK")
+      .order("discount_percentage", { ascending: false, nullsFirst: false })
+      .limit(limit * 3);
+
+  let rows: ProductRow[] = [];
+  if (product.category?.id) {
+    const { data } = await base().eq("category_id", product.category.id);
+    rows = (data ?? []) as ProductRow[];
+  }
+  if (rows.length < limit) {
+    const { data } = await base();
+    const seen = new Set(rows.map((row) => row.id));
+    rows = [
+      ...rows,
+      ...((data ?? []) as ProductRow[]).filter((row) => !seen.has(row.id)),
+    ];
+  }
+
+  return sortProducts(rows.map(mapProduct), "score").slice(0, limit);
 }
 
 /** Slugs de productos activos para el sitemap (paginado: PostgREST corta en 1000). */

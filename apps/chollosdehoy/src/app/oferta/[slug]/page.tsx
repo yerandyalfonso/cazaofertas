@@ -4,13 +4,18 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   ChevronRight,
+  CircleAlert,
   ExternalLink,
   ShieldCheck,
   TrendingDown,
 } from "lucide-react";
 import { cache } from "react";
 import type { Metadata } from "next";
-import { getProductBySlug as fetchProductBySlug } from "@/lib/catalog";
+import { ProductCard } from "@/components/ProductCard";
+import {
+  getAlternativeProducts,
+  getProductBySlug as fetchProductBySlug,
+} from "@/lib/catalog";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -57,7 +62,7 @@ function productSeoDescription(product: MarketplaceProduct): string {
 }
 
 function isUnavailable(product: MarketplaceProduct): boolean {
-  if (product.availability === "OUT_OF_STOCK") return true;
+  if (!product.isActive || product.availability === "OUT_OF_STOCK") return true;
   return Boolean(
     product.expiresAt && new Date(product.expiresAt).getTime() <= Date.now(),
   );
@@ -71,9 +76,11 @@ function productJsonLd(product: MarketplaceProduct, url: string) {
     url,
     price: product.currentPrice.toFixed(2),
     priceCurrency: "EUR",
-    availability: isUnavailable(product)
-      ? "https://schema.org/OutOfStock"
-      : "https://schema.org/InStock",
+    availability: !product.isActive
+      ? "https://schema.org/Discontinued"
+      : isUnavailable(product)
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
     itemCondition: "https://schema.org/NewCondition",
     seller: { "@type": "Organization", name: retailerLabel(product.retailer) },
   };
@@ -122,6 +129,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: url },
+    // Retirada: fuera del índice, pero Google sigue los enlaces a alternativas.
+    ...(product.isActive ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       type: "website",
       url,
@@ -144,6 +153,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
+  const unavailable = isUnavailable(product);
+  const alternatives = unavailable ? await getAlternativeProducts(product) : [];
   const jsonLd = productJsonLd(product, absoluteUrl(`/oferta/${product.slug}`));
 
   const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
@@ -276,19 +287,40 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 )}
               </div>
 
-              <a
-                href={product.affiliateUrl}
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-                className="btn btn-primary mt-6 w-full py-3.5 text-base"
-              >
-                Ver oferta en {retailerLabel(product.retailer)}
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              {unavailable ? (
+                <>
+                  <p className="mt-6 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--text)]">
+                    <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                    {product.isActive
+                      ? "Esta oferta está agotada o ha caducado. El precio mostrado es el último que comprobamos."
+                      : "Esta oferta ya no está disponible. El precio mostrado es el último que comprobamos."}
+                  </p>
+                  {alternatives.length > 0 && (
+                    <a
+                      href="#alternativas"
+                      className="btn btn-primary mt-4 w-full py-3.5 text-base"
+                    >
+                      Ver ofertas similares
+                    </a>
+                  )}
+                </>
+              ) : (
+                <>
+                  <a
+                    href={product.affiliateUrl}
+                    target="_blank"
+                    rel="noopener noreferrer sponsored"
+                    className="btn btn-primary mt-6 w-full py-3.5 text-base"
+                  >
+                    Ver oferta en {retailerLabel(product.retailer)}
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
 
-              <p className="mt-3 text-center text-[11px] text-[var(--text-muted)]">
-                Enlace de afiliado · El precio puede variar en la tienda
-              </p>
+                  <p className="mt-3 text-center text-[11px] text-[var(--text-muted)]">
+                    Enlace de afiliado · El precio puede variar en la tienda
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -303,37 +335,53 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
           )}
         </article>
+
+        {alternatives.length > 0 && (
+          <section id="alternativas" className="mt-8 scroll-mt-4">
+            <h2 className="mb-4 text-lg font-bold text-[var(--text)]">
+              Ofertas similares disponibles
+            </h2>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+              {alternatives.map((alternative) => (
+                <ProductCard key={alternative.id} product={alternative} view="grid" />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* CTA fijo en móvil */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] md:hidden">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs text-[var(--text-muted)]">
-              {retailerLabel(product.retailer)}
-            </p>
-            <p className="text-lg font-bold text-[var(--primary)]">
-              {formatEuro(product.currentPrice)}
-              {product.discountPercentage > 0 && (
-                <span className="ml-2 text-xs font-semibold text-[var(--text-muted)]">
-                  {formatDiscount(product.discountPercentage)}
-                </span>
-              )}
-            </p>
+      {!unavailable && (
+        <>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] md:hidden">
+            <div className="mx-auto flex max-w-4xl items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs text-[var(--text-muted)]">
+                  {retailerLabel(product.retailer)}
+                </p>
+                <p className="text-lg font-bold text-[var(--primary)]">
+                  {formatEuro(product.currentPrice)}
+                  {product.discountPercentage > 0 && (
+                    <span className="ml-2 text-xs font-semibold text-[var(--text-muted)]">
+                      {formatDiscount(product.discountPercentage)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <a
+                href={product.affiliateUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="btn btn-primary shrink-0"
+              >
+                Comprar
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
           </div>
-          <a
-            href={product.affiliateUrl}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="btn btn-primary shrink-0"
-          >
-            Comprar
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      </div>
-
-      <div className="h-20 md:hidden" aria-hidden />
+          <div className="h-20 md:hidden" aria-hidden />
+        </>
+      )}
     </div>
   );
 }

@@ -35,6 +35,8 @@ export interface MarketplaceProduct {
   availability: string | null;
   /** Caducidad de la oferta flash, si Amazon la publica. */
   expiresAt: string | null;
+  /** false = retirado del catálogo (la ficha sigue accesible con alternativas). */
+  isActive: boolean;
   category: {
     id: string;
     name: string;

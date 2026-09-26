@@ -20,7 +20,7 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Implementar IndexNow para avisar a Bing de productos nuevos/cambiados.
 - [ ] Páginas de categoría y tienda renderizadas en servidor (`/categoria/[slug]`, `/tienda/[retailer]`).
 - [ ] Agrupar variantes (una tarjeta por `parent_asin`) y mostrar las opciones en la ficha.
-- [ ] Ofertas caducadas/agotadas: aviso en la ficha + alternativas en vez del botón de compra.
+- [x] 2026-09-26 Ofertas caducadas/agotadas/retiradas: aviso en la ficha + alternativas en vez del botón de compra (retiradas: 200 con noindex en vez de 404).
 - [ ] Historial de precio en la ficha y «precio comprobado hace X min».
 - [ ] Enlaces a crear alerta / canal de Telegram desde ficha y categorías.
 - [x] Migrar `apps/chollosdehoy/src/middleware.ts` a `proxy.ts` (Next 16). 2026-09-26
