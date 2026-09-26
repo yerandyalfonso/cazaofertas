@@ -12,7 +12,7 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 | Job | VPS | Mac | Notas |
 |-----|-----|-----|-------|
 | `flash-deals` | cada 3 min | cada 10 min | VPS sin Miravia (`CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=0`) |
-| `check-prices` | cada 10 min | cada 10 min | VPS: `RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia` y `CAZAOFERTAS_META_FLUSH=1` (solo el VPS publica en Facebook/Instagram) |
+| `check-prices` | cada 10 min | cada 10 min | VPS: Miravia por WARP y `CAZAOFERTAS_META_FLUSH=1` (solo el VPS publica en Facebook/Instagram) |
 | `user-alerts` | cada hora | 08:15, 20:15 | Todas las tiendas menos PcComponentes |
 | `kiabi-deals` | 09:30, 18:30 | 09:30, 18:30 | |
 | `coupons-discover` | 10:00, 18:00 | 10:00, 18:00 | |
@@ -21,6 +21,8 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 | `user-alerts-residential` | — | cada 30 min | Solo PcComponentes |
 | `admin-digest` | 09:00, 15:00, 21:00 | — | |
 | backup | 03:00 | 04:00 (`pullbackup`, copia al Mac) | |
+
+Miravia desde el VPS: sale por Cloudflare WARP en modo proxy (`warp-cli`, `127.0.0.1:40000`, servicio `warp-svc`) con `MIRAVIA_PROXY_URL`; la IP del VPS recibe captcha. El modo proxy no cambia rutas ni DNS: **nunca** poner WARP en modo normal (desviaría todo el tráfico y podría cortar SSH).
 
 `com.cazaofertas.vps-tunnel` (Mac) mantiene un túnel SSH al VPS; si el Mac
 pierde la red sale con código 255 y launchd lo relanza.
