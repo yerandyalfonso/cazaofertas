@@ -1,7 +1,6 @@
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 
-let cachedAgent: ProxyAgent | null = null;
-let cachedProxyUrl: string | null = null;
+const agents = new Map<string, ProxyAgent>();
 
 function readBrightDataProxyUrl(): string | null {
   const direct = process.env.BRIGHTDATA_PROXY_URL?.trim();
@@ -19,18 +18,22 @@ function readBrightDataProxyUrl(): string | null {
 }
 
 function getProxyAgent(proxyUrl: string): ProxyAgent {
-  if (cachedAgent && cachedProxyUrl === proxyUrl) return cachedAgent;
-  cachedAgent = new ProxyAgent(proxyUrl);
-  cachedProxyUrl = proxyUrl;
-  return cachedAgent;
+  let agent = agents.get(proxyUrl);
+  if (!agent) {
+    agent = new ProxyAgent(proxyUrl);
+    agents.set(proxyUrl, agent);
+  }
+  return agent;
 }
 
 /**
- * Fetch que enruta por Bright Data (u otro proxy HTTP) cuando hay
- * BRIGHTDATA_PROXY_URL o BRIGHTDATA_PROXY_HOST/USER/PASSWORD en env.
+ * Fetch que enruta por un proxy HTTP: el indicado o, por defecto, Bright Data
+ * (BRIGHTDATA_PROXY_URL o BRIGHTDATA_PROXY_HOST/USER/PASSWORD en env).
  */
-export function createProxyFetch(baseFetch: typeof fetch = fetch): typeof fetch {
-  const proxyUrl = readBrightDataProxyUrl();
+export function createProxyFetch(
+  baseFetch: typeof fetch = fetch,
+  proxyUrl: string | null = readBrightDataProxyUrl(),
+): typeof fetch {
   if (!proxyUrl) return baseFetch;
 
   const agent = getProxyAgent(proxyUrl);

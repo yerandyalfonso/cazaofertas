@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { roundMoney } from "@/lib/money";
+import { createProxyFetch } from "@/lib/proxyFetch";
 import type {
   MiraviaDiscoveredItem,
   MiraviaProductQuote,
@@ -261,11 +262,19 @@ export function parseMiraviaFlashHtml(
   return [...byId.values()];
 }
 
+/**
+ * MIRAVIA_PROXY_URL (p. ej. http://127.0.0.1:40000, Cloudflare WARP en modo
+ * proxy en el VPS): Miravia da captcha a la IP del VPS, no a la de WARP.
+ */
+function miraviaFetch(): typeof fetch {
+  return createProxyFetch(fetch, process.env.MIRAVIA_PROXY_URL?.trim() || null);
+}
+
 export async function fetchMiraviaHtml(
   url: string,
   options?: { timeoutMs?: number },
 ): Promise<string> {
-  const response = await fetch(url, {
+  const response = await miraviaFetch()(url, {
     method: "GET",
     headers: {
       "User-Agent":
@@ -387,11 +396,29 @@ export function isPlaceholderMiraviaTitle(title: string | null | undefined): boo
  * Lectura ligera de ficha Miravia (og:* + clickTrackInfo del itemId).
  */
 /**
- * Descripción de la ficha: JSON-LD Product, og:description o meta description
- * (en ese orden). Descarta textos genéricos de la tienda.
+ * Descripción de la ficha: el bloque «Descripción del artículo»
+ * (`.lzd-article`, plantilla Lazada) y, si no está, JSON-LD / og / meta
+ * description. Descarta el texto SEO («¡Compra … ✓ Envío gratis»).
  */
 function extractMiraviaDescription(html: string): string | null {
   const $ = cheerio.load(html);
+
+  const article = $(".lzd-article").first();
+  if (article.length > 0) {
+    article.find("script, style, img").remove();
+    article.find("br").replaceWith("\n");
+    article.find("p, div, li, h1, h2, h3, h4").each((_, el) => {
+      $(el).append("\n");
+    });
+    const text = article
+      .text()
+      .split("\n")
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n");
+    if (text.length >= 30) return text.slice(0, 2_000);
+  }
+
   const candidates: string[] = [];
 
   $('script[type="application/ld+json"]').each((_, el) => {
@@ -416,7 +443,7 @@ function extractMiraviaDescription(html: string): string | null {
   for (const raw of candidates) {
     const text = raw.replace(/\s+/g, " ").trim();
     if (text.length < 30) continue;
-    if (/^(compra|descubre|encuentra).{0,80}miravia/i.test(text)) continue;
+    if (/^¡?(compra|descubre|encuentra)\b/i.test(text) || /envío gratis/i.test(text)) continue;
     return text.slice(0, 2_000);
   }
   return null;
