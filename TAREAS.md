@@ -5,8 +5,8 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 ## Contenido / Blog
 
 - [ ] Revisar y publicar los 22 artículos en borrador (admin → Artículos → filtro Borrador; hay vista previa).
-- [ ] Corregir el artículo «5 productos básicos para la limpieza del hogar»: FAQ con texto de prueba («wewewe», «qeqe») y enlace a `127.0.0.1` en el primer H2.
-- [ ] Quitar los artículos demo de `src/lib/blog.ts` / `src/lib/blog-extra-posts.ts` del seed (`src/database/seed.ts`): si se re-ejecuta, los vuelve a publicar.
+- [x] 2026-09-26 Corregir el artículo «5 productos básicos para la limpieza del hogar»: FAQ con texto de prueba («wewewe», «qeqe») y enlace a `127.0.0.1` en el primer H2.
+- [x] 2026-09-26 Seed: ya no siembra artículos en `seed`//api/seed; `seed:blog` solo inserta los que falten como borrador, sin sobrescribir.
 - [ ] Ampliar a 1.500+ palabras las guías que se quieran posicionar mejor.
 - [ ] Créditos de fotógrafo con nombre en imágenes Unsplash (necesita API key gratuita de Unsplash; la licencia no lo exige).
 - [ ] SEO del blog: JSON-LD `FAQPage` para los bloques de preguntas frecuentes.
@@ -31,8 +31,8 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [x] Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`). 2026-09-26
 - [x] Productos: usar `AdminSortButton` compartido y quitar el import `X` sin usar. 2026-09-26
 - [ ] Unificar la carga de datos del admin (23 avisos `react-hooks/set-state-in-effect`).
-- [ ] Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).
-- [ ] Guardar user-agent en `affiliate_clicks` para poder auditar clics (los de Facebook hasta 2026-09-24 están inflados por el rastreador).
+- [x] 2026-09-26 Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).
+- [x] 2026-09-26 Guardar user-agent en `affiliate_clicks` para poder auditar clics (los de Facebook hasta 2026-09-24 están inflados por el rastreador).
 
 ## Canales y automatización
 

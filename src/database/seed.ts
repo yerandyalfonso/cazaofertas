@@ -270,8 +270,10 @@ export async function seedFromMockProvider(
   }
 
   // Histórico de precios desactivado.
-
-  const { articles, articleProducts } = await seedBlogArticles(client);
+  // Artículos: no se siembran aquí (/api/seed corre en producción y
+  // republicaría los demo). Para desarrollo: `npm run seed:blog`.
+  const articles = 0;
+  const articleProducts = 0;
 
   return {
     categories: categoriesToSeed.length,
@@ -290,7 +292,10 @@ export interface SeedBlogResult {
   articlesUpserted: string[];
 }
 
-/** Inserta/actualiza artículos editoriales y enlaza productos existentes. */
+/**
+ * Inserta los artículos demo que falten (como borrador) y enlaza productos.
+ * Nunca sobrescribe ni republica artículos que ya existen en la BD.
+ */
 export async function seedBlogArticles(
   client: TypedSupabaseClient = createSupabaseServiceClient(),
 ): Promise<SeedBlogResult> {
@@ -309,34 +314,22 @@ export async function seedBlogArticles(
       featured_image: post.coverImage,
       author: "CazaOferta",
       category: post.category,
-      status: "published",
+      status: "draft",
       seo_title: post.title,
       seo_description: post.excerpt,
       reading_time: Number.isFinite(minutes) && minutes > 0 ? minutes : 5,
     };
   });
 
-  const { error: articlesError } = await client
+  // Con ignoreDuplicates, select() devuelve solo las filas insertadas.
+  const { data: storedArticles, error: articlesError } = await client
     .from("articles")
-    .upsert(articlePayload, { onConflict: "slug" });
+    .upsert(articlePayload, { onConflict: "slug", ignoreDuplicates: true })
+    .select("id, slug");
 
-  if (articlesError) {
+  if (articlesError || !storedArticles) {
     throw new Error(
-      `Error al sembrar artículos: ${articlesError.message}. ¿Aplicaste supabase/migrations/0003_articles.sql y 0004_align_articles_schema.sql?`,
-    );
-  }
-
-  const { data: storedArticles, error: articlesReadError } = await client
-    .from("articles")
-    .select("id, slug")
-    .in(
-      "slug",
-      BLOG_POSTS.map((post) => post.slug),
-    );
-
-  if (articlesReadError || !storedArticles) {
-    throw new Error(
-      `No se pudieron leer artículos: ${articlesReadError?.message ?? "sin datos"}`,
+      `Error al sembrar artículos: ${articlesError?.message ?? "sin datos"}. ¿Aplicaste supabase/migrations/0003_articles.sql y 0004_align_articles_schema.sql?`,
     );
   }
 
@@ -365,20 +358,6 @@ export async function seedBlogArticles(
   const articleIdBySlug = new Map(
     storedArticles.map((article) => [article.slug, article.id]),
   );
-
-  const articleIds = storedArticles.map((article) => article.id);
-  if (articleIds.length > 0) {
-    const { error: deleteLinksError } = await client
-      .from("article_products")
-      .delete()
-      .in("article_id", articleIds);
-
-    if (deleteLinksError) {
-      throw new Error(
-        `Error al limpiar article_products: ${deleteLinksError.message}`,
-      );
-    }
-  }
 
   const linkRows = BLOG_POSTS.flatMap((post) => {
     const articleId = articleIdBySlug.get(post.slug);
@@ -410,10 +389,10 @@ export async function seedBlogArticles(
   }
 
   return {
-    articles: articlePayload.length,
+    articles: storedArticles.length,
     articleProducts: linkRows.length,
     missingProductSlugs,
-    articlesUpserted: articlePayload.map((article) => article.slug),
+    articlesUpserted: storedArticles.map((article) => article.slug),
   };
 }
 

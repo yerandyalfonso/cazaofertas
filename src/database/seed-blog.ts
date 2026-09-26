@@ -10,7 +10,7 @@ async function main() {
   const result = await seedBlogArticles();
 
   console.log("Seed de blog completado:");
-  console.log(`  Artículos upserted: ${result.articles}`);
+  console.log(`  Artículos nuevos (borrador): ${result.articles}`);
   console.log(`  Enlaces article_products: ${result.articleProducts}`);
   console.log(`  Slugs: ${result.articlesUpserted.join(", ")}`);
 

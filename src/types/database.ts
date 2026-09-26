@@ -400,29 +400,41 @@ export type Database = {
       affiliate_clicks: {
         Row: {
           id: string;
-          product_id: string;
+          product_id: string | null;
           user_id: string | null;
           article_id: string | null;
           source: string;
           is_test: boolean;
+          product_title: string | null;
+          product_asin: string | null;
+          retailer: string | null;
+          user_agent: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
-          product_id: string;
+          product_id?: string | null;
           user_id?: string | null;
           article_id?: string | null;
           source: string;
           is_test?: boolean;
+          product_title?: string | null;
+          product_asin?: string | null;
+          retailer?: string | null;
+          user_agent?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
-          product_id?: string;
+          product_id?: string | null;
           user_id?: string | null;
           article_id?: string | null;
           source?: string;
           is_test?: boolean;
+          product_title?: string | null;
+          product_asin?: string | null;
+          retailer?: string | null;
+          user_agent?: string | null;
           created_at?: string;
         };
         Relationships: [

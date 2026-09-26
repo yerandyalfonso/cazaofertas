@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const client = createSupabaseServiceClient();
     const { data: product, error } = await client
       .from("products")
-      .select("id, asin, retailer, product_url, amazon_url, affiliate_url, is_active")
+      .select("id, title, asin, retailer, product_url, amazon_url, affiliate_url, is_active")
       .eq("id", productId)
       .maybeSingle();
 
@@ -90,6 +90,11 @@ export async function GET(request: NextRequest) {
           : `admin:${source}`
         : source,
       is_test: isTest,
+      // Copia para no perder la atribución si luego se borra el producto.
+      product_title: product.title,
+      product_asin: product.asin,
+      retailer: product.retailer,
+      user_agent: request.headers.get("user-agent")?.slice(0, 512) ?? null,
     };
 
     const { error: insertError } = isBotRequest(request)
