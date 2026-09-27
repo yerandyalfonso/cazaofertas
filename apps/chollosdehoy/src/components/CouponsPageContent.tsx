@@ -1,16 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  AlertCircle,
-  Check,
-  ChevronDown,
-  Copy,
-  ExternalLink,
-  Scissors,
-} from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Ticket } from "lucide-react";
 import type { CouponOffer } from "@/lib/coupons";
-import { formatCouponExpiry } from "@/lib/coupons";
+import { couponDetails, couponHighlight, formatCouponExpiry } from "@/lib/coupons";
 import {
   MARKETPLACE_RETAILERS,
   retailerColor,
@@ -23,9 +16,9 @@ interface CouponsPageContentProps {
 
 function CouponCard({ coupon }: { coupon: CouponOffer }) {
   const [copied, setCopied] = useState(false);
-  const [termsOpen, setTermsOpen] = useState(false);
-  const color = retailerColor(coupon.retailer);
   const expiry = formatCouponExpiry(coupon.expiresAt);
+  const highlight = couponHighlight(coupon.description);
+  const details = couponDetails(coupon.description);
   const hasRedeemCode =
     Boolean(coupon.code) &&
     !/^(PROMO-|CUPONES-|CLUB-|MV-|AWIN-|CLIP-)/i.test(coupon.code);
@@ -43,111 +36,79 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
   }
 
   return (
-    <article
-      className={`coupon-card ${coupon.highlight ? "coupon-card--highlight" : ""}`}
-    >
-      <div className="coupon-card-notch coupon-card-notch--left" aria-hidden />
-      <div className="coupon-card-notch coupon-card-notch--right" aria-hidden />
-
-      <div className="coupon-card-body">
-        <div className="coupon-card-main">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="badge text-white"
-              style={{ backgroundColor: color }}
-            >
-              {retailerLabel(coupon.retailer)}
-            </span>
-            {coupon.highlight && (
-              <span className="badge badge-great">Destacado</span>
-            )}
-            {coupon.source === "affiliate" && (
-              <span className="badge bg-primary-soft text-primary">
-                Afiliado
-              </span>
-            )}
-            {coupon.source === "scrape" && (
-              <span className="badge bg-surface-muted text-muted">
-                Detectado
-              </span>
-            )}
-            {expiry && (
-              <span className="text-xs text-muted">
-                Hasta {expiry}
-              </span>
-            )}
-          </div>
-
-          <h2 className="mt-2 text-lg font-semibold text-ink">
-            {coupon.title}
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted">
-            {coupon.description}
-          </p>
-
-          {hasRedeemCode ? (
-            <button
-              type="button"
-              onClick={copyCode}
-              aria-live="polite"
-              className="coupon-code-btn mt-4"
-            >
-              <Scissors className="h-4 w-4 shrink-0 text-primary" />
-              <span className="font-mono text-sm font-bold tracking-wide">
-                {coupon.code}
-              </span>
-              <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-muted">
-                {copied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    Copiar
-                  </>
-                )}
-              </span>
-            </button>
-          ) : null}
-
-          {terms ? (
-            <div className={hasRedeemCode ? "mt-3" : "mt-4"}>
-              <button
-                type="button"
-                onClick={() => setTermsOpen((v) => !v)}
-                className="flex items-center gap-1 text-xs font-semibold text-primary"
-                aria-expanded={termsOpen}
-              >
-                Condiciones
-                <ChevronDown
-                  className={`h-3.5 w-3.5 transition ${termsOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {termsOpen ? (
-                <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted">
-                  {terms}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="coupon-card-action">
-          <a
-            href={coupon.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary coupon-store-btn"
-          >
-            <span className="font-semibold">
-              Ir a {retailerLabel(coupon.retailer)}
-            </span>
-            <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-          </a>
-        </div>
+    <article className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5">
+      <div className="flex shrink-0 items-center gap-3 sm:w-28 sm:flex-col sm:items-start sm:gap-0">
+        <Ticket className="h-5 w-5 text-primary sm:hidden" aria-hidden />
+        <p className="price text-2xl font-semibold leading-none text-ink">
+          {highlight?.value ?? "Cupón"}
+        </p>
+        {highlight && <p className="text-xs text-muted sm:mt-1">{highlight.label}</p>}
       </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted">
+          <span translate="no" className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: retailerColor(coupon.retailer) }}
+            />
+            {retailerLabel(coupon.retailer)}
+          </span>
+          {expiry && <span>· Hasta {expiry}</span>}
+          {coupon.highlight && <span className="font-medium text-primary">· Destacado</span>}
+        </p>
+        <h2 className="mt-1 line-clamp-2 text-[0.95rem] font-semibold leading-snug text-ink">
+          {coupon.title}
+        </h2>
+        {details.length > 0 && (
+          <p className="mt-1 text-sm text-muted">{details.join(" · ")}</p>
+        )}
+
+        {hasRedeemCode && (
+          <button
+            type="button"
+            onClick={copyCode}
+            aria-live="polite"
+            className="coupon-code-btn mt-3"
+          >
+            <span className="font-mono text-sm font-bold tracking-wide">{coupon.code}</span>
+            <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-muted">
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" aria-hidden />
+                  Copiar código
+                </>
+              )}
+            </span>
+          </button>
+        )}
+
+        {terms && (
+          <details className="group mt-2">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-primary hover:underline">
+              Condiciones
+              <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted">{terms}</p>
+          </details>
+        )}
+      </div>
+
+      <a
+        href={coupon.url}
+        target="_blank"
+        rel="noopener noreferrer sponsored"
+        className="btn btn-primary shrink-0 sm:self-center"
+      >
+        Ver en {retailerLabel(coupon.retailer)}
+        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+      </a>
     </article>
   );
 }
@@ -189,17 +150,7 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
 
   return (
     <div className="space-y-6">
-      <div
-        className="flex gap-3 rounded-control border border-line bg-surface-muted px-4 py-3 text-sm text-muted"
-        role="note"
-      >
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <p>
-          Cupones manuales y detectados. Abre <strong>Condiciones</strong> en cada
-          ficha para ver vigencia y exclusiones.
-        </p>
-      </div>
-
+      {retailers.length > 1 && (
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -227,8 +178,9 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
           </button>
         ))}
       </div>
+      )}
 
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {visible.map((coupon) => (
           <CouponCard key={coupon.id} coupon={coupon} />
         ))}

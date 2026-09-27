@@ -309,23 +309,27 @@ export default async function ProductPage({ params }: ProductPageProps) {
             )}
 
             <div className="mt-6 border-y border-line py-5">
+              {unavailable && (
+                <p className="mb-1 text-xs font-medium text-muted">Último precio comprobado</p>
+              )}
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="price text-3xl font-semibold tracking-tight text-ink">
+                <span className={`price text-3xl font-semibold tracking-tight ${unavailable ? "text-muted" : "text-ink"}`}>
                   {formatEuro(product.currentPrice)}
                 </span>
-                {product.previousPrice &&
+                {!unavailable &&
+                  product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
                     <span className="price text-base text-muted line-through">
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
-                {product.discountPercentage >= 1 && (
+                {!unavailable && product.discountPercentage >= 1 && (
                   <span className="text-sm font-semibold text-primary">
                     {formatDiscount(product.discountPercentage)}
                   </span>
                 )}
               </div>
-              {savings !== null && savings > 0 && (
+              {!unavailable && savings !== null && savings > 0 && (
                 <p className="mt-1.5 text-sm text-muted">
                   Ahorras {formatEuro(savings)}
                 </p>

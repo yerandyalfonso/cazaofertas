@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { SiteFooter } from "@/components/SiteFooter";
 import { CouponsPageContent } from "@/components/CouponsPageContent";
 import { getActiveCoupons } from "@/lib/coupons-db";
 
@@ -15,25 +16,32 @@ export default async function CuponesPage() {
 
   return (
     <div className="marketplace-shell min-h-screen">
-      <header className="border-b border-line bg-gradient-to-br from-primary-soft to-surface">
-        <div className="mx-auto max-w-4xl px-4 py-6">
-          <Link href="/" className="btn btn-ghost mb-4 text-sm">
-            <ArrowLeft className="h-4 w-4" />
-            Volver al marketplace
-          </Link>
-          <h1 className="text-2xl font-bold text-ink md:text-3xl">
-            Cupones por tienda
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
-            Códigos y promociones detectados automáticamente en las tiendas.
-            Solo se listan los activos según su vigencia.
-          </p>
-        </div>
-      </header>
+      <nav
+        aria-label="Migas de pan"
+        className="mx-auto flex max-w-4xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
+      >
+        <Link href="/" className="hover:text-ink">
+          Inicio
+        </Link>
+        <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
+        <span>Cupones</span>
+      </nav>
 
-      <main id="contenido" className="mx-auto max-w-4xl px-4 py-8">
-        <CouponsPageContent coupons={coupons} />
+      <main id="contenido" className="mx-auto max-w-4xl px-4 pb-10 pt-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink md:text-[1.75rem]">
+          Cupones y códigos de descuento
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted">
+          {coupons.length > 0
+            ? `${coupons.length} cupones activos. Revisa las condiciones de cada uno: algunos solo valen para ciertos productos o tienen fecha de fin.`
+            : "Se revisan dos veces al día en las tiendas."}
+        </p>
+        <div className="mt-6">
+          <CouponsPageContent coupons={coupons} />
+        </div>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

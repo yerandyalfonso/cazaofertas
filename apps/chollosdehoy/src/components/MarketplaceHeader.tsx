@@ -183,7 +183,7 @@ export function MarketplaceHeader({
             )}
             <button
               type="button"
-              className="text-xs font-semibold text-primary hover:underline"
+              className="tap-target text-xs font-semibold text-primary hover:underline"
               onClick={() => onFiltersChange(DEFAULT_FILTERS)}
             >
               Limpiar todo
