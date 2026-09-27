@@ -55,6 +55,9 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [ ] Salida española para Amazon desde el VPS: fijar el CP 28001 no funciona sin iniciar sesión (Amazon responde «Sign in to update your location») y WARP también sale por Francia. Opciones: relé del Mac ampliado a amazon.es (solo con el Mac encendido), proxy residencial español de pago (Bright Data ya está soportado por `BRIGHTDATA_PROXY_*`) o dejar Amazon solo al Mac.
 - [ ] Revisar desde el Mac los ~338 productos de Amazon marcados agotados (muchos eran falsos «agotado»); se corrigen solos en su siguiente revisión.
 
+- [x] 2026-09-27 El contador de fallos por ASIN desactivaba productos que el VPS no veía desde Francia («El proveedor no devolvió precio»): 35 desactivados el 26–27/09, de ellos 27 estaban bien en España y se reactivaron desde el Mac. Ahora esas omisiones no cuentan como fallo ni avisan.
+- [ ] Router Digi (TP-Link EX520v ESDIGI): el firmware trae OpenVPN pero lo oculta; no sirve como salida española. Conexión Plus (1 €/mes) activada el 27-09: cancelarla si no se usa.
+
 ## Infraestructura / mantenimiento
 
 - [ ] Instalar en el Mac el relé de Miravia (respaldo del VPS si WARP da captcha): `scripts/local-cron/install-miravia-relay.sh`. El VPS ya lo tiene en `MIRAVIA_EGRESS` (WARP → Mac → directo).
