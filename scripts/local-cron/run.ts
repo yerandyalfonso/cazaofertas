@@ -18,7 +18,8 @@ type LocalCronJob =
   | "kiabi-deals"
   | "telegram-flush"
   | "coupons-discover"
-  | "admin-digest";
+  | "admin-digest"
+  | "alert-load-report";
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
@@ -31,6 +32,7 @@ const JOBS: LocalCronJob[] = [
   "telegram-flush",
   "coupons-discover",
   "admin-digest",
+  "alert-load-report",
 ];
 
 function parseJob(raw: string | undefined): LocalCronJob {
@@ -211,7 +213,10 @@ async function runUserAlerts(): Promise<void> {
   // cada 20 min) con un drop-in de systemd: ver scripts/local-cron/schedules.md.
   const limit = Number(process.env.CAZAOFERTAS_USER_ALERTS_LIMIT) || 40;
   const delayMs = Number(process.env.CAZAOFERTAS_USER_ALERTS_DELAY_MS) || 40_000;
+  const startedAt = new Date();
   const result = await runUserUrlAlerts({ limit, delayMs });
+  const { recordUserAlertRun } = await import("@/services/alertLoadTest");
+  await recordUserAlertRun(startedAt, result);
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);
 }
@@ -270,6 +275,13 @@ async function runAdminDigest(): Promise<void> {
   await sendAdminDigest();
 }
 
+/** Estadísticas del test de carga de alertas al chat del admin (si hay test). */
+async function runAlertLoadReport(): Promise<void> {
+  const { sendAlertLoadReport } = await import("@/services/alertLoadTest");
+  const text = await sendAlertLoadReport(2);
+  console.log(text ?? "Sin usuarios de prueba: no se envía informe.");
+}
+
 async function main(): Promise<void> {
   const job = parseJob(process.argv[2]);
   const started = new Date().toISOString();
@@ -308,6 +320,9 @@ async function main(): Promise<void> {
       break;
     case "coupons-discover":
       await runCouponsDiscover();
+      break;
+    case "alert-load-report":
+      await runAlertLoadReport();
       break;
     case "admin-digest":
       await runAdminDigest();

@@ -208,6 +208,32 @@ export type Database = {
           },
         ];
       };
+      user_alert_runs: {
+        Row: {
+          id: number;
+          machine: string;
+          started_at: string;
+          finished_at: string;
+          checked: number;
+          failed: number;
+          skipped: number;
+          price_drops: number;
+          notified: number;
+        };
+        Insert: {
+          id?: number;
+          machine: string;
+          started_at: string;
+          finished_at: string;
+          checked?: number;
+          failed?: number;
+          skipped?: number;
+          price_drops?: number;
+          notified?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_alert_runs"]["Insert"]>;
+        Relationships: [];
+      };
       users: {
         Row: {
           id: string;
