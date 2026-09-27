@@ -38,8 +38,21 @@ if (existing) {
 
 // 1) Productos nuevos en oferta (no están en la base de datos).
 const wantNew = Math.ceil((NEW_USERS * PER_USER) / FOLLOWERS_PER_PRODUCT);
+// Además de las ofertas del día (que el descubrimiento flash ya suele dar de
+// alta), «Los que más suben» y «Los más vendidos»: productos con mucho
+// movimiento de precio y ventas que no solemos tener.
+const LIST_PAGES = ["electronics", "computers", "videogames", "kitchen", "home", "toys", "sports"].flatMap(
+  (node) => [
+    `https://www.amazon.es/gp/movers-and-shakers/${node}`,
+    `https://www.amazon.es/gp/bestsellers/${node}`,
+  ],
+);
 const discovered = await discoverFlashDealListings({
-  feedUrls: ["https://www.amazon.es/gp/goldbox", ...VOLATILE_DEPARTMENTS.map(buildAmazonDealsDepartmentUrl)],
+  feedUrls: [
+    "https://www.amazon.es/gp/goldbox",
+    ...VOLATILE_DEPARTMENTS.map(buildAmazonDealsDepartmentUrl),
+    ...LIST_PAGES,
+  ],
   maxItems: wantNew * 4,
   delayMs: 2_500,
   allowSimulatedFallback: false,
