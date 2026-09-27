@@ -181,8 +181,13 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
                 loading ? "opacity-60" : ""
               }`}
             >
-              {catalog.items.map((product) => (
-                <ProductCard key={product.id} product={product} view="grid" />
+              {catalog.items.map((product, i) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  view="grid"
+                  horizontal={catalog.page === 1 && (i === 0 || i === 3)}
+                />
               ))}
             </div>
           ) : (
