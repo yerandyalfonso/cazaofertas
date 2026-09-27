@@ -81,6 +81,7 @@
   --badge-discount-bg: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-600) 100%);
   --badge-discount-fg: var(--white);
   --badge-radius: var(--radius-6);
+  --btn-outline-color: var(--accent-vivid);
   --header-accent: linear-gradient(90deg, var(--amber-500) 0%, var(--orange-600) 100%);
   --page-glow: #fff4e2;
 }
@@ -589,20 +590,16 @@ a {
   box-shadow: var(--focus-ring);
 }
 
-/* Botón secundario con el degradado de marca en el borde y texto naranja. */
+/* Botón secundario: borde y texto del mismo naranja vivo. Decisión de
+   diseño: el texto naranja sobre blanco no llega a AA (2,8:1). */
 .btn-outline-gradient {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    var(--cta-bg) border-box;
-  color: var(--primary);
+  border: 2px solid var(--btn-outline-color);
+  background: var(--surface);
+  color: var(--btn-outline-color);
   font-weight: 700;
   padding: 0.5rem 0.9rem;
 }
 
 .btn-outline-gradient:hover {
-  background:
-    linear-gradient(var(--primary-soft), var(--primary-soft)) padding-box,
-    var(--cta-bg-hover) border-box;
-  color: var(--primary-hover);
+  background: var(--primary-soft);
 }
