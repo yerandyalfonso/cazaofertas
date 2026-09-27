@@ -170,13 +170,13 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
           </p>
         )}
 
-        <div className="mt-auto pt-2">
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="price text-2xl font-extrabold leading-none tracking-tight text-ink">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-2">
+          <div className="min-w-0">
+            <span className="price block text-2xl font-extrabold leading-none tracking-tight text-ink">
               {formatEuro(product.currentPrice)}
             </span>
             {hasPrevious && (
-              <span className="price text-sm font-medium text-muted line-through">
+              <span className="price mt-1 block text-sm font-medium text-muted line-through">
                 {formatEuro(product.previousPrice!)}
               </span>
             )}
@@ -185,9 +185,9 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
             href={product.affiliateUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
-            className="btn btn-primary mt-3 w-full gap-1.5 whitespace-nowrap px-2 py-3"
+            className="btn btn-outline-gradient shrink-0 text-sm"
           >
-            Ver oferta
+            Ver
             <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
           </a>
         </div>
