@@ -259,14 +259,18 @@ a {
   box-shadow: var(--shadow-sm);
 }
 
+/* Centrado óptico: sin letter-spacing (dejaba hueco a la derecha) y con
+   line-height 1 para que el texto quede en el centro vertical. */
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
+  padding: 0.3rem 0.5rem 0.25rem;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 /* Descuento: un solo estilo (el nivel de oferta ya no se codifica por color). */
@@ -542,7 +546,7 @@ a {
 
 /* Descuento sobre la foto grande de la ficha. */
 .badge-lg {
-  padding: 0.3rem 0.7rem;
+  padding: 0.44rem 0.65rem 0.31rem;
   font-size: 1rem;
   font-weight: 800;
 }
