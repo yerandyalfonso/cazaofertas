@@ -81,3 +81,5 @@ npm run cron:local:install:high-freq
 # Quitar todos los agents
 npm run cron:local:uninstall
 ```
+
+Amazon desde el VPS: `AMAZON_EGRESS=http://127.0.0.1:8901,direct` = relé del Mac (IP residencial española) → IP del VPS. El VPS está en Francia y Amazon.es oculta el precio de lo que no envía allí; por el relé ve España. Si el Mac está apagado, la salida se marca caída 5 min y se usa la directa: las fichas sin precio por «envío fuera de España» se omiten (no se marcan agotadas ni cuentan para desactivar el producto). El relé (`scripts/local-cron/miravia-relay.mjs`, LaunchAgents `com.cazaofertas.miravia-relay` y `…-relay-tunnel`) acepta solo miravia.es y amazon.es.
