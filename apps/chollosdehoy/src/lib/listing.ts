@@ -91,7 +91,7 @@ export async function resolveCategoryListing(
   if (sub) {
     return {
       h1: `Ofertas de ${sub.name}`,
-      intro: `Chollos y descuentos en ${sub.name.toLowerCase()} (${parent.name}), con el precio comprobado y ordenados por calidad de la oferta.`,
+      intro: `Chollos y descuentos en ${sub.name.toLowerCase()} (${parent.name}), con el precio comprobado y ordenados de mejor a peor oferta.`,
       basePath: categoryHref(parent.slug, sub.slug),
       page,
       breadcrumbs: [parentLink, { name: sub.name, href: categoryHref(parent.slug, sub.slug) }],
@@ -104,7 +104,7 @@ export async function resolveCategoryListing(
 
   return {
     h1: `Ofertas de ${parent.name}`,
-    intro: `${parentMeta.description} Los mejores chollos de hoy, con el precio comprobado y ordenados por calidad de la oferta.`,
+    intro: `${parentMeta.description} Los mejores chollos de hoy, con el precio comprobado y ordenados de mejor a peor oferta.`,
     basePath: parentLink.href,
     page,
     breadcrumbs: [parentLink],
@@ -135,7 +135,7 @@ export async function resolveRetailerListing(
 
   return {
     h1: `Ofertas de ${label}`,
-    intro: `Los mejores chollos de ${label} hoy, con el precio comprobado y ordenados por calidad de la oferta.`,
+    intro: `Los mejores chollos de ${label} hoy, con el precio comprobado y ordenados de mejor a peor oferta.`,
     basePath: retailerHref(retailer),
     page,
     breadcrumbs: [{ name: label, href: retailerHref(retailer) }],

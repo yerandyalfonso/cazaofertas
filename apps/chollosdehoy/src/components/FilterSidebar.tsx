@@ -252,7 +252,7 @@ export function FilterSidebar({
               onChange={(e) => patch({ onlyTopDeals: e.target.checked })}
               className="h-4 w-4 accent-primary"
             />
-            Solo top chollos
+            Solo los mejores chollos
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input

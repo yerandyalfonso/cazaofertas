@@ -27,8 +27,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "score", label: "Mejor chollo" },
   { value: "discount", label: "Mayor descuento" },
   { value: "newest", label: "Más recientes" },
-  { value: "price-asc", label: "Precio ↑" },
-  { value: "price-desc", label: "Precio ↓" },
+  { value: "price-asc", label: "Precio más bajo" },
+  { value: "price-desc", label: "Precio más alto" },
 ];
 
 export function MarketplaceHeader({

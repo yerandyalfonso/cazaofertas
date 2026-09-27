@@ -24,7 +24,7 @@ export async function SiteFooter() {
             Chollos de Hoy
           </Link>
           <p className="mt-1 text-muted">
-            Marketplace de ofertas · Actualizado en tiempo real
+            Chollos de Amazon, Miravia y más · Precios revisados varias veces al día
           </p>
         </div>
 

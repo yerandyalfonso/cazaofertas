@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     template: "%s | Chollos de Hoy",
   },
   description:
-    "Marketplace de ofertas: filtra por categoría, tienda y descuento. Los mejores chollos del día en un solo sitio.",
+    "Chollos de Amazon, Miravia y otras tiendas con el precio comprobado. Filtra por categoría, tienda y descuento, y crea alertas en Telegram.",
   metadataBase: new URL(getSiteUrl()),
   openGraph: {
     type: "website",
