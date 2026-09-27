@@ -93,6 +93,12 @@ async function loadMiraviaCatalogForItems(
   return [...byId.values()];
 }
 
+/**
+ * Por encima de esto, el «precio recomendado» de Miravia suele ser inventado
+ * por el vendedor (relojes a 57,99 € «antes 289,95 €»): no se da por bueno.
+ */
+const MIRAVIA_MAX_TRUSTED_DISCOUNT = 70;
+
 function computeDiscount(current: number, reference: number | null): number {
   if (reference == null || reference <= current) return 0;
   return roundMoney(((reference - current) / reference) * 100);
@@ -288,7 +294,12 @@ export async function runMiraviaDealsCheck(options?: {
         : null;
     const discount = computeDiscount(price, listPrice);
     // Solo aceptar descuento real precio/lista; no inventar lista desde badge %.
-    if (discount < minDiscount || listPrice == null || listPrice <= price) {
+    if (
+      discount < minDiscount ||
+      discount > MIRAVIA_MAX_TRUSTED_DISCOUNT ||
+      listPrice == null ||
+      listPrice <= price
+    ) {
       return null;
     }
     return { price, listPrice, discount };
@@ -375,7 +386,11 @@ export async function runMiraviaDealsCheck(options?: {
             listPrice = roundMoney(quote.listPrice);
           }
           discount = computeDiscount(price, listPrice);
-          if (discount < minDiscount || listPrice <= price) {
+          if (
+            discount < minDiscount ||
+            discount > MIRAVIA_MAX_TRUSTED_DISCOUNT ||
+            listPrice <= price
+          ) {
             skippedNoDiscount += 1;
             continue;
           }
@@ -634,12 +649,15 @@ export async function runMiraviaDealsCheck(options?: {
         skippedNoDiscount += 1;
         continue;
       }
-      const { price, listPrice, discount } = prices;
+      const { price, listPrice } = prices;
       const storedCurrent = toNumber(row.current_price);
       const previousForNotify =
         storedCurrent != null && storedCurrent > price
           ? storedCurrent
           : listPrice;
+      // Contra el mismo precio que se guarda como anterior (antes se calculaba
+      // contra la lista y salía «antes 13,90 € · −79 %» con precio 12,49 €).
+      const discount = computeDiscount(price, previousForNotify);
       const now = new Date().toISOString();
       const lowest =
         toNumber(row.lowest_price) == null

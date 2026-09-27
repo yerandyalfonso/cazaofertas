@@ -238,7 +238,7 @@ export async function runRetailPriceCheck(options?: {
           : null;
       const storedCurrent = toNumber(product.current_price);
       const storedPrevious = toNumber(product.previous_price);
-      const reference =
+      let reference =
         resolvedListPrice ??
         (storedPrevious != null && storedPrevious > resolvedPrice
           ? storedPrevious
@@ -247,10 +247,15 @@ export async function runRetailPriceCheck(options?: {
         storedCurrent === null ||
         Math.abs(storedCurrent - resolvedPrice) >= 0.01;
       const now = new Date().toISOString();
-      const discount =
+      let discount =
         reference > resolvedPrice
           ? roundMoney(((reference - resolvedPrice) / reference) * 100)
           : 0;
+      // Miravia: un «precio recomendado» >70 % por encima suele ser inventado.
+      if (product.retailer === "miravia" && discount > 70) {
+        reference = resolvedPrice;
+        discount = 0;
+      }
 
       const { error: updateError } = await client
         .from("products")
