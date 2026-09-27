@@ -219,6 +219,7 @@ export type Database = {
           skipped: number;
           price_drops: number;
           notified: number;
+          reasons: Json;
         };
         Insert: {
           id?: number;
@@ -230,6 +231,7 @@ export type Database = {
           skipped?: number;
           price_drops?: number;
           notified?: number;
+          reasons?: Json;
         };
         Update: Partial<Database["public"]["Tables"]["user_alert_runs"]["Insert"]>;
         Relationships: [];

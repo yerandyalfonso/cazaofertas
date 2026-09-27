@@ -21,6 +21,7 @@ export async function recordUserAlertRun(startedAt: Date, result: UserUrlAlertsR
       skipped: result.skipped,
       price_drops: result.priceDrops,
       notified: result.notified,
+      reasons: result.reasons,
     });
   } catch (error) {
     console.warn(`[user-alerts] No se pudo guardar la ejecución en ${hostname()}:`, error);
@@ -49,6 +50,8 @@ export interface AlertLoadReport {
   byGroup: Record<string, { total: number; checked: number; withPrice: number; linked: number }>;
   windowHours: number;
   byMachine: Record<string, MachineStats>;
+  /** Motivos de fallos/omisiones sumados en la ventana. */
+  reasons: Record<string, number>;
 }
 
 /** Estadísticas del test de carga; null si no hay usuarios de prueba. */
@@ -119,11 +122,15 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
   const since = new Date(now - windowHours * 3_600_000).toISOString();
   const { data: runs, error: runError } = await client
     .from("user_alert_runs")
-    .select("machine, started_at, finished_at, checked, failed, price_drops, notified")
+    .select("machine, started_at, finished_at, checked, failed, price_drops, notified, reasons")
     .gte("started_at", since);
   if (runError) throw runError;
   const byMachine: Record<string, MachineStats> = {};
+  const reasons: Record<string, number> = {};
   for (const run of runs ?? []) {
+    for (const [reason, count] of Object.entries((run.reasons ?? {}) as Record<string, number>)) {
+      reasons[reason] = (reasons[reason] ?? 0) + Number(count);
+    }
     const m = (byMachine[run.machine] ??= { runs: 0, checked: 0, failed: 0, drops: 0, notified: 0, avgMinutes: 0 });
     const minutes = (new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 60_000;
     m.avgMinutes = (m.avgMinutes * m.runs + minutes) / (m.runs + 1);
@@ -145,6 +152,7 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
     byGroup,
     windowHours,
     byMachine,
+    reasons,
   };
 }
 
@@ -165,6 +173,16 @@ export function formatAlertLoadReport(r: AlertLoadReport): string {
         `• ${name}: ${m.runs} ejecuciones, ${m.checked} revisadas, ${m.failed} fallidas (${pct(m.failed, m.checked + m.failed)}), ${Math.round(m.avgMinutes)} min de media, ${m.drops} bajadas, ${m.notified} avisos`,
     ),
     ...(machines.length === 0 ? ["• Sin ejecuciones registradas en la ventana"] : []),
+    ...(Object.keys(r.reasons).length
+      ? [
+          "",
+          "<b>Motivos de fallos/omisiones:</b>",
+          ...Object.entries(r.reasons)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([reason, count]) => `• ${reason.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}: ${count}`),
+        ]
+      : []),
     "",
     `<b>Cobertura:</b> ${r.alerts - r.neverChecked} revisadas alguna vez, ${r.neverChecked} pendientes`,
     `Última revisión: ${Object.entries(r.ageBuckets).map(([k, v]) => `${k}: ${v}`).join(" · ")}`,

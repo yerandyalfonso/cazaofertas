@@ -40,7 +40,21 @@ export interface UserUrlAlertsResult {
   notified: number;
   failed: number;
   skipped: number;
+  /** Motivos de fallos y omisiones: «motivo» → número de alertas. */
+  reasons: Record<string, number>;
+  /** Hasta 6 ejemplos (motivo + enlace) para diagnosticar. */
+  examples: Array<{ reason: string; url: string; detail?: string }>;
   finishedAt: string;
+}
+
+/** Agrupa el mensaje de error en un motivo legible (para contar y avisar). */
+function reasonFromError(message: string): string {
+  if (isRetailBlockedError(message)) return "Bloqueo anti-bot de la tienda";
+  if (/timeout|timed out|aborted|ETIMEDOUT/i.test(message)) return "Tiempo de espera agotado";
+  if (/\b404\b|not found|no encontrado/i.test(message)) return "Producto no encontrado (404)";
+  if (/\b5\d\d\b/.test(message)) return "Error del servidor de la tienda (5xx)";
+  if (/ENOTFOUND|ECONNRESET|ECONNREFUSED|fetch failed|socket/i.test(message)) return "Error de red";
+  return `Otro error: ${message.slice(0, 80)}`;
 }
 
 interface RetailQuote {
@@ -215,7 +229,20 @@ export async function runUserUrlAlerts(options?: {
     notified: 0,
     failed: 0,
     skipped: 0,
+    reasons: {},
+    examples: [],
     finishedAt: new Date().toISOString(),
+  };
+  const note = (
+    kind: "failed" | "skipped",
+    reason: string,
+    url: string,
+    detail?: string,
+  ) => {
+    result[kind] += 1;
+    const key = `${reason} (${kind === "failed" ? "fallida" : "omitida"})`;
+    result.reasons[key] = (result.reasons[key] ?? 0) + 1;
+    if (result.examples.length < 6) result.examples.push({ reason, url, detail });
   };
 
   const telegramReady = isTelegramConfigured();
@@ -225,19 +252,19 @@ export async function runUserUrlAlerts(options?: {
     const alert = rows[index]!;
     const url = alert.url?.trim() ?? "";
     if (!url) {
-      result.skipped += 1;
+      note("skipped", "Alerta sin URL", "");
       continue;
     }
 
     const retailer = detectRetailerFromUrl(url) ?? "amazon";
     if (!allowedRetailers.includes(retailer)) {
       // No es esta corrida la que cubre esta tienda (p. ej. PcComponentes
-      // solo se revisa desde el cron del Mac). No cuenta como fallo.
+      // solo se revisa desde el cron del Mac). No cuenta como fallo ni motivo.
       result.skipped += 1;
       continue;
     }
     if (!alertRetailerSupported(retailer)) {
-      result.failed += 1;
+      note("failed", `Tienda sin revisión automática (${retailer})`, url);
       console.warn(
         `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
       );
@@ -246,7 +273,7 @@ export async function runUserUrlAlerts(options?: {
 
     const externalId = extractExternalId(retailer, url);
     if (!externalId) {
-      result.failed += 1;
+      note("failed", "URL sin identificador de producto", url);
       console.warn(`[user-alerts] Alerta ${alert.id}: URL sin identificador válido`);
       continue;
     }
@@ -267,6 +294,8 @@ export async function runUserUrlAlerts(options?: {
             .update({ product_id: productId })
             .eq("id", alert.id);
         } catch (ensureError) {
+          const reason = "No se pudo crear/vincular el producto (se sigue revisando)";
+          result.reasons[reason] = (result.reasons[reason] ?? 0) + 1;
           console.warn(
             `[user-alerts] Alerta ${alert.id}: no se pudo enlazar producto`,
             ensureError instanceof Error ? ensureError.message : ensureError,
@@ -301,6 +330,14 @@ export async function runUserUrlAlerts(options?: {
             .update(buildOutOfStockUpdate(productRow ?? {}, nowIso))
             .eq("id", productId);
         }
+        note(
+          "skipped",
+          quote.availability === ProductAvailability.OUT_OF_STOCK
+            ? "Producto agotado"
+            : "Sin precio en la página",
+          url,
+        );
+        if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
         continue;
       }
 
@@ -385,7 +422,7 @@ export async function runUserUrlAlerts(options?: {
         alert.max_price !== undefined &&
         currentPrice > Number(alert.max_price)
       ) {
-        result.skipped += 1;
+        note("skipped", "Bajada por encima del precio máximo de la alerta", url);
         if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
         continue;
       }
@@ -398,7 +435,13 @@ export async function runUserUrlAlerts(options?: {
       const recipient = user ? alertRecipient(user) : null;
 
       if (userError || !recipient || !telegramReady) {
-        result.failed += 1;
+        note(
+          "failed",
+          !telegramReady
+            ? "Telegram sin configurar"
+            : "Usuario sin chat de Telegram (o sin chat de admin para pruebas)",
+          url,
+        );
         if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
         continue;
       }
@@ -524,11 +567,7 @@ export async function runUserUrlAlerts(options?: {
       // Bloqueo anti-bot de la tienda (DataDome, Cloudflare, 403…): transitorio,
       // no es un fallo real de la alerta. No lo contamos como "failed" para no
       // disparar avisos ruidosos al admin en cada ciclo.
-      if (isRetailBlockedError(message)) {
-        result.skipped += 1;
-      } else {
-        result.failed += 1;
-      }
+      note(isRetailBlockedError(message) ? "skipped" : "failed", reasonFromError(message), url, message.slice(0, 160));
       console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
 

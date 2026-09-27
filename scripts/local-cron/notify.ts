@@ -296,18 +296,38 @@ export async function reviewKiabiDealsResult(
   });
 }
 
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export async function reviewUserAlertsResult(
   result: UserUrlAlertsResult,
 ): Promise<void> {
-  if (result.failed <= 0) return;
+  // Avisa si hay fallos reales o si la tienda empieza a bloquear (≥3 omitidas
+  // por anti-bot). Agotados / sin precio no avisan: son normales y harían ruido.
+  const blocked = Object.entries(result.reasons ?? {})
+    .filter(([reason]) => reason.startsWith("Bloqueo anti-bot"))
+    .reduce((sum, [, count]) => sum + count, 0);
+  if (result.failed <= 0 && blocked < 3) return;
 
+  const reasons = Object.entries(result.reasons ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, count]) => `• ${escapeHtml(reason)}: ${count}`);
+  const examples = (result.examples ?? []).slice(0, 4).map(
+    (example) =>
+      `• ${escapeHtml(example.reason)}: ${escapeHtml(example.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 70))}${
+        example.detail ? ` — <i>${escapeHtml(example.detail.slice(0, 100))}</i>` : ""
+      }`,
+  );
   await notifyCronAlert({
     job: jobId("user-alerts"),
-    headline: "Alertas de usuario con fallos",
+    headline: result.failed > 0 ? "Alertas de usuario con fallos" : "Alertas de usuario: la tienda está bloqueando",
     lines: [
       `Revisadas: ${result.checked}`,
       `Fallidas: ${result.failed}`,
       `Omitidas: ${result.skipped}`,
+      ...(reasons.length ? ["", "<b>Motivos:</b>", ...reasons] : []),
+      ...(examples.length ? ["", "<b>Ejemplos:</b>", ...examples] : []),
     ],
   });
 }
