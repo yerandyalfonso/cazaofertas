@@ -45,6 +45,8 @@ export interface AlertLoadReport {
   /** Minutos desde la revisión más antigua (de las ya revisadas). */
   oldestCheckMinutes: number | null;
   byStore: Record<string, { total: number; checked: number; withPrice: number }>;
+  /** Por grupo de usuarios: productos nuevos vs del catálogo. */
+  byGroup: Record<string, { total: number; checked: number; withPrice: number; linked: number }>;
   windowHours: number;
   byMachine: Record<string, MachineStats>;
 }
@@ -52,16 +54,31 @@ export interface AlertLoadReport {
 /** Estadísticas del test de carga; null si no hay usuarios de prueba. */
 export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadReport | null> {
   const client = createSupabaseServiceClient();
-  const { data: users, error } = await client.from("users").select("id").eq("is_test", true);
+  const { data: users, error } = await client
+    .from("users")
+    .select("id, telegram_username")
+    .eq("is_test", true);
   if (error) throw error;
   const ids = (users ?? []).map((u) => u.id);
+  const groupOf = new Map(
+    (users ?? []).map((u) => [
+      u.id,
+      u.telegram_username?.startsWith("test_nuevos") ? "Productos nuevos" : "Catálogo",
+    ]),
+  );
   if (ids.length === 0) return null;
 
-  const alerts: { url: string | null; last_checked_at: string | null; last_known_price: number | null }[] = [];
+  const alerts: {
+    user_id: string;
+    url: string | null;
+    product_id: string | null;
+    last_checked_at: string | null;
+    last_known_price: number | null;
+  }[] = [];
   for (let i = 0; i < ids.length; i += 50) {
     const { data, error: alertError } = await client
       .from("alerts")
-      .select("url, last_checked_at, last_known_price")
+      .select("user_id, url, product_id, last_checked_at, last_known_price")
       .in("user_id", ids.slice(i, i + 50));
     if (alertError) throw alertError;
     alerts.push(...(data ?? []));
@@ -70,11 +87,17 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
   const now = Date.now();
   const ageBuckets: Record<string, number> = { "0–1 h": 0, "1–3 h": 0, "3–6 h": 0, ">6 h": 0 };
   const byStore: AlertLoadReport["byStore"] = {};
+  const byGroup: AlertLoadReport["byGroup"] = {};
   let neverChecked = 0;
   let checkedLastHour = 0;
   let oldest: number | null = null;
   for (const alert of alerts) {
     const store = (alert.url ?? "").match(/amazon|miravia|kiabi|carrefour|aliexpress|pccomponentes/)?.[0] ?? "otra";
+    const g = (byGroup[groupOf.get(alert.user_id) ?? "Catálogo"] ??= { total: 0, checked: 0, withPrice: 0, linked: 0 });
+    g.total += 1;
+    if (alert.last_checked_at) g.checked += 1;
+    if (alert.last_known_price !== null) g.withPrice += 1;
+    if (alert.product_id) g.linked += 1;
     const s = (byStore[store] ??= { total: 0, checked: 0, withPrice: 0 });
     s.total += 1;
     if (alert.last_known_price !== null) s.withPrice += 1;
@@ -119,6 +142,7 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
     ageBuckets,
     oldestCheckMinutes: oldest === null ? null : Math.round(oldest),
     byStore,
+    byGroup,
     windowHours,
     byMachine,
   };
@@ -145,6 +169,11 @@ export function formatAlertLoadReport(r: AlertLoadReport): string {
     `<b>Cobertura:</b> ${r.alerts - r.neverChecked} revisadas alguna vez, ${r.neverChecked} pendientes`,
     `Última revisión: ${Object.entries(r.ageBuckets).map(([k, v]) => `${k}: ${v}`).join(" · ")}`,
     r.oldestCheckMinutes !== null ? `La más antigua: hace ${Math.round(r.oldestCheckMinutes / 60 * 10) / 10} h` : "",
+    "",
+    "<b>Por grupo</b> (revisadas / con precio / con producto creado o vinculado / total):",
+    ...Object.entries(r.byGroup).map(
+      ([group, g]) => `• ${group}: ${g.checked} / ${g.withPrice} / ${g.linked} / ${g.total}`,
+    ),
     "",
     "<b>Por tienda</b> (revisadas / con precio / total):",
     ...Object.entries(r.byStore).map(

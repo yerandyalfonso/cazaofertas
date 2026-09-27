@@ -1,22 +1,31 @@
 /**
- * Test de carga de alertas: crea 100 usuarios de prueba (`is_test`) con 5
- * alertas de URL cada uno sobre ~250 productos reales del catálogo (cada
- * producto lo siguen ~2 usuarios). Los avisos llegan al chat privado del
- * admin. Uso: npx tsx scripts/alert-load-test/seed.mts [usuarios] [alertasPorUsuario]
+ * Test de carga de alertas: 100 usuarios de prueba (`is_test`) con 5 alertas
+ * de URL cada uno.
+ * - 70 usuarios «test_nuevos_NNN»: productos que están en oferta ahora en
+ *   Amazon (categorías que más cambian de precio) y que NO están en el
+ *   catálogo. La primera revisión los crea (camino real de un usuario que pega
+ *   un enlace nuevo); quedan públicos como cualquier producto de alerta.
+ * - 30 usuarios «test_catalogo_NNN»: productos del catálogo (Amazon, Miravia,
+ *   Kiabi).
+ * Cada producto lo siguen ~2 usuarios. Los avisos llegan al chat del admin.
+ * Uso: npx tsx scripts/alert-load-test/seed.mts
  * Limpieza: npx tsx scripts/alert-load-test/cleanup.mts
  */
 import { config } from "dotenv";
-config({ path: ".env.local" });
+config({ path: ".env.local", quiet: true });
 const { createSupabaseServiceClient } = await import("@/lib/supabase");
 const { ProductAvailability } = await import("@/types");
+const { discoverFlashDealListings, buildAmazonDealsDepartmentUrl } = await import(
+  "@/providers/price/amazonFlashDiscovery"
+);
 
-const USERS = Number(process.argv[2]) || 100;
-const PER_USER = Number(process.argv[3]) || 5;
-const TOTAL = USERS * PER_USER;
-const PRODUCTS = Math.ceil(TOTAL / 2);
-// Reparto por tienda (las que el cron revisa desde el VPS y el Mac).
-const MIX: Record<string, number> = { amazon: 0.6, miravia: 0.2, kiabi: 0.1, carrefour: 0.05, aliexpress: 0.05 };
-// telegram_id inventados, fuera de cualquier rango real de Telegram.
+const PER_USER = 5;
+const NEW_USERS = 70;
+const CATALOG_USERS = 30;
+const FOLLOWERS_PER_PRODUCT = 2;
+// Departamentos de Amazon cuyos precios más se mueven (electrónica, informática,
+// videojuegos, hogar/pequeño electrodoméstico, juguetes, deportes).
+const VOLATILE_DEPARTMENTS = ["667050031", "599383031", "599392031", "599386031", "2665403031"];
 const FAKE_ID_BASE = -9_000_000_000_000;
 
 const sb = createSupabaseServiceClient();
@@ -27,12 +36,45 @@ if (existing) {
   process.exit(1);
 }
 
-const products: { id: string; url: string; retailer: string; title: string }[] = [];
-for (const [retailer, share] of Object.entries(MIX)) {
-  const want = Math.round(PRODUCTS * share);
+// 1) Productos nuevos en oferta (no están en la base de datos).
+const wantNew = Math.ceil((NEW_USERS * PER_USER) / FOLLOWERS_PER_PRODUCT);
+const discovered = await discoverFlashDealListings({
+  feedUrls: ["https://www.amazon.es/gp/goldbox", ...VOLATILE_DEPARTMENTS.map(buildAmazonDealsDepartmentUrl)],
+  maxItems: wantNew * 4,
+  delayMs: 2_500,
+  allowSimulatedFallback: false,
+});
+console.log(`Ofertas leídas: ${discovered.items.length} (${discovered.feedsFetched} listados, ${discovered.feedErrors.length} con error)`);
+const candidates = discovered.items.filter((item) => item.origin === "live");
+const known = new Set<string>();
+for (let i = 0; i < candidates.length; i += 100) {
   const { data, error } = await sb
     .from("products")
-    .select("id, retailer, title, product_url, amazon_url")
+    .select("asin")
+    .in("asin", candidates.slice(i, i + 100).map((c) => c.asin));
+  if (error) throw error;
+  for (const row of data ?? []) known.add(row.asin);
+}
+const fresh = candidates
+  .filter((c) => !known.has(c.asin))
+  .sort(() => Math.random() - 0.5)
+  .slice(0, wantNew)
+  .map((c) => ({ url: `https://www.amazon.es/dp/${c.asin}`, productId: null as string | null }));
+console.log(`Nuevos (no en catálogo): ${fresh.length}/${wantNew} (descartados ${known.size} que ya teníamos)`);
+if (fresh.length < wantNew / 2) {
+  console.error("Muy pocos productos nuevos (¿bloqueo de Amazon?). No se crea nada.");
+  process.exit(1);
+}
+
+// 2) Productos del catálogo.
+const wantCatalog = Math.ceil((CATALOG_USERS * PER_USER) / FOLLOWERS_PER_PRODUCT);
+const MIX: Record<string, number> = { amazon: 0.5, miravia: 0.3, kiabi: 0.2 };
+const catalog: { url: string; productId: string | null }[] = [];
+for (const [retailer, share] of Object.entries(MIX)) {
+  const want = Math.round(wantCatalog * share);
+  const { data, error } = await sb
+    .from("products")
+    .select("id, product_url, amazon_url")
     .eq("is_active", true)
     .eq("retailer", retailer)
     .eq("availability", ProductAvailability.IN_STOCK)
@@ -40,33 +82,34 @@ for (const [retailer, share] of Object.entries(MIX)) {
     .limit(want * 3);
   if (error) throw error;
   const rows = (data ?? [])
-    .map((p) => ({ id: p.id, retailer: p.retailer, title: p.title, url: (retailer === "amazon" ? p.amazon_url : p.product_url ?? p.amazon_url)?.trim() ?? "" }))
+    .map((p) => ({ productId: p.id, url: (retailer === "amazon" ? p.amazon_url : p.product_url ?? p.amazon_url)?.trim() ?? "" }))
     .filter((p) => /^https?:\/\//.test(p.url))
     .sort(() => Math.random() - 0.5)
     .slice(0, want);
-  console.log(`${retailer}: ${rows.length}/${want} productos`);
-  products.push(...rows);
+  console.log(`Catálogo ${retailer}: ${rows.length}/${want}`);
+  catalog.push(...rows);
 }
-if (products.length === 0) throw new Error("No hay productos para la prueba.");
 
-const users = Array.from({ length: USERS }, (_, i) => ({
-  telegram_id: FAKE_ID_BASE - i,
-  telegram_username: `test_alertas_${String(i + 1).padStart(3, "0")}`,
-  is_test: true,
-}));
-const { data: createdUsers, error: userError } = await sb.from("users").insert(users).select("id");
-if (userError) throw userError;
-
-// Cada usuario sigue 5 productos distintos; se recorre la lista en bucle para
-// que cada producto quede con ~2 seguidores.
-const alerts = createdUsers!.flatMap((user, u) =>
-  Array.from({ length: PER_USER }, (_, k) => {
-    const p = products[(u * PER_USER + k) % products.length]!;
-    return { user_id: user.id, url: p.url, product_id: p.id, is_active: true };
-  }),
-);
-for (let i = 0; i < alerts.length; i += 200) {
-  const { error } = await sb.from("alerts").insert(alerts.slice(i, i + 200));
+async function createGroup(prefix: string, count: number, offset: number, pool: { url: string; productId: string | null }[]) {
+  const users = Array.from({ length: count }, (_, i) => ({
+    telegram_id: FAKE_ID_BASE - offset - i,
+    telegram_username: `${prefix}_${String(i + 1).padStart(3, "0")}`,
+    is_test: true,
+  }));
+  const { data: created, error } = await sb.from("users").insert(users).select("id");
   if (error) throw error;
+  const alerts = created!.flatMap((user, u) =>
+    Array.from({ length: PER_USER }, (_, k) => {
+      const p = pool[(u * PER_USER + k) % pool.length]!;
+      return { user_id: user.id, url: p.url, product_id: p.productId, is_active: true };
+    }),
+  );
+  for (let i = 0; i < alerts.length; i += 200) {
+    const { error: alertError } = await sb.from("alerts").insert(alerts.slice(i, i + 200));
+    if (alertError) throw alertError;
+  }
+  console.log(`${prefix}: ${created!.length} usuarios, ${alerts.length} alertas sobre ${pool.length} productos`);
 }
-console.log(`Creados ${createdUsers!.length} usuarios de prueba y ${alerts.length} alertas sobre ${products.length} productos.`);
+
+await createGroup("test_nuevos", NEW_USERS, 0, fresh);
+await createGroup("test_catalogo", CATALOG_USERS, NEW_USERS, catalog);
