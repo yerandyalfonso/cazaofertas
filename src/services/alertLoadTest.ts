@@ -68,7 +68,7 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
   }
 
   const now = Date.now();
-  const ageBuckets: Record<string, number> = { "<1 h": 0, "1–3 h": 0, "3–6 h": 0, ">6 h": 0 };
+  const ageBuckets: Record<string, number> = { "0–1 h": 0, "1–3 h": 0, "3–6 h": 0, ">6 h": 0 };
   const byStore: AlertLoadReport["byStore"] = {};
   let neverChecked = 0;
   let checkedLastHour = 0;
@@ -87,7 +87,7 @@ export async function buildAlertLoadReport(windowHours = 2): Promise<AlertLoadRe
     oldest = oldest === null ? minutes : Math.max(oldest, minutes);
     if (minutes < 60) {
       checkedLastHour += 1;
-      ageBuckets["<1 h"] += 1;
+      ageBuckets["0–1 h"] += 1;
     } else if (minutes < 180) ageBuckets["1–3 h"] += 1;
     else if (minutes < 360) ageBuckets["3–6 h"] += 1;
     else ageBuckets[">6 h"] += 1;
