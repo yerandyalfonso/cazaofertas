@@ -38,7 +38,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
   return (
     <article className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5">
       <div className="flex shrink-0 items-center gap-3 sm:w-28 sm:flex-col sm:items-start sm:gap-0">
-        <Ticket className="h-5 w-5 text-primary sm:hidden" aria-hidden />
+        <Ticket className="h-5 w-5 text-vivid sm:hidden" aria-hidden />
         <p className="price text-2xl font-semibold leading-none text-ink">
           {highlight?.value ?? "Cupón"}
         </p>
@@ -76,7 +76,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
             <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-muted">
               {copied ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-primary" aria-hidden />
+                  <Check className="h-3.5 w-3.5 text-vivid" aria-hidden />
                   Copiado
                 </>
               ) : (

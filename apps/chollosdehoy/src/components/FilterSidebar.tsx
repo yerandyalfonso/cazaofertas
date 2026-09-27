@@ -75,10 +75,10 @@ export function FilterSidebar({
     >
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2 font-semibold">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
+          <SlidersHorizontal className="h-4 w-4 text-vivid" />
           Filtros
           {activeCount > 0 && (
-            <span className="badge bg-primary-soft text-primary">
+            <span className="badge bg-vivid text-white">
               {activeCount}
             </span>
           )}
@@ -171,7 +171,7 @@ export function FilterSidebar({
                   onClick={() => toggleRetailer(id)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                     active
-                      ? "border-primary bg-primary-soft text-primary"
+                      ? "border-vivid bg-primary-soft text-primary"
                       : "border-line bg-surface text-muted hover:border-line-strong"
                   }`}
                 >
@@ -194,7 +194,7 @@ export function FilterSidebar({
                 onClick={() => patch({ minDiscount: value })}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   filters.minDiscount === value
-                    ? "border-primary bg-primary text-white"
+                    ? "border-vivid bg-vivid text-white"
                     : "border-line text-muted hover:bg-surface-muted"
                 }`}
               >
@@ -250,7 +250,7 @@ export function FilterSidebar({
               type="checkbox"
               checked={filters.onlyTopDeals}
               onChange={(e) => patch({ onlyTopDeals: e.target.checked })}
-              className="h-4 w-4 accent-primary"
+              className="h-4 w-4 accent-vivid"
             />
             Solo los mejores chollos
           </label>
@@ -259,7 +259,7 @@ export function FilterSidebar({
               type="checkbox"
               checked={filters.onlyFeatured}
               onChange={(e) => patch({ onlyFeatured: e.target.checked })}
-              className="h-4 w-4 accent-primary"
+              className="h-4 w-4 accent-vivid"
             />
             Destacados
           </label>

@@ -63,7 +63,7 @@ export function PaginationBar({
               onClick={() => onPageChange(p)}
               className={`tap-target min-w-[2.25rem] rounded-control px-2 py-1.5 text-sm font-semibold transition ${
                 p === page
-                  ? "bg-primary text-white"
+                  ? "bg-vivid text-white"
                   : "text-muted hover:bg-surface-muted"
               }`}
             >

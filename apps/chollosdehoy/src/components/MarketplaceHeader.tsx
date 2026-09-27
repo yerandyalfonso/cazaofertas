@@ -71,7 +71,7 @@ export function MarketplaceHeader({
             href="/cupones"
             className="btn btn-ghost shrink-0 text-sm shadow-card"
           >
-            <Ticket className="h-4 w-4 text-primary" />
+            <Ticket className="h-4 w-4 text-vivid" />
             <span className="hidden sm:inline">Cupones</span>
           </Link>
         </div>

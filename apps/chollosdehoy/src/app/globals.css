@@ -50,6 +50,10 @@
   --primary: var(--orange-800);
   --primary-hover: var(--orange-900);
   --primary-soft: var(--orange-50);
+  /* Acento vivo (iconos, contadores, filtros activos, página actual): el
+     naranja del extremo del degradado. Decisión de diseño: con texto blanco
+     pequeño queda en 3,6:1 (por debajo de AA 4,5:1). */
+  --accent-vivid: var(--orange-600);
   --accent: var(--blue-600);
   --danger: var(--red-700);
   /* Urgencia (ofertas flash con fecha de fin): rojo, distinto del naranja. */
@@ -88,6 +92,7 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
+  --color-vivid: var(--accent-vivid);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-page: var(--bg);
@@ -370,7 +375,7 @@ a {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: var(--primary);
+  background: var(--accent-vivid);
   color: white;
   font-size: 0.6875rem;
   font-weight: 700;
@@ -439,7 +444,7 @@ a {
 
 .hero-toolbar-view button.is-active {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--accent-vivid);
 }
 
 .hero-filter-chip {
