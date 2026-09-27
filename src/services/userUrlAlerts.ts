@@ -21,6 +21,7 @@ import {
   scrapePcComponentesProductPage,
 } from "@/providers/browser";
 import { ensureProductFromUrl } from "@/services/products";
+import { alertRecipient } from "@/services/testUsers";
 import { DealLevel, ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
@@ -391,11 +392,12 @@ export async function runUserUrlAlerts(options?: {
 
       const { data: user, error: userError } = await client
         .from("users")
-        .select("id, telegram_id")
+        .select("id, telegram_id, telegram_username, is_test")
         .eq("id", alert.user_id)
         .maybeSingle();
+      const recipient = user ? alertRecipient(user) : null;
 
-      if (userError || !user?.telegram_id || !telegramReady) {
+      if (userError || !recipient || !telegramReady) {
         result.failed += 1;
         if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
         continue;
@@ -443,8 +445,9 @@ export async function runUserUrlAlerts(options?: {
       }
 
       await sendTelegramMessage({
-        chatId: user.telegram_id,
+        chatId: recipient.chatId,
         text: [
+          ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
           "📉 <b>Bajada en tu alerta de URL</b>",
           "",
           escapeHtml(title),
@@ -466,7 +469,8 @@ export async function runUserUrlAlerts(options?: {
       // cooldown de `notifyChannelDealIfEligible` (pendiente + 12h al mismo
       // precio) evita reenvíos duplicados si el descubrimiento normal ya
       // publicó este mismo producto.
-      if (productId) {
+      // Los usuarios de prueba no propagan ofertas al canal ni a redes.
+      if (productId && !recipient.testLabel) {
         try {
           const category = linkedProduct?.categories ?? null;
           const scoring = dealScoringService.scoreProduct({

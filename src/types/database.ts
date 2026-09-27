@@ -217,6 +217,7 @@ export type Database = {
           telegram_wizard: Json | null;
           created_at: string;
           last_active_at: string | null;
+          is_test: boolean;
         };
         Insert: {
           id?: string;
@@ -226,6 +227,7 @@ export type Database = {
           telegram_wizard?: Json | null;
           created_at?: string;
           last_active_at?: string | null;
+          is_test?: boolean;
         };
         Update: {
           id?: string;
@@ -235,6 +237,7 @@ export type Database = {
           telegram_wizard?: Json | null;
           created_at?: string;
           last_active_at?: string | null;
+          is_test?: boolean;
         };
         Relationships: [];
       };

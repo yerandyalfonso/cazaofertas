@@ -1,4 +1,5 @@
 import { roundMoney } from "@/lib/money";
+import { alertRecipient } from "@/services/testUsers";
 import type { TypedSupabaseClient } from "@/lib/supabase";
 import {
   findMatchingAlerts,
@@ -129,7 +130,8 @@ export async function notifyMatchingUsers(
 
     result.created += 1;
 
-    if (!telegramReady || match.user.telegram_id === null) {
+    const recipient = alertRecipient(match.user);
+    if (!telegramReady || !recipient) {
       await client
         .from("notifications")
         .update({ status: "skipped_no_telegram" })
@@ -140,8 +142,10 @@ export async function notifyMatchingUsers(
 
     try {
       await sendDealAlertMessage({
-        chatId: match.user.telegram_id,
-        deal,
+        chatId: recipient.chatId,
+        deal: recipient.testLabel
+          ? { ...deal, title: `${recipient.testLabel} · ${deal.title}` }
+          : deal,
       });
 
       await client
