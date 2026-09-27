@@ -9,6 +9,7 @@ import {
   countActiveFilters,
 } from "@/lib/filters";
 import { categoryHref, subcategoryHasPage } from "@/lib/links";
+import { PriceRangeSlider } from "@/components/PriceRangeSlider";
 import { MARKETPLACE_RETAILERS, retailerLabel } from "@/lib/retailers";
 import type { CategoryFilterNode } from "@/lib/types";
 
@@ -208,40 +209,11 @@ export function FilterSidebar({
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Precio (€)
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              name="minPrice"
-              autoComplete="off"
-              aria-label="Precio mínimo en euros"
-              min={0}
-              placeholder="Mín., p. ej. 10…"
-              className="input text-sm"
-              value={filters.minPrice ?? ""}
-              onChange={(e) =>
-                patch({
-                  minPrice: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-            />
-            <input
-              type="number"
-              inputMode="decimal"
-              name="maxPrice"
-              autoComplete="off"
-              aria-label="Precio máximo en euros"
-              min={0}
-              placeholder="Máx., p. ej. 100…"
-              className="input text-sm"
-              value={filters.maxPrice ?? ""}
-              onChange={(e) =>
-                patch({
-                  maxPrice: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-            />
-          </div>
+          <PriceRangeSlider
+            min={filters.minPrice}
+            max={filters.maxPrice}
+            onCommit={(minPrice, maxPrice) => patch({ minPrice, maxPrice })}
+          />
         </section>
 
         <section className="space-y-2">
