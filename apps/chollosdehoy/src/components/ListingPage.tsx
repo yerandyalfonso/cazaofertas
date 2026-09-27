@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TelegramCta } from "@/components/TelegramCta";
@@ -59,19 +59,18 @@ export function ListingPage({ listing }: { listing: Listing }) {
           __html: JSON.stringify(listingJsonLd(listing)).replace(/</g, "\\u003c"),
         }}
       />
-      <div className="border-b border-[var(--border)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link href="/" className="btn btn-ghost text-sm">
-            <ArrowLeft className="h-4 w-4" />
-            Todas las ofertas
-          </Link>
+      <div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 pt-5">
           <nav
-            className="flex min-w-0 flex-1 items-center gap-1 text-xs text-[var(--text-muted)]"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-[var(--text-muted)]"
             aria-label="Migas de pan"
           >
+            <Link href="/" className="hover:text-[var(--text)]">
+              Inicio
+            </Link>
             {listing.breadcrumbs.map((crumb, i) => (
-              <span key={crumb.href} className="flex items-center gap-1">
-                {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
+              <span key={crumb.href} className="flex items-center gap-1.5">
+                <ChevronRight className="h-3 w-3 shrink-0" />
                 {i < listing.breadcrumbs.length - 1 ? (
                   <Link href={crumb.href} className="truncate hover:text-[var(--text)]">
                     {crumb.name}
@@ -123,8 +122,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
         {listing.alertCategorySlug && (
           <TelegramCta
             alertHref={telegramAlertForCategory(listing.alertCategorySlug)}
-            title={`Alertas de ${listing.h1.replace(/^Ofertas de /, "")} en Telegram`}
-            text="Te avisamos de los nuevos chollos de esta categoría en cuanto aparecen."
+            text={`Recibe en Telegram los nuevos chollos de ${listing.h1.replace(/^Ofertas de /, "").toLowerCase()}.`}
           />
         )}
 

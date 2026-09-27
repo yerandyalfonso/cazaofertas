@@ -2,17 +2,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
+  BellRing,
   ChevronRight,
   CircleAlert,
   ExternalLink,
-  TrendingDown,
+  Send,
 } from "lucide-react";
-import { cache } from "react";
+import { cache, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
-import { TelegramCta } from "@/components/TelegramCta";
 import {
   getAlternativeProducts,
   getCategoryNodes,
@@ -21,9 +20,10 @@ import {
 } from "@/lib/catalog";
 import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { formatDiscount, formatEuro } from "@/lib/money";
-import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
+import { retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
-import { telegramAlertForAsin } from "@/lib/telegram";
+import { TELEGRAM_GROUP_URL, telegramAlertForAsin } from "@/lib/telegram";
+import { parseProductDescription, type DescriptionItem } from "@/lib/description";
 import { flashDealLabel } from "@/lib/flash";
 import { DealLevel, type MarketplaceProduct } from "@/lib/types";
 
@@ -32,17 +32,6 @@ const getProductBySlug = cache(fetchProductBySlug);
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
-}
-
-function dealBadgeClass(level: DealLevel): string {
-  switch (level) {
-    case DealLevel.HISTORICAL_LOW:
-      return "badge-historic";
-    case DealLevel.GREAT_DEAL:
-      return "badge-great";
-    default:
-      return "badge-deal";
-  }
 }
 
 function truncate(value: string, max: number): string {
@@ -190,12 +179,54 @@ export default async function ProductPage({ params }: ProductPageProps) {
   ]);
   const jsonLd = productJsonLd(product, absoluteUrl(`/oferta/${product.slug}`));
 
-  const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
   const savings =
     product.previousPrice && product.previousPrice > product.currentPrice
       ? product.previousPrice - product.currentPrice
       : null;
   const categoryPath = await productBreadcrumbs(product);
+
+  // La opción actual siempre visible (primera), el resto por precio.
+  const orderedVariants = [
+    ...variants.filter((variant) => variant.id === product.id),
+    ...variants.filter((variant) => variant.id !== product.id),
+  ];
+  const descriptionItems = parseProductDescription(product.description);
+  const featured = descriptionItems.slice(0, 5);
+  const rest = descriptionItems.slice(5);
+  const flashLabel = unavailable ? null : flashDealLabel(product.expiresAt);
+  const retailer = retailerLabel(product.retailer);
+  const details: Array<{ label: string; value: ReactNode }> = [
+    ...(product.brand ? [{ label: "Marca", value: product.brand }] : []),
+    { label: "Tienda", value: retailer },
+    ...(categoryPath.length > 0
+      ? [
+          {
+            label: "Categoría",
+            value: categoryPath.map((part, i) => (
+              <span key={part.name}>
+                {i > 0 && " › "}
+                {part.href ? (
+                  <Link href={part.href} className="underline-offset-2 hover:underline">
+                    {part.name}
+                  </Link>
+                ) : (
+                  part.name
+                )}
+              </span>
+            )),
+          },
+        ]
+      : []),
+    {
+      label: "Disponibilidad",
+      value: !product.isActive
+        ? "Retirado"
+        : unavailable
+          ? "Agotado o caducado"
+          : "Disponible",
+    },
+    { label: "Referencia", value: product.asin },
+  ];
 
   return (
     <div className="marketplace-shell bg-[var(--bg)]">
@@ -206,223 +237,213 @@ export default async function ProductPage({ params }: ProductPageProps) {
           __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
         }}
       />
-      <div className="border-b border-[var(--border)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link href="/" className="btn btn-ghost text-sm">
-            <ArrowLeft className="h-4 w-4" />
-            Volver
-          </Link>
-          {categoryPath.length > 0 && (
-            <nav
-              className="flex min-w-0 flex-1 items-center gap-1 text-xs text-[var(--text-muted)]"
-              aria-label="Categoría"
-            >
-              {categoryPath.map((part, i) => (
-                <span key={part.name} className="flex items-center gap-1">
-                  {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
-                  {part.href ? (
-                    <Link href={part.href} className="truncate hover:text-[var(--text)]">
-                      {part.name}
-                    </Link>
-                  ) : (
-                    <span className="truncate">{part.name}</span>
-                  )}
-                </span>
-              ))}
-            </nav>
-          )}
-        </div>
-      </div>
 
-      <main className="mx-auto max-w-4xl px-4 py-6 md:py-8">
-        <article className="card overflow-hidden">
-          <div className="grid md:grid-cols-[minmax(0,340px)_1fr] md:divide-x md:divide-[var(--border)]">
-            {/* Imagen */}
-            <div className="relative border-b border-[var(--border)] bg-white p-6 md:border-b-0">
-              <div className="relative mx-auto aspect-square max-w-[300px]">
-                {product.imageUrl ? (
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.title}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 768px) 80vw, 300px"
-                    priority
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                    Sin imagen
-                  </div>
+      <nav
+        aria-label="Migas de pan"
+        className="mx-auto flex max-w-5xl items-center gap-1.5 px-4 pt-5 text-xs text-[var(--text-muted)]"
+      >
+        <Link href="/" className="hover:text-[var(--text)]">
+          Inicio
+        </Link>
+        {categoryPath.map((part) => (
+          <span key={part.name} className="flex min-w-0 items-center gap-1.5">
+            <ChevronRight className="h-3 w-3 shrink-0" />
+            {part.href ? (
+              <Link href={part.href} className="truncate hover:text-[var(--text)]">
+                {part.name}
+              </Link>
+            ) : (
+              <span className="truncate">{part.name}</span>
+            )}
+          </span>
+        ))}
+      </nav>
+
+      <main className="mx-auto max-w-5xl px-4 pb-10 pt-4">
+        <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10">
+          {/* Imagen */}
+          <div className="md:sticky md:top-6 md:self-start">
+            <div className="relative aspect-square overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white">
+              {product.imageUrl ? (
+                <Image
+                  src={product.imageUrl}
+                  alt={product.title}
+                  fill
+                  className="object-contain p-8"
+                  sizes="(max-width: 768px) 92vw, 480px"
+                  priority
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
+                  Sin imagen
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Compra */}
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              {product.brand ? `${product.brand} · ` : ""}
+              {retailer}
+            </p>
+            <h1 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-[var(--text)] md:text-[1.6rem]">
+              {product.title}
+            </h1>
+
+            {(product.dealLevel === DealLevel.HISTORICAL_LOW || flashLabel) && (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+                {product.dealLevel === DealLevel.HISTORICAL_LOW && !unavailable && (
+                  <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-[var(--primary)]">
+                    Precio más bajo registrado
+                  </span>
                 )}
-                {product.discountPercentage > 0 && (
-                  <span
-                    className={`badge absolute left-0 top-0 shadow-sm ${dealBadgeClass(product.dealLevel)}`}
-                  >
+                {flashLabel && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
+                    {flashLabel}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 border-y border-[var(--border)] py-5">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-3xl font-semibold tracking-tight text-[var(--text)]">
+                  {formatEuro(product.currentPrice)}
+                </span>
+                {product.previousPrice &&
+                  product.previousPrice > product.currentPrice && (
+                    <span className="text-base text-[var(--text-muted)] line-through">
+                      {formatEuro(product.previousPrice)}
+                    </span>
+                  )}
+                {product.discountPercentage >= 1 && (
+                  <span className="text-sm font-semibold text-[var(--primary)]">
                     {formatDiscount(product.discountPercentage)}
                   </span>
                 )}
               </div>
+              {savings !== null && savings > 0 && (
+                <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                  Ahorras {formatEuro(savings)}
+                </p>
+              )}
             </div>
 
-            {/* Info + compra */}
-            <div className="flex flex-col p-6 md:p-8">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="badge text-white"
-                  style={{ backgroundColor: retailerColor }}
+            {unavailable ? (
+              <>
+                <p className="mt-6 flex items-start gap-2 text-sm text-[var(--text-muted)]">
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  {product.isActive
+                    ? "Esta oferta está agotada o ha caducado. El precio mostrado es el último que comprobamos."
+                    : "Esta oferta ya no está disponible. El precio mostrado es el último que comprobamos."}
+                </p>
+                {alternatives.length > 0 && (
+                  <a href="#alternativas" className="btn btn-primary mt-4 w-full py-3.5 text-base">
+                    Ver ofertas similares
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <a
+                  href={product.affiliateUrl}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="btn btn-primary mt-6 w-full py-3.5 text-base"
                 >
-                  {retailerLabel(product.retailer)}
-                </span>
-                <span className={`badge ${dealBadgeClass(product.dealLevel)}`}>
-                  {product.dealLabel}
-                </span>
-                <span className="text-xs text-[var(--text-muted)]">
-                  {product.dealScore} pts
-                </span>
-              </div>
-
-              <h1 className="mt-4 text-xl font-bold leading-snug text-[var(--text)] md:text-2xl">
-                {product.title}
-              </h1>
-
-              {product.brand && (
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Marca: {product.brand}
+                  Ver en {retailer}
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+                <p className="mt-2.5 text-center text-xs text-[var(--text-muted)]">
+                  Enlace de afiliado. El precio puede cambiar en la tienda.
                 </p>
-              )}
+              </>
+            )}
 
-              {!unavailable && flashDealLabel(product.expiresAt) && (
-                <p className="mt-3 inline-block rounded-[var(--radius-sm)] bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800">
-                  {flashDealLabel(product.expiresAt)}
-                </p>
-              )}
-
-              <div className="mt-6 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-muted)]/50 p-4">
-                <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-                  <span className="text-3xl font-bold text-[var(--primary)]">
-                    {formatEuro(product.currentPrice)}
+            {variants.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-sm font-medium text-[var(--text)]">
+                  Opciones
+                  <span className="ml-1.5 font-normal text-[var(--text-muted)]">
+                    {variants.length < variantTotal
+                      ? `${variants.length} de ${variantTotal}`
+                      : variantTotal}
                   </span>
-                  {product.previousPrice &&
-                    product.previousPrice > product.currentPrice && (
-                      <span className="text-base text-[var(--text-muted)] line-through">
-                        {formatEuro(product.previousPrice)}
-                      </span>
-                    )}
-                </div>
-
-                {savings !== null && savings > 0 && (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-[var(--primary)]">
-                    <TrendingDown className="h-4 w-4" />
-                    Ahorras {formatEuro(savings)}
-                  </p>
+                </h2>
+                <VariantList variants={orderedVariants.slice(0, VISIBLE_VARIANTS)} currentId={product.id} />
+                {variants.length > VISIBLE_VARIANTS && (
+                  <details className="group mt-2">
+                    <summary className="cursor-pointer list-none text-sm font-medium text-[var(--primary)] hover:underline">
+                      <span className="group-open:hidden">Ver las {variants.length} opciones</span>
+                      <span className="hidden group-open:inline">Ver menos</span>
+                    </summary>
+                    <VariantList variants={orderedVariants.slice(VISIBLE_VARIANTS)} currentId={product.id} />
+                  </details>
                 )}
               </div>
+            )}
 
-              {unavailable ? (
-                <>
-                  <p className="mt-6 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-[var(--text)]">
-                    <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                    {product.isActive
-                      ? "Esta oferta está agotada o ha caducado. El precio mostrado es el último que comprobamos."
-                      : "Esta oferta ya no está disponible. El precio mostrado es el último que comprobamos."}
-                  </p>
-                  {alternatives.length > 0 && (
-                    <a
-                      href="#alternativas"
-                      className="btn btn-primary mt-4 w-full py-3.5 text-base"
-                    >
-                      Ver ofertas similares
-                    </a>
-                  )}
-                </>
-              ) : (
-                <>
-                  <a
-                    href={product.affiliateUrl}
-                    target="_blank"
-                    rel="noopener noreferrer sponsored"
-                    className="btn btn-primary mt-6 w-full py-3.5 text-base"
-                  >
-                    Ver oferta en {retailerLabel(product.retailer)}
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-
-                  <p className="mt-3 text-center text-[11px] text-[var(--text-muted)]">
-                    Enlace de afiliado · El precio puede variar en la tienda
-                  </p>
-                </>
-              )}
-
-              <TelegramCta
-                className="mt-6"
-                alertHref={telegramAlertForAsin(product.asin)}
-                title={unavailable ? "¿Te interesaba este producto?" : "¿Esperas a que baje más?"}
-                text="Crea una alerta en Telegram y te avisamos cuando baje de precio."
-              />
-            </div>
+            <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-muted)]">
+              <a
+                href={telegramAlertForAsin(product.asin)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-[var(--text)] hover:underline"
+              >
+                <BellRing className="h-4 w-4" />
+                Avísame si baja de precio
+              </a>
+              <a
+                href={TELEGRAM_GROUP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 hover:text-[var(--text)] hover:underline"
+              >
+                <Send className="h-4 w-4" />
+                Grupo de Telegram
+              </a>
+            </p>
           </div>
-
-          {variants.length > 0 && (
-            <div className="border-t border-[var(--border)] px-6 py-6 md:px-8">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Opciones disponibles (
-                {variants.length < variantTotal
-                  ? `${variants.length} de ${variantTotal}`
-                  : variantTotal}
-                )
-              </h2>
-              <ul className="flex flex-wrap gap-2">
-                {variants.map((variant) => {
-                  const current = variant.id === product.id;
-                  const label = variant.variantLabel ?? truncate(variant.title, 40);
-                  const className = `flex flex-col rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm transition ${
-                    current
-                      ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                      : "border-[var(--border)] hover:border-[var(--border-strong)]"
-                  }`;
-                  const body = (
-                    <>
-                      <span className="font-medium text-[var(--text)]">{label}</span>
-                      <span className="text-xs text-[var(--primary)]">
-                        {formatEuro(variant.currentPrice)}
-                        {variant.discountPercentage >= 1 &&
-                          ` · ${formatDiscount(variant.discountPercentage)}`}
-                      </span>
-                    </>
-                  );
-                  return (
-                    <li key={variant.id}>
-                      {current ? (
-                        <span className={className} aria-current="true">
-                          {body}
-                        </span>
-                      ) : (
-                        <Link href={`/oferta/${variant.slug}`} className={className}>
-                          {body}
-                        </Link>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-
-          {product.description && (
-            <div className="border-t border-[var(--border)] px-6 py-6 md:px-8">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Sobre este producto
-              </h2>
-              <div className="product-description text-sm leading-relaxed text-[var(--text)]">
-                {product.description}
-              </div>
-            </div>
-          )}
         </article>
 
+        {(descriptionItems.length > 0 || details.length > 0) && (
+          <div className="mt-12 grid gap-10 border-t border-[var(--border)] pt-10 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            {descriptionItems.length > 0 ? (
+              <section>
+                <h2 className="text-lg font-semibold text-[var(--text)]">Descripción</h2>
+                <DescriptionList items={featured} />
+                {rest.length > 0 && (
+                  <details className="group mt-4">
+                    <summary className="cursor-pointer list-none text-sm font-medium text-[var(--primary)] hover:underline">
+                      <span className="group-open:hidden">Ver descripción completa</span>
+                      <span className="hidden group-open:inline">Ver menos</span>
+                    </summary>
+                    <DescriptionList items={rest} />
+                  </details>
+                )}
+              </section>
+            ) : (
+              <div />
+            )}
+
+            <section>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Detalles del producto</h2>
+              <dl className="mt-4 divide-y divide-[var(--border)] border-y border-[var(--border)] text-sm">
+                {details.map((row) => (
+                  <div key={row.label} className="grid grid-cols-[7.5rem_1fr] gap-3 py-2.5">
+                    <dt className="text-[var(--text-muted)]">{row.label}</dt>
+                    <dd className="min-w-0 break-words text-[var(--text)]">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </div>
+        )}
+
         {alternatives.length > 0 && (
-          <section id="alternativas" className="mt-8 scroll-mt-4">
-            <h2 className="mb-4 text-lg font-bold text-[var(--text)]">
+          <section id="alternativas" className="mt-12 scroll-mt-4">
+            <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">
               Ofertas similares disponibles
             </h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -439,20 +460,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {/* CTA fijo en móvil */}
       {!unavailable && (
         <>
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] md:hidden">
-            <div className="mx-auto flex max-w-4xl items-center gap-3">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
+            <div className="mx-auto flex max-w-5xl items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs text-[var(--text-muted)]">
-                  {retailerLabel(product.retailer)}
-                </p>
-                <p className="text-lg font-bold text-[var(--primary)]">
+                <p className="text-lg font-semibold leading-tight text-[var(--text)]">
                   {formatEuro(product.currentPrice)}
-                  {product.discountPercentage > 0 && (
-                    <span className="ml-2 text-xs font-semibold text-[var(--text-muted)]">
+                  {product.discountPercentage >= 1 && (
+                    <span className="ml-2 text-xs font-semibold text-[var(--primary)]">
                       {formatDiscount(product.discountPercentage)}
                     </span>
                   )}
                 </p>
+                <p className="truncate text-xs text-[var(--text-muted)]">en {retailer}</p>
               </div>
               <a
                 href={product.affiliateUrl}
@@ -460,7 +479,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 rel="noopener noreferrer sponsored"
                 className="btn btn-primary shrink-0"
               >
-                Comprar
+                Ver oferta
                 <ExternalLink className="h-4 w-4" />
               </a>
             </div>
@@ -469,5 +488,66 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </>
       )}
     </div>
+  );
+}
+
+const VISIBLE_VARIANTS = 8;
+
+function VariantList({
+  variants,
+  currentId,
+}: {
+  variants: MarketplaceProduct[];
+  currentId: string;
+}) {
+  return (
+    <ul className="mt-2 flex flex-wrap gap-2">
+      {variants.map((variant) => {
+        const current = variant.id === currentId;
+        const label = variant.variantLabel ?? truncate(variant.title, 40);
+        const className = `flex flex-col rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm transition ${
+          current
+            ? "border-[var(--text)] bg-[var(--surface)]"
+            : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]"
+        }`;
+        const body = (
+          <>
+            <span className="font-medium text-[var(--text)]">{label}</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              {formatEuro(variant.currentPrice)}
+            </span>
+          </>
+        );
+        return (
+          <li key={variant.id}>
+            {current ? (
+              <span className={className} aria-current="true">
+                {body}
+              </span>
+            ) : (
+              <Link href={`/oferta/${variant.slug}`} className={className}>
+                {body}
+              </Link>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function DescriptionList({ items }: { items: DescriptionItem[] }) {
+  return (
+    <ul className="mt-4 space-y-3 text-[0.95rem] leading-relaxed text-[var(--text)]">
+      {items.map((item, index) => (
+        <li key={index} className="flex gap-3">
+          <span aria-hidden className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-[var(--text-muted)]" />
+          <span className="max-w-[68ch]">
+            {item.title && <strong className="font-semibold">{item.title}. </strong>}
+            {item.text}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

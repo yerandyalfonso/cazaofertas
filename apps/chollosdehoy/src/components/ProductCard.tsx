@@ -51,15 +51,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className="badge text-white"
-              style={{ backgroundColor: retailerColor }}
-            >
-              {retailerLabel(product.retailer)}
-            </span>
-            <span className="text-xs text-[var(--text-muted)]">
-              {product.dealLabel}
-            </span>
+            <RetailerTag retailer={product.retailer} color={retailerColor} />
           </div>
 
           <Link href={`/oferta/${product.slug}`}>
@@ -149,17 +141,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
       </Link>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="badge text-white"
-            style={{ backgroundColor: retailerColor }}
-          >
-            {retailerLabel(product.retailer)}
-          </span>
-          <span className="text-xs font-medium text-[var(--text-muted)]">
-            {product.dealScore} pts
-          </span>
-        </div>
+        <RetailerTag retailer={product.retailer} color={retailerColor} />
 
         <Link href={`/oferta/${product.slug}`}>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-[var(--text)] group-hover:text-[var(--primary)]">
@@ -201,11 +183,21 @@ export function ProductCard({ product, view }: ProductCardProps) {
             rel="noopener noreferrer sponsored"
             className="btn btn-ghost text-xs"
           >
-            Ir
+            Ver
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>
     </article>
+  );
+}
+
+/** Tienda en texto discreto con un punto de su color (sin píldora). */
+function RetailerTag({ retailer, color }: { retailer: string; color: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {retailerLabel(retailer)}
+    </span>
   );
 }

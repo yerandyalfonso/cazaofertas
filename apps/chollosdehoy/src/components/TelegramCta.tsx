@@ -2,41 +2,34 @@ import { BellRing, Send } from "lucide-react";
 import { TELEGRAM_GROUP_URL } from "@/lib/telegram";
 
 interface TelegramCtaProps {
-  /** Deep link al bot con el producto o la categoría ya elegidos. */
+  /** Deep link al bot con la categoría ya elegida. */
   alertHref: string;
-  title: string;
   text: string;
-  className?: string;
 }
 
-/** «Avísame si baja» (bot) + «Únete al grupo» (grupo público de Telegram con temas). */
-export function TelegramCta({ alertHref, title, text, className = "" }: TelegramCtaProps) {
+/** Línea discreta: alerta en el bot + grupo público de Telegram. */
+export function TelegramCta({ alertHref, text }: TelegramCtaProps) {
   return (
-    <section
-      className={`rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-muted)]/50 p-4 ${className}`}
-    >
-      <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
-      <p className="mt-1 text-xs text-[var(--text-muted)]">{text}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <a
-          href={alertHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-ghost border border-[var(--border)] text-sm"
-        >
-          <BellRing className="h-4 w-4" />
-          Avísame si baja
-        </a>
-        <a
-          href={TELEGRAM_GROUP_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-ghost border border-[var(--border)] text-sm"
-        >
-          <Send className="h-4 w-4" />
-          Únete al grupo
-        </a>
-      </div>
-    </section>
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-muted)]">
+      <span>{text}</span>
+      <a
+        href={alertHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 font-medium text-[var(--text)] hover:underline"
+      >
+        <BellRing className="h-4 w-4" />
+        Crear alerta
+      </a>
+      <a
+        href={TELEGRAM_GROUP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 hover:text-[var(--text)] hover:underline"
+      >
+        <Send className="h-4 w-4" />
+        Grupo de Telegram
+      </a>
+    </p>
   );
 }
