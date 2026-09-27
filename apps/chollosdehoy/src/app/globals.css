@@ -522,3 +522,10 @@ a {
   height: 3px;
   background: var(--header-accent);
 }
+
+/* Descuento sobre la foto grande de la ficha. */
+.badge-lg {
+  padding: 0.3rem 0.7rem;
+  font-size: 1rem;
+  font-weight: 800;
+}

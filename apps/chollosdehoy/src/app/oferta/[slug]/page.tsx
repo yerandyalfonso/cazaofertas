@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { cache, type ReactNode } from "react";
 import type { Metadata } from "next";
+import { FillImage } from "@/components/FillImage";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import {
@@ -21,12 +21,12 @@ import {
 } from "@/lib/catalog";
 import { categoryHref, subcategoryHasPage } from "@/lib/links";
 import { formatDiscount, formatEuro } from "@/lib/money";
-import { retailerLabel } from "@/lib/retailers";
+import { retailerColor, retailerLabel } from "@/lib/retailers";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { TELEGRAM_GROUP_URL, telegramAlertForAsin } from "@/lib/telegram";
 import { parseProductDescription, type DescriptionItem } from "@/lib/description";
 import { flashDealLabel } from "@/lib/flash";
-import { DealLevel, type MarketplaceProduct } from "@/lib/types";
+import type { MarketplaceProduct } from "@/lib/types";
 
 // generateMetadata y la página comparten una sola consulta por petición.
 const getProductBySlug = cache(fetchProductBySlug);
@@ -265,40 +265,42 @@ export default async function ProductPage({ params }: ProductPageProps) {
           {/* Imagen */}
           <div className="md:sticky md:top-6 md:self-start">
             <div className="relative aspect-square overflow-hidden rounded-card border border-line bg-white">
-              {product.imageUrl ? (
-                <Image
-                  src={product.imageUrl}
-                  alt={product.title}
-                  fill
-                  className="object-contain p-8"
-                  sizes="(max-width: 768px) 92vw, 480px"
-                  priority
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted">
-                  Sin imagen
-                </div>
+              <FillImage
+                src={product.imageUrl}
+                alt={product.title}
+                sizes="(max-width: 768px) 92vw, 480px"
+                padding="p-8"
+                priority
+              />
+              {!unavailable && product.discountPercentage >= 1 && (
+                <span className="badge badge-deal badge-lg absolute left-4 top-4 z-10 shadow-sm">
+                  {formatDiscount(product.discountPercentage)}
+                </span>
               )}
             </div>
           </div>
 
           {/* Compra */}
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
-              {product.brand ? `${product.brand} · ` : ""}
-              {retailer}
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+              <span translate="no" className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: retailerColor(product.retailer) }}
+                />
+                {retailer}
+              </span>
+              {product.brand && product.brand.toLowerCase() !== retailer.toLowerCase() && (
+                <span>Marca: {product.brand}</span>
+              )}
             </p>
             <h1 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-ink md:text-[1.6rem]">
               {product.title}
             </h1>
 
-            {(product.dealLevel === DealLevel.HISTORICAL_LOW || flashLabel) && (
+            {flashLabel && (
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
-                {product.dealLevel === DealLevel.HISTORICAL_LOW && !unavailable && (
-                  <span className="rounded-full bg-primary-soft px-2.5 py-1 text-primary">
-                    Precio más bajo registrado
-                  </span>
-                )}
                 {flashLabel && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-urgent-soft px-2.5 py-1 text-urgent-strong">
                     <Zap className="h-3.5 w-3.5" aria-hidden />
@@ -313,7 +315,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <p className="mb-1 text-xs font-medium text-muted">Último precio comprobado</p>
               )}
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className={`price text-3xl font-semibold tracking-tight ${unavailable ? "text-muted" : "text-ink"}`}>
+                <span className={`price text-[2.5rem] font-extrabold leading-none tracking-tight ${unavailable ? "text-muted" : "text-ink"}`}>
                   {formatEuro(product.currentPrice)}
                 </span>
                 {!unavailable &&
@@ -323,14 +325,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
-                {!unavailable && product.discountPercentage >= 1 && (
-                  <span className="text-sm font-semibold text-primary">
-                    {formatDiscount(product.discountPercentage)}
-                  </span>
-                )}
               </div>
               {!unavailable && savings !== null && savings > 0 && (
-                <p className="mt-1.5 text-sm text-muted">
+                <p className="price mt-2 text-sm font-semibold text-primary">
                   Ahorras {formatEuro(savings)}
                 </p>
               )}
@@ -361,9 +358,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   Ver en {retailer}
                   <ExternalLink className="h-4 w-4" />
                 </a>
-                <p className="mt-2.5 text-center text-xs text-muted">
-                  Enlace de afiliado. El precio puede cambiar en la tienda.
-                </p>
               </>
             )}
 
