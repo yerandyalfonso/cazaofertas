@@ -79,12 +79,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
           <div className="mt-auto flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-[var(--primary)]">
+                <span className="price text-xl font-semibold text-[var(--text)]">
                   {formatEuro(product.currentPrice)}
                 </span>
                 {product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
-                    <span className="text-sm text-[var(--text-muted)] line-through">
+                    <span className="text-sm text-[var(--text-muted)] line-through price">
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
@@ -123,7 +123,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
             src={product.imageUrl}
             alt={product.title}
             fill
-            className="object-contain p-4 transition duration-300 group-hover:scale-[1.03]"
+            className="object-contain p-4 transition-transform duration-300 group-hover:scale-[1.03]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
@@ -167,12 +167,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <div>
-            <div className="text-lg font-bold text-[var(--primary)]">
+            <div className="price text-lg font-semibold text-[var(--text)]">
               {formatEuro(product.currentPrice)}
             </div>
             {product.previousPrice &&
               product.previousPrice > product.currentPrice && (
-                <div className="text-xs text-[var(--text-muted)] line-through">
+                <div className="text-xs text-[var(--text-muted)] line-through price">
                   {formatEuro(product.previousPrice)}
                 </div>
               )}
@@ -195,7 +195,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
 /** Tienda en texto discreto con un punto de su color (sin píldora). */
 function RetailerTag({ retailer, color }: { retailer: string; color: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+    <span translate="no" className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
       <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
       {retailerLabel(retailer)}
     </span>

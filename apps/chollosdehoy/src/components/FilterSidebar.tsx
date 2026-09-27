@@ -84,7 +84,12 @@ export function FilterSidebar({
           )}
         </div>
         {mobile && onClose && (
-          <button type="button" onClick={onClose} className="btn btn-ghost p-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost p-2"
+            aria-label="Cerrar filtros"
+          >
             <X className="h-4 w-4" />
           </button>
         )}
@@ -206,8 +211,12 @@ export function FilterSidebar({
           <div className="grid grid-cols-2 gap-2">
             <input
               type="number"
+              inputMode="decimal"
+              name="minPrice"
+              autoComplete="off"
+              aria-label="Precio mínimo en euros"
               min={0}
-              placeholder="Mín"
+              placeholder="Mín., p. ej. 10…"
               className="input text-sm"
               value={filters.minPrice ?? ""}
               onChange={(e) =>
@@ -218,8 +227,12 @@ export function FilterSidebar({
             />
             <input
               type="number"
+              inputMode="decimal"
+              name="maxPrice"
+              autoComplete="off"
+              aria-label="Precio máximo en euros"
               min={0}
-              placeholder="Máx"
+              placeholder="Máx., p. ej. 100…"
               className="input text-sm"
               value={filters.maxPrice ?? ""}
               onChange={(e) =>

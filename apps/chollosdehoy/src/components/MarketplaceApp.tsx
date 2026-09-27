@@ -7,7 +7,7 @@ import { MarketplaceHeader } from "@/components/MarketplaceHeader";
 import { PaginationBar } from "@/components/PaginationBar";
 import { ProductCard } from "@/components/ProductCard";
 import { TopDealsPanel } from "@/components/TopDealsPanel";
-import { filtersToSearchParams } from "@/lib/api-params";
+import { filtersToSearchParams, searchParamsToFilters } from "@/lib/api-params";
 import { MARKETPLACE_PAGE_SIZE } from "@/lib/coupons";
 import {
   DEFAULT_FILTERS,
@@ -34,9 +34,12 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
   );
   const [loading, setLoading] = useState(false);
   const skipInitialFetch = useRef(true);
+  // Solo cuenta la respuesta de la última petición (las lentas no pisan a las nuevas).
+  const latestRequest = useRef(0);
 
   const fetchPage = useCallback(
     async (nextFilters: MarketplaceFilters, nextPage: number) => {
+      const requestId = ++latestRequest.current;
       setLoading(true);
       try {
         const params = filtersToSearchParams(
@@ -47,11 +50,11 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
         const res = await fetch(`/api/ofertas?${params.toString()}`);
         if (!res.ok) throw new Error("fetch failed");
         const data = (await res.json()) as PaginatedProducts;
-        setCatalog(data);
+        if (requestId === latestRequest.current) setCatalog(data);
       } catch {
         /* keep previous page on error */
       } finally {
-        setLoading(false);
+        if (requestId === latestRequest.current) setLoading(false);
       }
     },
     [],
@@ -71,6 +74,42 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
     }, filters.query.trim() ? 350 : 0);
     return () => clearTimeout(timer);
   }, [filters, page, fetchPage, activeFilterCount]);
+
+  // Filtros y página en la URL (?q=…&parent=…&page=2): se pueden compartir y
+  // «atrás» los conserva. La portada es estática, así que se leen al montar.
+  useEffect(() => {
+    const applyFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      if ([...params.keys()].length === 0) return;
+      const parsed = searchParamsToFilters(params);
+      setFilters(parsed.filters);
+      setPage(parsed.page);
+    };
+    applyFromUrl();
+    window.addEventListener("popstate", applyFromUrl);
+    return () => window.removeEventListener("popstate", applyFromUrl);
+  }, []);
+
+  useEffect(() => {
+    const params = filtersToSearchParams(filters, page, MARKETPLACE_PAGE_SIZE);
+    params.delete("pageSize");
+    if (page === 1) params.delete("page");
+    const query = params.toString();
+    const next = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, "", next);
+    }
+  }, [filters, page]);
+
+  // Escape cierra el panel de filtros del móvil.
+  useEffect(() => {
+    if (!mobileFiltersOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileFiltersOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileFiltersOpen]);
 
   function updateFilters(next: MarketplaceFilters) {
     setFilters(next);
@@ -108,16 +147,18 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
           </div>
         </div>
 
-        <main className="min-w-0 space-y-5">
+        <main id="contenido" className="min-w-0 space-y-5">
+          {!showHero && <h1 className="sr-only">Chollos de hoy</h1>}
           {showHero && (
-            <CategoryHero categories={bootstrap.categories} />
+            <CategoryHero
+              categories={bootstrap.categories}
+              totalProducts={bootstrap.stats.totalProducts}
+            />
           )}
 
-          {loading && (
-            <div className="text-center text-sm text-[var(--text-muted)]">
-              Cargando ofertas…
-            </div>
-          )}
+          <p aria-live="polite" className="text-center text-sm text-[var(--text-muted)] empty:hidden">
+            {loading ? "Cargando ofertas…" : ""}
+          </p>
 
           {catalog.items.length === 0 && !loading ? (
             <div className="card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
@@ -136,7 +177,7 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
             </div>
           ) : viewMode === "grid" ? (
             <div
-              className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 ${
+              className={`grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 ${
                 loading ? "opacity-60" : ""
               }`}
             >
@@ -174,14 +215,19 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
       </div>
 
       {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div
+          className="fixed inset-0 z-50 overscroll-contain lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Filtros"
+        >
           <button
             type="button"
             className="absolute inset-0 bg-black/40"
             onClick={() => setMobileFiltersOpen(false)}
             aria-label="Cerrar filtros"
           />
-          <div className="absolute inset-y-0 left-0 w-[min(100%,320px)] bg-[var(--surface)] shadow-2xl">
+          <div className="absolute inset-y-0 left-0 w-[min(100%,320px)] overscroll-contain bg-[var(--surface)] shadow-2xl">
             <FilterSidebar
               categories={bootstrap.categories}
               filters={filters}

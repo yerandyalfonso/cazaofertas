@@ -6,7 +6,6 @@ import {
   LayoutList,
   Search,
   SlidersHorizontal,
-  Sparkles,
   Ticket,
   X,
 } from "lucide-react";
@@ -49,32 +48,22 @@ export function MarketplaceHeader({
       <div className="mx-auto max-w-[1600px] px-4 py-3 md:py-4">
         {/* Marca + acciones secundarias */}
         <div className="mb-3 flex items-center justify-between gap-3">
-          <Link href="/" className="group flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-sm">
-              <Sparkles className="h-5 w-5" />
+          <Link href="/" className="flex min-w-0 items-baseline gap-3">
+            <span className="text-lg font-bold tracking-tight text-[var(--text)] md:text-xl">
+              Chollos de Hoy
             </span>
-            <span className="min-w-0">
-              <span className="block truncate text-lg font-bold tracking-tight text-[var(--text)] md:text-xl">
-                Chollos de Hoy
-              </span>
-              <span className="block truncate text-xs text-[var(--text-muted)]">
-                {isFiltered ? (
-                  <>
-                    <span className="font-semibold text-[var(--primary)]">
-                      {resultCount}
-                    </span>
-                    {" de "}
-                    {totalCount} ofertas
-                  </>
-                ) : (
-                  <>{totalCount} ofertas activas</>
-                )}
-                {" · "}
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  en vivo
-                </span>
-              </span>
+            <span className="hidden truncate text-xs text-[var(--text-muted)] sm:inline">
+              {isFiltered ? (
+                <>
+                  <span className="price font-semibold text-[var(--text)]">
+                    {new Intl.NumberFormat("es-ES").format(resultCount)}
+                  </span>
+                  {" de "}
+                  {new Intl.NumberFormat("es-ES").format(totalCount)} ofertas
+                </>
+              ) : (
+                <>{new Intl.NumberFormat("es-ES").format(totalCount)} ofertas activas</>
+              )}
             </span>
           </Link>
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { UmamiScript } from "@/components/UmamiScript";
@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#f3f6f4",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,6 +38,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${dmSans.variable} antialiased`}>
+        <a href="#contenido" className="skip-link">
+          Saltar al contenido
+        </a>
         {children}
         <UmamiScript />
       </body>

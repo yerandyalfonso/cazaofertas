@@ -259,7 +259,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         ))}
       </nav>
 
-      <main className="mx-auto max-w-5xl px-4 pb-10 pt-4">
+      <main id="contenido" className="mx-auto max-w-5xl px-4 pb-10 pt-4">
         <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10">
           {/* Imagen */}
           <div className="md:sticky md:top-6 md:self-start">
@@ -308,12 +308,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             <div className="mt-6 border-y border-[var(--border)] py-5">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-3xl font-semibold tracking-tight text-[var(--text)]">
+                <span className="price text-3xl font-semibold tracking-tight text-[var(--text)]">
                   {formatEuro(product.currentPrice)}
                 </span>
                 {product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
-                    <span className="text-base text-[var(--text-muted)] line-through">
+                    <span className="price text-base text-[var(--text-muted)] line-through">
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
@@ -463,7 +463,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
             <div className="mx-auto flex max-w-5xl items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-semibold leading-tight text-[var(--text)]">
+                <p className="price text-lg font-semibold leading-tight text-[var(--text)]">
                   {formatEuro(product.currentPrice)}
                   {product.discountPercentage >= 1 && (
                     <span className="ml-2 text-xs font-semibold text-[var(--primary)]">

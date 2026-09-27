@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { Flame, Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { retailerLabel } from "@/lib/retailers";
@@ -23,7 +22,7 @@ function MiniDealRow({ product }: { product: MarketplaceProduct }) {
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
-            alt={product.title}
+            alt=""
             fill
             className="object-contain p-1"
             sizes="56px"
@@ -40,7 +39,7 @@ function MiniDealRow({ product }: { product: MarketplaceProduct }) {
           {product.title}
         </p>
         <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm leading-snug">
-          <span className="font-bold text-[var(--primary)]">
+          <span className="price font-semibold text-[var(--text)]">
             {formatEuro(product.currentPrice)}
           </span>
           {product.discountPercentage > 0 && (
@@ -63,21 +62,16 @@ function MiniDealRow({ product }: { product: MarketplaceProduct }) {
 
 function PanelSection({
   title,
-  icon: Icon,
   items,
 }: {
   title: string;
-  icon: typeof Flame;
   items: MarketplaceProduct[];
 }) {
   if (items.length === 0) return null;
 
   return (
     <section className="card p-4">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-        <Icon className="h-4 w-4 text-[var(--primary)]" />
-        {title}
-      </h2>
+      <h2 className="mb-2 text-sm font-semibold text-[var(--text)]">{title}</h2>
       <div className="space-y-0.5">
         {items.map((product) => (
           <MiniDealRow key={product.id} product={product} />
@@ -94,9 +88,12 @@ export function TopDealsPanel({
 }: TopDealsPanelProps) {
   return (
     <div className="space-y-4">
-      <PanelSection title="Top chollos" icon={Flame} items={topDeals} />
-      <PanelSection title="Más descuento" icon={TrendingUp} items={trending} />
-      <PanelSection title="Últimas añadidas" icon={Sparkles} items={latest} />
+      <PanelSection title="Los mejores de hoy" items={topDeals} />
+      {/* «Más descuento» solo si no repite los mismos productos. */}
+      {trending.some((item) => !topDeals.some((top) => top.id === item.id)) && (
+        <PanelSection title="Más descuento" items={trending} />
+      )}
+      <PanelSection title="Recién añadidas" items={latest} />
     </div>
   );
 }

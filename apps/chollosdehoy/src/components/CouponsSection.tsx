@@ -59,6 +59,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
           <button
             type="button"
             onClick={copyCode}
+            aria-live="polite"
             className="btn btn-ghost flex-1 font-mono text-sm"
           >
             {copied ? (

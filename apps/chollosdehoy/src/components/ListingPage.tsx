@@ -84,7 +84,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 md:py-8">
+      <main id="contenido" className="mx-auto max-w-6xl space-y-5 px-4 py-6 md:py-8">
         <header>
           <h1 className="text-2xl font-bold text-[var(--text)] md:text-3xl">
             {listing.h1}
@@ -126,7 +126,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
           />
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {data.items.map((product) => (
             <ProductCard key={product.id} product={product} view="grid" />
           ))}
