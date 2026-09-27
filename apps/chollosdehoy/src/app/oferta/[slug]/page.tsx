@@ -207,7 +207,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <span key={part.name}>
                 {i > 0 && " › "}
                 {part.href ? (
-                  <Link href={part.href} className="underline-offset-2 hover:underline">
+                  <Link href={part.href} className="tap-link underline-offset-2 hover:underline">
                     {part.name}
                   </Link>
                 ) : (
@@ -243,14 +243,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
         aria-label="Migas de pan"
         className="mx-auto flex max-w-5xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
       >
-        <Link href="/" className="hover:text-ink">
+        <Link href="/" className="tap-link hover:text-ink">
           Inicio
         </Link>
         {categoryPath.map((part) => (
           <span key={part.name} className="flex min-w-0 items-center gap-1.5">
             <ChevronRight className="h-3 w-3 shrink-0" />
             {part.href ? (
-              <Link href={part.href} className="truncate hover:text-ink">
+              <Link href={part.href} className="tap-link truncate hover:text-ink">
                 {part.name}
               </Link>
             ) : (
@@ -389,7 +389,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 href={telegramAlertForAsin(product.asin)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-ink hover:underline"
+                className="tap-link inline-flex items-center gap-1.5 font-medium text-ink hover:underline"
               >
                 <BellRing className="h-4 w-4" />
                 Avísame si baja de precio
@@ -398,7 +398,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 href={TELEGRAM_GROUP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 hover:text-ink hover:underline"
+                className="tap-link inline-flex items-center gap-1.5 hover:text-ink hover:underline"
               >
                 <Send className="h-4 w-4" />
                 Grupo de Telegram

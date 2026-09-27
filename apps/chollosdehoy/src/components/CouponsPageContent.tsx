@@ -155,9 +155,9 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
         <button
           type="button"
           onClick={() => setRetailer(null)}
-          className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+          className={`tap-target rounded-full border px-4 py-2 text-sm font-semibold transition ${
             retailer === null
-              ? "border-primary bg-primary text-white"
+              ? "border-vivid bg-vivid text-white"
               : "border-line bg-surface text-muted"
           }`}
         >
@@ -168,7 +168,7 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
             key={id}
             type="button"
             onClick={() => setRetailer(id)}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+            className={`tap-target rounded-full border px-4 py-2 text-sm font-semibold transition ${
               retailer === id
                 ? "border-primary bg-primary-soft text-primary"
                 : "border-line bg-surface text-muted"

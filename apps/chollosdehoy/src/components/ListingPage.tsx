@@ -65,14 +65,14 @@ export function ListingPage({ listing }: { listing: Listing }) {
             className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted"
             aria-label="Migas de pan"
           >
-            <Link href="/" className="hover:text-ink">
+            <Link href="/" className="tap-link hover:text-ink">
               Inicio
             </Link>
             {listing.breadcrumbs.map((crumb, i) => (
               <span key={crumb.href} className="flex items-center gap-1.5">
                 <ChevronRight className="h-3 w-3 shrink-0" />
                 {i < listing.breadcrumbs.length - 1 ? (
-                  <Link href={crumb.href} className="truncate hover:text-ink">
+                  <Link href={crumb.href} className="tap-link truncate hover:text-ink">
                     {crumb.name}
                   </Link>
                 ) : (
@@ -106,7 +106,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
               <Link
                 key={sub.href}
                 href={sub.href}
-                className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-line-strong"
+                className="tap-link rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-line-strong"
               >
                 {sub.name}
                 {sub.count !== undefined && (
@@ -193,9 +193,9 @@ export function ListingPage({ listing }: { listing: Listing }) {
                     key={p}
                     href={withPage(basePath, p)}
                     aria-current={p === page ? "page" : undefined}
-                    className={`min-w-[2.25rem] rounded-control px-2 py-1.5 text-center text-sm font-semibold transition ${
+                    className={`tap-link min-w-[2.25rem] justify-center rounded-control px-2 py-1.5 text-center text-sm font-semibold transition ${
                       p === page
-                        ? "bg-primary text-white"
+                        ? "bg-vivid text-white"
                         : "text-muted hover:bg-surface-muted"
                     }`}
                   >

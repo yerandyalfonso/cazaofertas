@@ -57,7 +57,7 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
             <RetailerTag retailer={product.retailer} color={retailerTint} />
           </div>
 
-          <Link href={`/oferta/${product.slug}`}>
+          <Link href={`/oferta/${product.slug}`} className="tap-link w-full">
             <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-primary md:text-base">
               {product.title}
             </h3>
@@ -154,7 +154,7 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
       <div className={`flex min-w-0 flex-1 flex-col gap-2 ${horizontal ? "p-4 sm:p-5" : "p-3 sm:p-4"}`}>
         <RetailerTag retailer={product.retailer} color={retailerTint} />
 
-        <Link href={`/oferta/${product.slug}`}>
+        <Link href={`/oferta/${product.slug}`} className="tap-link w-full">
           <h3
             className={`font-semibold leading-snug text-ink group-hover:text-primary ${
               horizontal ? "line-clamp-3 text-base sm:text-lg" : "line-clamp-2 min-h-[2.5rem] text-sm"

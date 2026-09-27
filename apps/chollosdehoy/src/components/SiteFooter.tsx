@@ -20,7 +20,7 @@ export async function SiteFooter() {
     <footer className="border-t border-line bg-surface py-8">
       <div className="mx-auto grid max-w-[1600px] gap-6 px-4 text-sm md:grid-cols-[1fr_2fr_1fr]">
         <div>
-          <Link href="/" className="font-semibold text-ink">
+          <Link href="/" className="tap-link font-semibold text-ink">
             Chollos de Hoy
           </Link>
           <p className="mt-1 text-muted">
@@ -37,7 +37,7 @@ export async function SiteFooter() {
               <li key={parent.id}>
                 <Link
                   href={categoryHref(parent.slug)}
-                  className="text-muted hover:text-ink"
+                  className="tap-link text-muted hover:text-ink"
                 >
                   {parent.name}
                 </Link>
@@ -55,7 +55,7 @@ export async function SiteFooter() {
               <li key={retailer.id}>
                 <Link
                   href={retailerHref(retailer.id)}
-                  className="text-muted hover:text-ink"
+                  className="tap-link text-muted hover:text-ink"
                 >
                   {retailerLabel(retailer.id)}
                 </Link>
@@ -64,7 +64,7 @@ export async function SiteFooter() {
             <li>
               <Link
                 href="/cupones"
-                className="text-muted hover:text-ink"
+                className="tap-link text-muted hover:text-ink"
               >
                 Cupones
               </Link>

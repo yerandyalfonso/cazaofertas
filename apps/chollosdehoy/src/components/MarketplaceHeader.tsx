@@ -48,7 +48,7 @@ export function MarketplaceHeader({
       <div className="mx-auto max-w-[1600px] px-4 py-3 md:py-4">
         {/* Marca + acciones secundarias */}
         <div className="mb-3 flex items-center justify-between gap-3">
-          <Link href="/" className="flex min-w-0 items-baseline gap-3">
+          <Link href="/" className="flex min-h-11 min-w-0 items-center gap-3">
             <span className="text-lg font-bold tracking-tight text-ink md:text-xl">
               Chollos de Hoy
             </span>

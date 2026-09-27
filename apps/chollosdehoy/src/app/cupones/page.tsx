@@ -20,7 +20,7 @@ export default async function CuponesPage() {
         aria-label="Migas de pan"
         className="mx-auto flex max-w-4xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
       >
-        <Link href="/" className="hover:text-ink">
+        <Link href="/" className="tap-link hover:text-ink">
           Inicio
         </Link>
         <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />

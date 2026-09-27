@@ -507,6 +507,19 @@ a {
 
   /* Desplegables («Condiciones», «Ver las 25 opciones»): más alto, sin
      cambiar el texto. */
+  /* Enlaces de texto (migas, pie, avisos): la zona táctil crece hacia
+     arriba y abajo sin cambiar el aspecto. */
+  .tap-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .hero-toolbar-search input {
+    min-height: 44px;
+  }
+
   summary {
     display: inline-flex;
     align-items: center;
