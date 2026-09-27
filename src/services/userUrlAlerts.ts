@@ -22,6 +22,7 @@ import {
 } from "@/providers/browser";
 import { ensureProductFromUrl } from "@/services/products";
 import { alertRecipient } from "@/services/testUsers";
+import { AMAZON_FOREIGN_DELIVERY_ERROR } from "@/providers/price/AmazonHtmlPriceProvider";
 import { DealLevel, ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
@@ -47,8 +48,15 @@ export interface UserUrlAlertsResult {
   finishedAt: string;
 }
 
+function isForeignDeliveryError(message: string): boolean {
+  return message.includes(AMAZON_FOREIGN_DELIVERY_ERROR);
+}
+
 /** Agrupa el mensaje de error en un motivo legible (para contar y avisar). */
 function reasonFromError(message: string): string {
+  if (isForeignDeliveryError(message)) {
+    return "Amazon sin precio para envío fuera de España (IP del servidor)";
+  }
   if (isRetailBlockedError(message)) return "Bloqueo anti-bot de la tienda";
   if (/timeout|timed out|aborted|ETIMEDOUT/i.test(message)) return "Tiempo de espera agotado";
   if (/\b404\b|not found|no encontrado/i.test(message)) return "Producto no encontrado (404)";
@@ -567,7 +575,14 @@ export async function runUserUrlAlerts(options?: {
       // Bloqueo anti-bot de la tienda (DataDome, Cloudflare, 403…): transitorio,
       // no es un fallo real de la alerta. No lo contamos como "failed" para no
       // disparar avisos ruidosos al admin en cada ciclo.
-      note(isRetailBlockedError(message) ? "skipped" : "failed", reasonFromError(message), url, message.slice(0, 160));
+      // Bloqueos y «sin precio por envío fuera de España» son omisiones
+      // (transitorias / dependen de la IP), no fallos de la alerta.
+      note(
+        isRetailBlockedError(message) || isForeignDeliveryError(message) ? "skipped" : "failed",
+        reasonFromError(message),
+        url,
+        message.slice(0, 160),
+      );
       console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
 

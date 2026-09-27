@@ -150,10 +150,17 @@ function isForeignDeliveryGlow(html: string): boolean {
   const glow = glowDeliveryText(html);
   if (!glow) return false;
   if (/españa|spain|\bES\b|madrid|barcelona|28001/i.test(glow)) return false;
-  return /estados unidos|united states|deutschland|france|italy|united kingdom|japan/i.test(
+  // Amazon.es escribe el país en español («Enviar a Francia»): sin estos
+  // nombres el VPS (en Francia) nunca detectaba la entrega extranjera y
+  // leía fichas sin precio («no se envía a tu ubicación») como agotadas.
+  return /estados unidos|united states|francia|france|alemania|deutschland|germany|italia|italy|portugal|reino unido|united kingdom|países bajos|paises bajos|netherlands|bélgica|belgica|belgium|luxemburgo|suiza|austria|irlanda|polonia|japón|japon|japan/i.test(
     glow,
   );
 }
+
+/** Mensaje de error cuando la ficha no trae precio por entrega fuera de ES. */
+export const AMAZON_FOREIGN_DELIVERY_ERROR =
+  "Amazon no muestra precio para envío fuera de España";
 
 /** Última respuesta HTML venía con entrega fuera de ES (p. ej. Vercel → US). */
 let lastFetchForeignDelivery = false;
@@ -532,6 +539,32 @@ function isOutOfStockText(text: string): boolean {
   );
 }
 
+/** La ficha permite comprar: botón de cesta/compra o «Realiza tu pedido». */
+function isOrderableAmazonPage($: cheerio.CheerioAPI): boolean {
+  if ($("#add-to-cart-button, #buy-now-button").length > 0) return true;
+  const text = [
+    $("#availability").text(),
+    $("#availability_feature_div").text(),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return /realiza tu pedido|haz tu pedido|queda\(n\) \d+ en stock|quedan? \d+ en stock|\ben stock\b/.test(text);
+}
+
+/**
+ * Producto «padre» con variantes: Amazon enseña un rango («37,98 € – 59,99 €»)
+ * y «Ver opciones de compra», sin precio único. Devuelve el mínimo del rango.
+ */
+function priceFromVariantRange($: cheerio.CheerioAPI): number | null {
+  const values = collectPricesFromSelectors(
+    $,
+    buyboxSelectors(".a-price-range span.a-price span.a-offscreen"),
+  );
+  if (values.length === 0) return null;
+  const min = Math.min(...values);
+  return Number.isFinite(min) && min > 0 ? Math.round(min * 100) / 100 : null;
+}
+
 function availabilityFromHtml($: cheerio.CheerioAPI): ProductAvailability {
   const availability = [
     $("#availability").text(),
@@ -766,7 +799,7 @@ export function extractPriceFromAmazonHtml(html: string): {
       ["#priceblock_dealprice", "#priceblock_saleprice", "#priceblock_ourprice"],
     ),
   );
-  const price =
+  const directPrice =
     priceFromOneTimeBuyBox($) ??
     payCandidates[0] ??
     priceFromWholeFraction(
@@ -781,6 +814,9 @@ export function extractPriceFromAmazonHtml(html: string): {
     ) ??
     // Último recurso: solo patrones priceToPay en JSON (no priceAmount suelto).
     priceFromPageScripts(html);
+  // Producto padre con variantes: mínimo del rango (sin «antes» ni descuento).
+  const rangePrice = directPrice === null ? priceFromVariantRange($) : null;
+  const price = directPrice ?? rangePrice;
 
   // Precio recomendado / lista: solo basis del buy box (nunca mini de relacionados).
   // "basisPrice"/"apex-basisprice-value"/"apex-priceperunit-value" son el
@@ -833,12 +869,15 @@ export function extractPriceFromAmazonHtml(html: string): {
   if (listPrice !== null && price !== null && listPrice <= price) {
     listPrice = null;
   }
+  // Con rango de variantes, los «a-text-price» son el propio rango, no un
+  // precio tachado: no hay referencia real.
+  if (rangePrice !== null) listPrice = null;
 
   let discountPercentage: number | null = null;
   if (price !== null && listPrice !== null && listPrice > price) {
     discountPercentage =
       Math.round(((listPrice - price) / listPrice) * 10000) / 100;
-  } else if (badgeDiscount !== null) {
+  } else if (badgeDiscount !== null && rangePrice === null) {
     discountPercentage = badgeDiscount;
   }
 
@@ -940,6 +979,16 @@ export function extractPriceFromAmazonHtml(html: string): {
   }
 
   let availability = availabilityFromHtml($);
+  // «Temporalmente sin stock. Realiza tu pedido…» o textos contradictorios
+  // («Sólo quedan 2 en stock» + «sin stock» de otra oferta): si hay precio y la
+  // ficha deja comprar, está disponible (antes se marcaba como agotado).
+  if (
+    price !== null &&
+    availability === ProductAvailability.OUT_OF_STOCK &&
+    isOrderableAmazonPage($)
+  ) {
+    availability = ProductAvailability.IN_STOCK;
+  }
   if (price === null && availability === ProductAvailability.IN_STOCK) {
     const hint = [
       $("#availability").text(),
@@ -947,6 +996,10 @@ export function extractPriceFromAmazonHtml(html: string): {
       $("#availability_feature_div").text(),
     ].join(" ");
     if (isOutOfStockText(hint)) {
+      availability = ProductAvailability.OUT_OF_STOCK;
+    } else if ($("#buybox").length > 0 && !isOrderableAmazonPage($)) {
+      // Caja de compra sin precio ni botón (ningún vendedor lo ofrece ahora):
+      // no está a la venta aunque Amazon no escriba «agotado».
       availability = ProductAvailability.OUT_OF_STOCK;
     }
   }
@@ -1193,6 +1246,14 @@ export async function scrapeAmazonProductPage(
   const html = await fetchAmazonPageHtml(amazonUrl, options);
   const extracted = extractPriceFromAmazonHtml(html);
   const variantInfo = extractAmazonVariantInfo(html, asin);
+
+  // IP fuera de España (VPS en Francia): Amazon quita el precio de lo que no
+  // envía a ese país. No es «agotado»: se omite y lo revisa una IP española.
+  if (extracted.price === null && lastFetchForeignDelivery) {
+    throw new Error(
+      `${AMAZON_FOREIGN_DELIVERY_ERROR} (${glowDeliveryText(html).slice(0, 40) || "país desconocido"}).`,
+    );
+  }
 
   if (extracted.price === null) {
     if (extracted.availability === ProductAvailability.OUT_OF_STOCK) {
