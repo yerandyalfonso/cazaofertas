@@ -12,6 +12,8 @@
   --white: #ffffff;
   /* Naranjas. Con texto blanco: 600/650 solo en texto grande en negrita
      (≥19 px, AA 3:1); 700/750 también en texto pequeño (AA 4,5:1). */
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
   --orange-50: #fff4e0;
   --orange-600: #ea580c;
   --orange-650: #d9480f;
@@ -63,15 +65,18 @@
 
   /* ── 3. Componente ── */
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--orange-700);
-  /* Botón principal: naranja vivo, texto blanco grande (ver .btn-primary). */
-  --cta-bg: linear-gradient(135deg, var(--orange-600) 0%, var(--orange-650) 100%);
-  --cta-bg-hover: linear-gradient(135deg, var(--orange-650) 0%, var(--orange-700) 100%);
+  /* Botón principal: degradado ámbar → naranja con texto blanco. Decisión de
+     diseño: el lado ámbar queda por debajo de AA (2,1:1); se compensa en
+     parte con texto grande en negrita (ver .btn-primary). */
+  --cta-bg: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-600) 100%);
+  --cta-bg-hover: linear-gradient(135deg, var(--amber-600) 0%, var(--orange-650) 100%);
   --cta-fg: var(--white);
-  /* Etiqueta de descuento: texto pequeño, así que naranja intenso (AA 4,5:1). */
-  --badge-discount-bg: linear-gradient(135deg, var(--orange-750) 0%, var(--orange-700) 100%);
+  /* Etiqueta de descuento: mismo degradado que el botón (no llega a AA con
+     texto blanco pequeño; decisión de diseño). */
+  --badge-discount-bg: linear-gradient(135deg, var(--amber-500) 0%, var(--orange-600) 100%);
   --badge-discount-fg: var(--white);
   --badge-radius: var(--radius-6);
-  --header-accent: linear-gradient(90deg, var(--orange-600) 0%, var(--orange-700) 100%);
+  --header-accent: linear-gradient(90deg, var(--amber-500) 0%, var(--orange-600) 100%);
   --page-glow: #fff4e2;
 }
 
@@ -200,8 +205,8 @@ a {
   background: var(--cta-bg);
   color: var(--cta-fg);
   padding: 0.65rem 1.1rem;
-  /* Blanco sobre naranja vivo solo cumple AA como texto grande en negrita
-     (≥18,66 px): no bajar de 19 px ni de 700. */
+  /* Texto grande en negrita para que el blanco se lea lo mejor posible sobre
+     el degradado ámbar → naranja: no bajar de 19 px ni de 700. */
   font-size: 1.1875rem;
   font-weight: 700;
   line-height: 1.3;
