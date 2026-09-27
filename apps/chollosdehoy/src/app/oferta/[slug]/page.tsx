@@ -232,7 +232,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <div className="marketplace-shell bg-page">
-      <SiteHeader />
+      <SiteHeader width="max-w-5xl" />
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.
@@ -344,7 +344,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     : "Esta oferta ya no está disponible. El precio mostrado es el último que comprobamos."}
                 </p>
                 {alternatives.length > 0 && (
-                  <a href="#alternativas" className="btn btn-primary mt-4 w-full py-3.5 text-base">
+                  <a href="#alternativas" className="btn btn-outline-gradient btn-lg mt-4 w-full">
                     Ver ofertas similares
                   </a>
                 )}
@@ -355,7 +355,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   href={product.affiliateUrl}
                   target="_blank"
                   rel="noopener noreferrer sponsored"
-                  className="btn btn-primary mt-6 w-full py-3.5 text-base"
+                  className="btn btn-outline-gradient btn-lg mt-6 w-full"
                 >
                   Ver en {retailer}
                   <ExternalLink className="h-4 w-4" />
@@ -479,7 +479,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 href={product.affiliateUrl}
                 target="_blank"
                 rel="noopener noreferrer sponsored"
-                className="btn btn-primary shrink-0"
+                className="btn btn-outline-gradient shrink-0"
               >
                 Ver oferta
                 <ExternalLink className="h-4 w-4" />

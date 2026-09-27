@@ -17,7 +17,7 @@ export default function Error({
 
   return (
     <div className="marketplace-shell">
-      <SiteHeader />
+      <SiteHeader width="max-w-3xl" />
       <main id="contenido" className="mx-auto max-w-3xl px-4 py-16 md:py-24">
         <h1 className="text-2xl font-semibold tracking-tight text-ink md:text-3xl">
           No hemos podido cargar esta página
