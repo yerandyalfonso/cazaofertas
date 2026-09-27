@@ -6,15 +6,10 @@ import { Search, Ticket } from "lucide-react";
  * Barra fija de las páginas interiores (ficha, listados, cupones, 404): marca,
  * buscador que lleva a la portada con ?q= y acceso a cupones.
  */
-export function SiteHeader({
-  width = "max-w-6xl",
-}: {
-  /** Mismo ancho máximo que el contenido de la página, para que todo alinee. */
-  width?: "max-w-3xl" | "max-w-4xl" | "max-w-5xl" | "max-w-6xl";
-}) {
+export function SiteHeader() {
   return (
     <header className="hero-header sticky top-0 z-30 border-b border-line bg-page/95 backdrop-blur-md">
-      <div className={`mx-auto flex ${width} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 md:flex-nowrap`}>
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 md:flex-nowrap">
         <Link
           href="/"
           className="flex min-h-11 items-center text-lg font-bold tracking-tight text-ink md:text-xl"
@@ -25,7 +20,7 @@ export function SiteHeader({
         <Form
           action="/"
           role="search"
-          className="hero-toolbar-search order-last w-full rounded-control border border-line bg-surface md:order-none md:w-auto md:flex-1"
+          className="hero-toolbar-search search-field order-last w-full md:order-none md:w-auto md:flex-1"
         >
           <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
           <input

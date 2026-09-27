@@ -232,7 +232,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <div className="marketplace-shell bg-page">
-      <SiteHeader width="max-w-5xl" />
+      <SiteHeader />
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.

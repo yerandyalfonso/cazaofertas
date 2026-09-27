@@ -69,6 +69,8 @@
   --shadow-sm: 0 1px 2px rgb(28 25 23 / 0.04);
 
   /* ── 3. Componente ── */
+  /* Altura única de botones y campos (búsqueda, «Cupones», «Ver», compra…). */
+  --control-height: 2.75rem;
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--orange-700);
   /* Botón principal: degradado ámbar → naranja con texto blanco. Decisión de
      diseño: el lado ámbar queda por debajo de AA (2,1:1); se compensa en
@@ -205,6 +207,8 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: var(--control-height);
+  padding-block: 0;
   border-radius: var(--radius-sm);
   font-weight: 600;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -213,7 +217,7 @@ a {
 .btn-primary {
   background: var(--cta-bg);
   color: var(--cta-fg);
-  padding: 0.65rem 1.1rem;
+  padding-inline: 1.1rem;
   /* Texto grande en negrita para que el blanco se lea lo mejor posible sobre
      el degradado ámbar → naranja: no bajar de 19 px ni de 700. */
   font-size: 1.1875rem;
@@ -229,7 +233,7 @@ a {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 0.55rem 0.85rem;
+  padding-inline: 0.85rem;
 }
 
 .btn-ghost:hover {
@@ -298,10 +302,21 @@ a {
   flex-direction: column;
   gap: 0;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
+  /* Borde con outline: no ocupa espacio, así la búsqueda mide lo mismo que
+     un botón (--control-height) por dentro y por fuera. */
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+}
+
+/* Buscador suelto (barra de las páginas interiores). */
+.search-field {
+  border-radius: var(--radius-sm);
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+  background: var(--surface);
 }
 
 @media (min-width: 768px) {
@@ -322,7 +337,7 @@ a {
   align-items: center;
   gap: 0.65rem;
   padding: 0 1rem;
-  min-height: 3rem;
+  min-height: var(--control-height);
 }
 
 .hero-toolbar-search input {
@@ -330,7 +345,8 @@ a {
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 0.65rem 0;
+  padding: 0;
+  align-self: stretch;
   font-size: 0.9375rem;
   color: var(--text);
   outline: none;
@@ -405,7 +421,7 @@ a {
 }
 
 .hero-toolbar-select {
-  height: 2.75rem;
+  height: var(--control-height);
   min-width: 8.5rem;
   border: none;
   background: transparent;
@@ -524,10 +540,6 @@ a {
     min-width: 44px;
   }
 
-  .hero-toolbar-search input {
-    min-height: 44px;
-  }
-
   summary {
     display: inline-flex;
     align-items: center;
@@ -601,12 +613,12 @@ a {
   background: var(--surface);
   color: var(--btn-outline-color);
   font-weight: 700;
-  padding: 0.5rem 0.9rem;
+  padding-inline: 0.9rem;
 }
 
 /* Versión grande (botón de compra de la ficha). */
 .btn-outline-gradient.btn-lg {
-  padding: 0.75rem 1.1rem;
+  padding-inline: 1.1rem;
   font-size: 1.1875rem;
   line-height: 1.3;
 }

@@ -17,7 +17,7 @@ export default async function CuponesPage() {
 
   return (
     <div className="marketplace-shell min-h-screen">
-      <SiteHeader width="max-w-4xl" />
+      <SiteHeader />
       <nav
         aria-label="Migas de pan"
         className="mx-auto flex max-w-4xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
