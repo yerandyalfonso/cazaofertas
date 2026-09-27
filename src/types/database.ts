@@ -68,6 +68,7 @@ export type Database = {
           category_id: string | null;
           current_price: number;
           previous_price: number | null;
+          previous_price_observed_at: string | null;
           lowest_price: number | null;
           highest_price: number | null;
           average_price_30d: number | null;
@@ -104,6 +105,7 @@ export type Database = {
           category_id?: string | null;
           current_price: number;
           previous_price?: number | null;
+          previous_price_observed_at?: string | null;
           lowest_price?: number | null;
           highest_price?: number | null;
           average_price_30d?: number | null;
@@ -140,6 +142,7 @@ export type Database = {
           category_id?: string | null;
           current_price?: number;
           previous_price?: number | null;
+          previous_price_observed_at?: string | null;
           lowest_price?: number | null;
           highest_price?: number | null;
           average_price_30d?: number | null;

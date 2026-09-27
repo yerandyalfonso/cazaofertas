@@ -1,5 +1,5 @@
 import { generateAffiliateUrl } from "@/lib/affiliate";
-import { calculateDiscountPercentage, requireNumber, roundMoney, toNumber } from "@/lib/money";
+import { requireNumber, roundMoney, toNumber } from "@/lib/money";
 import {
   buildOutOfStockUpdate,
   inStockAvailabilityPatch,
@@ -12,6 +12,7 @@ import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/sup
 import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
+import { discountFrom, resolveReferencePrice } from "@/services/referencePrice";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import {
   notifyMatchingUsers,
@@ -151,31 +152,6 @@ function availabilityFrom(value: string | undefined): ProductAvailability {
   return ProductAvailability.IN_STOCK;
 }
 
-/**
- * Referencia para UI/descuento:
- * 1) lista Amazon del quote (precio recomendado)
- * 2) previous_price guardado si sigue por encima del actual
- * 3) current anterior (caída vs última lectura)
- */
-function resolveReferencePrice(options: {
-  nextPrice: number;
-  amazonList: number | null;
-  storedPrevious: number | null;
-  storedCurrent: number;
-}): number {
-  const { nextPrice, amazonList, storedPrevious, storedCurrent } = options;
-  if (amazonList !== null && amazonList > nextPrice) {
-    return roundMoney(amazonList);
-  }
-  if (storedPrevious !== null && storedPrevious > nextPrice) {
-    return roundMoney(storedPrevious);
-  }
-  if (storedCurrent > nextPrice) {
-    return roundMoney(storedCurrent);
-  }
-  return nextPrice;
-}
-
 function emptyNotificationStats(): NotificationDispatchResult {
   return {
     matched: 0,
@@ -213,7 +189,7 @@ function variantPatch(quote: {
 }
 
 const PRICE_PRODUCT_SELECT =
-  "id, asin, title, slug, brand, image_url, description, retailer, amazon_url, affiliate_url, product_url, current_price, previous_price, lowest_price, highest_price, discount_percentage, category_id, availability, out_of_stock_at, is_active, deal_expires_at, categories(id, slug, name, parent:parent_id(id, slug, name))";
+  "id, asin, title, slug, brand, image_url, description, retailer, amazon_url, affiliate_url, product_url, current_price, previous_price, previous_price_observed_at, lowest_price, highest_price, discount_percentage, category_id, availability, out_of_stock_at, is_active, deal_expires_at, categories(id, slug, name, parent:parent_id(id, slug, name))";
 
 const ASIN_LOOKUP_CHUNK = 100;
 
@@ -387,19 +363,24 @@ export async function runPriceDetection(
         }
 
         const amazonList = toNumber(quote.previousPrice ?? null);
-        const storedPrevious = toNumber(product.previous_price);
-        const referencePrice = resolveReferencePrice({
+        const reference = resolveReferencePrice({
           nextPrice,
-          amazonList,
-          storedPrevious,
+          listPrice: amazonList,
           storedCurrent: storedPrice,
+          storedPrevious: toNumber(product.previous_price),
+          storedObservedAt: product.previous_price_observed_at ?? null,
+          now: new Date(now),
         });
+        const referencePrice = reference.previousPrice;
+        // El % del badge de Amazon solo si Amazon muestra precio tachado ahora.
         const discountPercentage =
+          amazonList !== null &&
+          referencePrice !== null &&
           quote.discountPercentage != null &&
           Number.isFinite(quote.discountPercentage) &&
           quote.discountPercentage > 0
             ? roundMoney(quote.discountPercentage)
-            : calculateDiscountPercentage(referencePrice, nextPrice);
+            : discountFrom(referencePrice, nextPrice);
         const priceChanged = nextPrice !== storedPrice;
 
         // Aunque el precio no cambie, refrescar referencia Amazon + descuento.
@@ -408,8 +389,8 @@ export async function runPriceDetection(
           const { error: touchError } = await client
             .from("products")
             .update({
-              previous_price:
-                referencePrice > nextPrice ? referencePrice : storedPrevious,
+              previous_price: referencePrice,
+              previous_price_observed_at: reference.observedAt,
               discount_percentage: discountPercentage,
               last_checked_at: now,
               availability,
@@ -436,9 +417,9 @@ export async function runPriceDetection(
             : roundMoney(Math.min(previousLowest, nextPrice));
         const highestPrice =
           previousHighest === null
-            ? Math.max(nextPrice, referencePrice)
+            ? Math.max(nextPrice, referencePrice ?? nextPrice)
             : roundMoney(
-                Math.max(previousHighest, nextPrice, referencePrice),
+                Math.max(previousHighest, nextPrice, referencePrice ?? nextPrice),
               );
 
         const category = categoryOf(product);
@@ -448,7 +429,7 @@ export async function runPriceDetection(
           (category?.slug ? resolveParentSlug(category.slug) : null);
         const scoring = dealScoringService.score({
           currentPrice: nextPrice,
-          previousPrice: referencePrice > nextPrice ? referencePrice : storedPrice,
+          previousPrice: referencePrice ?? storedPrice,
           lowestPrice: previousLowest,
           discountPercentage,
           categorySlug: parentSlug ?? "otros",
@@ -460,8 +441,8 @@ export async function runPriceDetection(
         const { error: updateError } = await client
           .from("products")
           .update({
-            previous_price:
-              referencePrice > nextPrice ? referencePrice : storedPrice,
+            previous_price: referencePrice,
+            previous_price_observed_at: reference.observedAt,
             current_price: nextPrice,
             lowest_price: lowestPrice,
             highest_price: highestPrice,
@@ -509,8 +490,7 @@ export async function runPriceDetection(
             parentCategoryName: parentCategory?.name ?? null,
             retailer: product.retailer,
             currentPrice: nextPrice,
-            previousPrice:
-              referencePrice > nextPrice ? referencePrice : storedPrice,
+            previousPrice: referencePrice ?? storedPrice,
             discountPercentage,
             dealLevel: scoring.level,
             score: scoring.score,

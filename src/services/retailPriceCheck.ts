@@ -1,4 +1,5 @@
 import { roundMoney, toNumber } from "@/lib/money";
+import { discountFrom, resolveReferencePrice } from "@/services/referencePrice";
 import {
   buildOutOfStockUpdate,
   inStockAvailabilityPatch,
@@ -55,7 +56,7 @@ export async function runRetailPriceCheck(options?: {
     .filter(Boolean);
 
   const RETAIL_SELECT =
-    "id, asin, retailer, product_url, amazon_url, title, brand, image_url, current_price, previous_price, lowest_price, highest_price, availability, out_of_stock_at, is_active, last_checked_at";
+    "id, asin, retailer, product_url, amazon_url, title, brand, image_url, current_price, previous_price, previous_price_observed_at, lowest_price, highest_price, availability, out_of_stock_at, is_active, last_checked_at";
 
   const limitRaw = options?.limit;
   const limit =
@@ -74,6 +75,7 @@ export async function runRetailPriceCheck(options?: {
     image_url: string | null;
     current_price: number | string;
     previous_price: number | string | null;
+    previous_price_observed_at: string | null;
     lowest_price: number | string | null;
     highest_price: number | string | null;
     availability: string | null;
@@ -237,23 +239,23 @@ export async function runRetailPriceCheck(options?: {
           ? roundMoney(listPrice)
           : null;
       const storedCurrent = toNumber(product.current_price);
-      const storedPrevious = toNumber(product.previous_price);
-      let reference =
-        resolvedListPrice ??
-        (storedPrevious != null && storedPrevious > resolvedPrice
-          ? storedPrevious
-          : resolvedPrice);
       const changed =
         storedCurrent === null ||
         Math.abs(storedCurrent - resolvedPrice) >= 0.01;
       const now = new Date().toISOString();
-      let discount =
-        reference > resolvedPrice
-          ? roundMoney(((reference - resolvedPrice) / reference) * 100)
-          : 0;
+      let { previousPrice: reference, observedAt } = resolveReferencePrice({
+        nextPrice: resolvedPrice,
+        listPrice: resolvedListPrice,
+        storedCurrent,
+        storedPrevious: toNumber(product.previous_price),
+        storedObservedAt: product.previous_price_observed_at,
+        now: new Date(now),
+      });
+      let discount = discountFrom(reference, resolvedPrice);
       // Miravia: un «precio recomendado» >70 % por encima suele ser inventado.
       if (product.retailer === "miravia" && discount > 70) {
-        reference = resolvedPrice;
+        reference = null;
+        observedAt = null;
         discount = 0;
       }
 
@@ -262,6 +264,7 @@ export async function runRetailPriceCheck(options?: {
         .update({
           current_price: resolvedPrice,
           previous_price: reference,
+          previous_price_observed_at: observedAt,
           discount_percentage: discount,
           lowest_price:
             toNumber(product.lowest_price) == null
@@ -273,7 +276,7 @@ export async function runRetailPriceCheck(options?: {
             Math.max(
               toNumber(product.highest_price) ?? resolvedPrice,
               resolvedPrice,
-              reference,
+              reference ?? resolvedPrice,
             ),
           ),
           availability: ProductAvailability.IN_STOCK,
