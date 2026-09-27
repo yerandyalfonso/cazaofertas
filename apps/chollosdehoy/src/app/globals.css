@@ -344,8 +344,15 @@ a {
 
 /* Portada: la búsqueda va dentro de .hero-toolbar. */
 .hero-toolbar-search:focus-within {
-  box-shadow: inset 0 0 0 2px var(--accent-vivid);
-  border-radius: var(--radius-sm);
+  outline: 2px solid var(--accent-vivid);
+  outline-offset: -2px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+@media (min-width: 768px) {
+  .hero-toolbar-search:focus-within {
+    border-radius: var(--radius) 0 0 var(--radius);
+  }
 }
 
 /* Barra de las páginas interiores: el anillo sustituye al borde. */
@@ -505,8 +512,8 @@ a {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: var(--accent-vivid);
+  color: white;
   font-size: 0.6875rem;
   font-weight: 600;
   padding: 0.2rem 0.55rem;
@@ -664,6 +671,16 @@ a {
 }
 
 .hero-toolbar-select-wrap:has(select:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--accent-vivid);
-  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+/* Paneles laterales de la portada: fijos justo bajo la cabecera (su altura la
+   publica MarketplaceHeader en --header-height) y con scroll propio si no
+   caben. */
+.sticky-below-header {
+  position: sticky;
+  top: calc(var(--header-height, 148px) + 1rem);
+  max-height: calc(100vh - var(--header-height, 148px) - 2rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }

@@ -111,7 +111,7 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
               href={product.affiliateUrl}
               target="_blank"
               rel="noopener noreferrer sponsored"
-              className="btn btn-primary text-sm"
+              className="btn btn-outline-gradient text-sm"
             >
               Ver oferta
               <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />

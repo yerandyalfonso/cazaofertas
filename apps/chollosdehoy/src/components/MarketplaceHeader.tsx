@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import {
   Grid3x3,
   LayoutList,
@@ -42,9 +43,23 @@ export function MarketplaceHeader({
   activeFilterCount,
 }: MarketplaceHeaderProps) {
   const isFiltered = activeFilterCount > 0 || resultCount !== totalCount;
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Publica la altura real de la cabecera fija (cambia con «Filtros activos»)
+  // para que los paneles laterales se peguen justo debajo.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () =>
+      document.documentElement.style.setProperty("--header-height", `${el.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <header className="hero-header sticky top-0 z-30 border-b border-line bg-page/95 backdrop-blur-md">
+    <header ref={headerRef} className="hero-header sticky top-0 z-30 border-b border-line bg-page/95 backdrop-blur-md">
       <div className="mx-auto max-w-[1600px] px-4 py-3 md:py-4">
         {/* Marca + acciones secundarias */}
         <div className="mb-3 flex items-center justify-between gap-3">

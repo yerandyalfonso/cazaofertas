@@ -138,7 +138,7 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
 
       <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 lg:grid-cols-[280px_minmax(0,1fr)_300px]">
         <div className="hidden lg:block">
-          <div className="sticky top-[148px]">
+          <div className="sticky-below-header">
             <FilterSidebar
               categories={bootstrap.categories}
               filters={filters}
@@ -218,7 +218,7 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
         </main>
 
         <aside className="hidden xl:block">
-          <div className="sticky top-[148px]">
+          <div className="sticky-below-header">
             <TopDealsPanel
               topDeals={bootstrap.spotlight.topDeals}
               trending={bootstrap.spotlight.trending}
