@@ -15,6 +15,7 @@
   --amber-500: #f59e0b;
   --amber-600: #d97706;
   --orange-50: #fff4e0;
+  --orange-500: #f97316;
   --orange-600: #ea580c;
   --orange-650: #d9480f;
   --orange-700: #c2410c;
@@ -50,10 +51,10 @@
   --primary: var(--orange-800);
   --primary-hover: var(--orange-900);
   --primary-soft: var(--orange-50);
-  /* Acento vivo (iconos, contadores, filtros activos, página actual): el
-     naranja del extremo del degradado. Decisión de diseño: con texto blanco
-     pequeño queda en 3,6:1 (por debajo de AA 4,5:1). */
-  --accent-vivid: var(--orange-600);
+  /* Acento vivo (iconos, contadores, filtros activos, página actual): naranja
+     puro, sin tirar a rojo. Decisión de diseño: con texto blanco pequeño queda
+     en 2,8:1 (por debajo de AA 4,5:1). */
+  --accent-vivid: var(--orange-500);
   --accent: var(--blue-600);
   --danger: var(--red-700);
   /* Urgencia (ofertas flash con fecha de fin): rojo, distinto del naranja. */
