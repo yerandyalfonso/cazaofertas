@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 import { TelegramCta } from "@/components/TelegramCta";
 import { withPage } from "@/lib/links";
 import type { Listing } from "@/lib/listing";
@@ -52,6 +53,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
 
   return (
     <div className="marketplace-shell bg-page">
+      <SiteHeader />
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.

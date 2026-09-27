@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import { FillImage } from "@/components/FillImage";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 import {
   getAlternativeProducts,
   getCategoryNodes,
@@ -231,6 +232,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   return (
     <div className="marketplace-shell bg-page">
+      <SiteHeader />
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.
@@ -263,7 +265,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <main id="contenido" className="mx-auto max-w-5xl px-4 pb-10 pt-4">
         <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10">
           {/* Imagen */}
-          <div className="md:sticky md:top-6 md:self-start">
+          <div className="md:sticky md:top-24 md:self-start">
             <div className="relative aspect-square overflow-hidden rounded-card border border-line bg-white">
               <FillImage
                 src={product.imageUrl}
@@ -463,11 +465,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 py-3 md:hidden">
             <div className="mx-auto flex max-w-5xl items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="price text-lg font-semibold leading-tight text-ink">
+                <p className="price text-xl font-extrabold leading-tight text-ink">
                   {formatEuro(product.currentPrice)}
-                  {product.discountPercentage >= 1 && (
-                    <span className="ml-2 text-xs font-semibold text-primary">
-                      {formatDiscount(product.discountPercentage)}
+                  {product.previousPrice && product.previousPrice > product.currentPrice && (
+                    <span className="ml-2 text-sm font-medium text-muted line-through">
+                      {formatEuro(product.previousPrice)}
                     </span>
                   )}
                 </p>

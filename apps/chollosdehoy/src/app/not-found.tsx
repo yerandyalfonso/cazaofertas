@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 import { categoryHref } from "@/lib/links";
 import { BLOG_CATEGORIES } from "@/lib/taxonomy";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="marketplace-shell">
+      <SiteHeader />
       <main id="contenido" className="mx-auto max-w-3xl px-4 py-16 md:py-24">
         <p className="text-sm font-medium text-muted">Error 404</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink md:text-3xl">
