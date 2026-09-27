@@ -109,7 +109,7 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
               rel="noopener noreferrer sponsored"
               className="btn btn-primary text-sm"
             >
-              Comprar
+              Ver oferta
               <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
             </a>
           </div>
