@@ -23,14 +23,18 @@ function dealBadgeClass(level: DealLevel): string {
 interface ProductCardProps {
   product: MarketplaceProduct;
   view: "grid" | "list";
-  /** Tarjeta horizontal que ocupa 2 columnas (primeras ofertas de la portada). */
-  horizontal?: boolean;
+  /**
+   * Forma de la tarjeta en la rejilla: vertical; horizontal (foto a la
+   * izquierda); o «responsive», horizontal en móvil (una por fila) y vertical
+   * desde sm.
+   */
+  layout?: "vertical" | "horizontal" | "responsive";
 }
 
 const imageWrapClass =
   "relative overflow-hidden bg-white";
 
-export function ProductCard({ product, view, horizontal = false }: ProductCardProps) {
+export function ProductCard({ product, view, layout = "vertical" }: ProductCardProps) {
   const retailerTint = retailerColor(product.retailer);
   const flashLabel = flashDealLabel(product.expiresAt);
 
@@ -118,30 +122,17 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
     );
   }
 
+  const L = LAYOUTS[layout];
   const hasPrevious =
     product.previousPrice !== null && product.previousPrice > product.currentPrice;
 
   return (
-    <article
-      className={`card group flex h-full overflow-hidden transition hover:border-line-strong hover:shadow-raised ${
-        horizontal ? "col-span-2 flex-row" : "flex-col"
-      }`}
-    >
+    <article className={`card group flex h-full overflow-hidden transition hover:border-line-strong hover:shadow-raised ${L.article}`}>
       <Link
         href={`/oferta/${product.slug}`}
-        className={`relative block shrink-0 overflow-hidden bg-white ${
-          horizontal ? "w-2/5 border-r border-line sm:w-1/2" : "aspect-square border-b border-line"
-        }`}
+        className={`relative block shrink-0 overflow-hidden bg-white border-line ${L.image}`}
       >
-        <FillImage
-          src={product.imageUrl}
-          alt={product.title}
-          sizes={
-            horizontal
-              ? "(max-width: 640px) 40vw, 25vw"
-              : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          }
-        />
+        <FillImage src={product.imageUrl} alt={product.title} sizes={L.sizes} />
         {product.discountPercentage > 0 && (
           <span
             className={`badge absolute left-3 top-3 z-10 text-sm shadow-sm ${dealBadgeClass(product.dealLevel)}`}
@@ -151,15 +142,11 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
         )}
       </Link>
 
-      <div className={`flex min-w-0 flex-1 flex-col gap-2 ${horizontal ? "p-4 sm:p-5" : "p-3 sm:p-4"}`}>
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 sm:p-4">
         <RetailerTag retailer={product.retailer} color={retailerTint} />
 
         <Link href={`/oferta/${product.slug}`} className="tap-link w-full">
-          <h3
-            className={`font-semibold leading-snug text-ink group-hover:text-primary ${
-              horizontal ? "line-clamp-3 text-base sm:text-lg" : "line-clamp-2 min-h-[2.5rem] text-sm"
-            }`}
-          >
+          <h3 className="line-clamp-2 text-base font-semibold leading-snug text-ink group-hover:text-primary">
             {product.title}
           </h3>
         </Link>
@@ -185,16 +172,12 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
 
         <div className="mt-auto pt-2">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span
-              className={`price font-extrabold leading-none tracking-tight text-ink ${
-                horizontal ? "text-[1.75rem]" : "text-2xl"
-              }`}
-            >
+            <span className="price text-2xl font-extrabold leading-none tracking-tight text-ink">
               {formatEuro(product.currentPrice)}
             </span>
             {hasPrevious && (
-              <span className="price text-sm font-medium text-muted">
-                antes <span className="line-through">{formatEuro(product.previousPrice!)}</span>
+              <span className="price text-sm font-medium text-muted line-through">
+                {formatEuro(product.previousPrice!)}
               </span>
             )}
           </div>
@@ -202,9 +185,7 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
             href={product.affiliateUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
-            className={`btn btn-primary mt-3 gap-1.5 whitespace-nowrap px-2 py-3 ${
-              horizontal ? "w-full sm:w-auto sm:px-8" : "w-full"
-            }`}
+            className="btn btn-primary mt-3 w-full gap-1.5 whitespace-nowrap px-2 py-3"
           >
             Ver oferta
             <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
@@ -214,6 +195,24 @@ export function ProductCard({ product, view, horizontal = false }: ProductCardPr
     </article>
   );
 }
+
+const LAYOUTS = {
+  vertical: {
+    article: "flex-col",
+    image: "aspect-square border-b",
+    sizes: "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw",
+  },
+  horizontal: {
+    article: "flex-row",
+    image: "w-2/5 border-r",
+    sizes: "(max-width: 640px) 40vw, 20vw",
+  },
+  responsive: {
+    article: "flex-row sm:flex-col",
+    image: "w-2/5 border-r sm:aspect-square sm:w-auto sm:border-r-0 sm:border-b",
+    sizes: "(max-width: 640px) 40vw, (max-width: 1024px) 33vw, 25vw",
+  },
+} as const;
 
 /** Tienda en texto discreto con un punto de su color (sin píldora). */
 function RetailerTag({ retailer, color }: { retailer: string; color: string }) {

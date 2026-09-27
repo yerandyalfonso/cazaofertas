@@ -84,51 +84,58 @@ export function ListingPage({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      <main id="contenido" className="mx-auto max-w-6xl space-y-5 px-4 py-6 md:py-8">
-        <header>
-          <h1 className="text-2xl font-bold text-ink md:text-3xl">
-            {listing.h1}
-            {page > 1 && (
-              <span className="text-muted"> · Página {page}</span>
-            )}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted">
+      <main id="contenido" className="mx-auto max-w-6xl space-y-6 px-4 pb-8 pt-3 md:pb-10">
+        <header className="border-b border-line pb-5">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-ink md:text-[2.5rem] md:leading-tight">
+              {listing.h1}
+              {page > 1 && (
+                <span className="text-muted"> · Página {page}</span>
+              )}
+            </h1>
+            <p className="price text-sm font-semibold text-muted">
+              {new Intl.NumberFormat("es-ES").format(data.total)} ofertas
+            </p>
+          </div>
+          <p className="mt-2 max-w-3xl text-[0.9375rem] leading-relaxed text-muted">
             {listing.intro}
           </p>
-          <p className="mt-1 text-xs text-muted">
-            {data.total} ofertas disponibles
-          </p>
+
+          {(listing.subLinks.length > 0 || listing.alertCategorySlug) && (
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              {listing.subLinks.length > 0 ? (
+                <nav aria-label="Subcategorías" className="flex flex-wrap gap-2">
+                  {listing.subLinks.map((sub) => (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      className="tap-link rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink transition hover:border-vivid"
+                    >
+                      {sub.name}
+                      {sub.count !== undefined && (
+                        <span className="price ml-1.5 text-xs font-normal text-muted">
+                          {sub.count}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </nav>
+              ) : (
+                <span />
+              )}
+              {listing.alertCategorySlug && (
+                <TelegramCta
+                  alertHref={telegramAlertForCategory(listing.alertCategorySlug)}
+                  topic={`los nuevos chollos de ${listing.h1.replace(/^Ofertas de /, "").toLowerCase()}`}
+                />
+              )}
+            </div>
+          )}
         </header>
 
-        {listing.subLinks.length > 0 && (
-          <nav aria-label="Subcategorías" className="flex flex-wrap gap-2">
-            {listing.subLinks.map((sub) => (
-              <Link
-                key={sub.href}
-                href={sub.href}
-                className="tap-link rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-line-strong"
-              >
-                {sub.name}
-                {sub.count !== undefined && (
-                  <span className="ml-1.5 text-xs text-muted">
-                    {sub.count}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </nav>
-        )}
-
-        {listing.alertCategorySlug && (
-          <TelegramCta
-            alertHref={telegramAlertForCategory(listing.alertCategorySlug)}
-            text={`Recibe en Telegram los nuevos chollos de ${listing.h1.replace(/^Ofertas de /, "").toLowerCase()}.`}
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {data.items.map((product) => (
-            <ProductCard key={product.id} product={product} view="grid" />
+            <ProductCard key={product.id} product={product} view="grid" layout="responsive" />
           ))}
         </div>
 

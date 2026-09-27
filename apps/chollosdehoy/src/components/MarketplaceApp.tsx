@@ -176,19 +176,28 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
               </button>
             </div>
           ) : viewMode === "grid" ? (
-            <div
-              className={`grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 ${
-                loading ? "opacity-60" : ""
-              }`}
-            >
-              {catalog.items.map((product, i) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  view="grid"
-                  horizontal={catalog.page === 1 && (i === 0 || i === 3)}
-                />
-              ))}
+            <div className={`space-y-3 sm:space-y-4 ${loading ? "opacity-60" : ""}`}>
+              {/* Página 1: las dos mejores en horizontal, lado a lado; luego la rejilla. */}
+              {catalog.page === 1 && catalog.items.length > 2 && (
+                <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+                  {catalog.items.slice(0, 2).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      view="grid"
+                      layout="horizontal"
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+                {(catalog.page === 1 && catalog.items.length > 2
+                  ? catalog.items.slice(2)
+                  : catalog.items
+                ).map((product) => (
+                  <ProductCard key={product.id} product={product} view="grid" />
+                ))}
+              </div>
             </div>
           ) : (
             <div className={`space-y-3 ${loading ? "opacity-60" : ""}`}>
