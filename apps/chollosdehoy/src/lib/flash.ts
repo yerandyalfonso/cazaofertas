@@ -7,7 +7,7 @@ const EXPIRY_FORMAT = new Intl.DateTimeFormat("es-ES", {
 });
 
 /**
- * «⚡ Oferta flash · vence el 27/9 a las 14:00» si la oferta tiene fecha de fin
+ * «Oferta flash · vence el 27/9 a las 14:00» si la oferta tiene fecha de fin
  * (Amazon la publica en las ofertas flash) y aún no ha pasado; si no, null.
  */
 export function flashDealLabel(expiresAt: string | null): string | null {
@@ -17,5 +17,5 @@ export function flashDealLabel(expiresAt: string | null): string | null {
   const parts = Object.fromEntries(
     EXPIRY_FORMAT.formatToParts(date).map((part) => [part.type, part.value]),
   );
-  return `⚡ Oferta flash · vence el ${parts.day}/${parts.month} a las ${parts.hour}:${parts.minute}`;
+  return `Oferta flash · vence el ${parts.day}/${parts.month} a las ${parts.hour}:${parts.minute}`;
 }

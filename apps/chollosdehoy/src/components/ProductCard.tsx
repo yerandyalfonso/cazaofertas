@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Zap } from "lucide-react";
 import { flashDealLabel } from "@/lib/flash";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
@@ -73,7 +73,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
           )}
 
           {flashLabel && (
-            <p className="text-xs font-semibold text-amber-700">{flashLabel}</p>
+            <p className="flex items-center gap-1 text-xs font-semibold text-amber-700">
+              <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {flashLabel}
+            </p>
           )}
 
           <div className="mt-auto flex flex-wrap items-end justify-between gap-3">
@@ -162,7 +165,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
         )}
 
         {flashLabel && (
-          <p className="text-xs font-semibold text-amber-700">{flashLabel}</p>
+          <p className="flex items-center gap-1 text-xs font-semibold text-amber-700">
+            <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {flashLabel}
+          </p>
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">

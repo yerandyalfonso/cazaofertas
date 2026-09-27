@@ -61,7 +61,7 @@ export function PaginationBar({
               type="button"
               disabled={loading}
               onClick={() => onPageChange(p)}
-              className={`min-w-[2.25rem] rounded-[var(--radius-sm)] px-2 py-1.5 text-sm font-semibold transition ${
+              className={`tap-target min-w-[2.25rem] rounded-[var(--radius-sm)] px-2 py-1.5 text-sm font-semibold transition ${
                 p === page
                   ? "bg-[var(--primary)] text-white"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"

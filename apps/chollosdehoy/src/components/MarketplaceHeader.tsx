@@ -82,6 +82,10 @@ export function MarketplaceHeader({
             <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
             <input
               type="search"
+              name="q"
+              autoComplete="off"
+              enterKeyHint="search"
+              spellCheck={false}
               placeholder="Buscar productos, marcas, categorías…"
               value={filters.query}
               onChange={(e) =>
