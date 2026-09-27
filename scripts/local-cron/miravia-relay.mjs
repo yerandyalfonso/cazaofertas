@@ -1,17 +1,20 @@
 /**
  * Proxy HTTP mínimo (solo CONNECT) en el Mac para que el VPS pueda salir a
- * Miravia por la IP residencial cuando WARP da captcha. Solo acepta hosts de
- * Miravia en el puerto 443: no es un proxy abierto.
+ * Miravia y Amazon.es por la IP residencial española (Miravia da captcha a
+ * WARP; Amazon.es, desde la IP francesa del VPS, oculta el precio de lo que no
+ * envía a Francia). Solo acepta esos hosts en el puerto 443: no es un proxy
+ * abierto.
  *
  * Escucha en 127.0.0.1:8902; el LaunchAgent com.cazaofertas.miravia-relay-tunnel
  * lo expone en el VPS como 127.0.0.1:8901 (ssh -R). En el VPS:
  *   MIRAVIA_EGRESS=http://127.0.0.1:40000,http://127.0.0.1:8901,direct
+ *   AMAZON_EGRESS=http://127.0.0.1:8901,direct
  */
 import http from "node:http";
 import net from "node:net";
 
 const PORT = Number(process.env.MIRAVIA_RELAY_PORT ?? 8902);
-const ALLOWED_HOST = /(^|\.)(miravia\.es|mrvcdn\.com)$/i;
+const ALLOWED_HOST = /(^|\.)(miravia\.es|mrvcdn\.com|amazon\.es)$/i;
 
 const server = http.createServer((_req, res) => {
   res.writeHead(405).end("Solo CONNECT\n");

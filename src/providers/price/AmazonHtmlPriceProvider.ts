@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { extractAsin, generateAmazonUrl } from "@/lib/affiliate";
 import { inferAmazonCategorySlug } from "@/lib/amazon-category";
-import { resolveProxyFetch } from "@/lib/proxyFetch";
+import { createProxyFetch, resolveProxyFetch } from "@/lib/proxyFetch";
 import { formatDescriptionForStorage } from "@/lib/product-description";
 import {
   extractAmazonVariantInfo,
@@ -1048,7 +1048,75 @@ function resetAmazonHtmlSession(): void {
   spainDeliveryPromise = null;
 }
 
+/**
+ * Salidas para Amazon, en orden (AMAZON_EGRESS, separadas por comas): URL de
+ * proxy HTTP o «direct». En el VPS (Francia): `http://127.0.0.1:8901,direct` =
+ * relé del Mac por túnel (IP residencial española) → IP del VPS. Sin la
+ * variable, como siempre (directo o Bright Data si está configurado).
+ * Respaldo, no rotación: solo se pasa a la siguiente si la salida falla o
+ * sigue viendo la entrega fuera de España.
+ */
+function amazonEgressRoutes(): string[] | null {
+  const raw = process.env.AMAZON_EGRESS?.trim();
+  if (!raw) return null;
+  const routes = raw.split(",").map((r) => r.trim()).filter(Boolean);
+  return routes.length > 0 ? routes : null;
+}
+
+/** Salidas caídas (p. ej. Mac apagado): no se reintentan durante 5 min. */
+const downAmazonRoutes = new Map<string, number>();
+const AMAZON_ROUTE_DOWN_MS = 5 * 60_000;
+/** Última salida usada: al cambiar, la sesión (cookies) se reinicia. */
+let currentAmazonRoute: string | null = null;
+
 async function fetchAmazonPageHtml(
+  url: string,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+    pinSpainDelivery?: boolean;
+  } = {},
+): Promise<string> {
+  const routes = amazonEgressRoutes();
+  if (!routes) return fetchAmazonPageHtmlVia(url, options);
+
+  let lastError: unknown;
+  const now = Date.now();
+  const usable = routes.filter((route) => (downAmazonRoutes.get(route) ?? 0) <= now);
+  const candidates = usable.length > 0 ? usable : routes.slice(-1);
+  for (let i = 0; i < candidates.length; i += 1) {
+    const route = candidates[i]!;
+    if (currentAmazonRoute !== route) {
+      resetAmazonHtmlSession();
+      currentAmazonRoute = route;
+    }
+    try {
+      const html = await fetchAmazonPageHtmlVia(url, {
+        ...options,
+        fetchImpl: route === "direct" ? fetch : createProxyFetch(fetch, route),
+      });
+      const isLast = i === candidates.length - 1;
+      if (lastFetchForeignDelivery && !isLast && route !== "direct") {
+        // Un proxy que también sale fuera de España no sirve: siguiente.
+        downAmazonRoutes.set(route, Date.now() + AMAZON_ROUTE_DOWN_MS);
+        continue;
+      }
+      return html;
+    } catch (error) {
+      lastError = error;
+      if (i < candidates.length - 1) {
+        console.warn(
+          `[AmazonHtml] Salida ${route} falló; se usa la siguiente:`,
+          error instanceof Error ? error.message.slice(0, 80) : error,
+        );
+        downAmazonRoutes.set(route, Date.now() + AMAZON_ROUTE_DOWN_MS);
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("No se pudo leer Amazon.");
+}
+
+async function fetchAmazonPageHtmlVia(
   url: string,
   options: {
     timeoutMs?: number;
