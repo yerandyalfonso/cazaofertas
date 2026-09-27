@@ -206,10 +206,11 @@ async function runMiraviaDeals(): Promise<void> {
 async function runUserAlerts(): Promise<void> {
   const { runUserUrlAlerts } = await import("@/services/userUrlAlerts");
   const { reviewUserAlertsResult } = await import("./notify");
-  // Ritmo configurable por máquina (VPS algo más rápido que el Mac para
-  // repartir el riesgo de bloqueo). Por defecto: 40 alertas, 60 s entre cada una.
+  // Ritmo configurable por máquina. Por defecto, el del Mac (40 alertas, 40 s
+  // entre cada una, cada 30 min). El VPS va algo más rápido (35 alertas, 30 s,
+  // cada 20 min) con un drop-in de systemd: ver scripts/local-cron/schedules.md.
   const limit = Number(process.env.CAZAOFERTAS_USER_ALERTS_LIMIT) || 40;
-  const delayMs = Number(process.env.CAZAOFERTAS_USER_ALERTS_DELAY_MS) || 60_000;
+  const delayMs = Number(process.env.CAZAOFERTAS_USER_ALERTS_DELAY_MS) || 40_000;
   const result = await runUserUrlAlerts({ limit, delayMs });
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);

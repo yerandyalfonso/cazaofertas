@@ -103,7 +103,7 @@ write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20
 write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "600" ""
 # Miravia aparte: cada 30 min (ya no va dentro de flash).
 write_plist "com.cazaofertas.cron.miravia-deals" "miravia-deals" "1800" ""
-write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
+write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "1800" ""
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 write_plist "com.cazaofertas.cron.coupons-discover" "coupons-discover" "" "10:00 18:00"
 
@@ -121,7 +121,7 @@ echo "Listo. Horarios (hora local del Mac):"
 echo "  • flash-deals:   cada 10 min · Amazon discovery (encola Telegram)"
 echo "  • miravia-deals: cada 30 min · Miravia discovery"
 echo "  • check-prices:  cada 10 min · precios + lote Telegram si toca"
-echo "  • user-alerts:   08:15 y 20:15 (1 min entre alertas)"
+echo "  • user-alerts:   cada 30 min (40 alertas, 40 s entre cada una)"
 echo "  • kiabi-deals:   09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1)"
 echo "  • coupons:       10:00 y 18:00"
 echo "  • telegram:      lote al grupo según intervalo admin (default 4 h)"

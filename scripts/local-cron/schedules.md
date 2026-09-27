@@ -13,7 +13,7 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 |-----|-----|-----|-------|
 | `flash-deals` | cada 3 min | cada 10 min | VPS sin Miravia (`CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=0`) |
 | `check-prices` | cada 10 min | cada 10 min | VPS: Miravia por WARP y `CAZAOFERTAS_META_FLUSH=1` (solo el VPS publica en Facebook/Instagram) |
-| `user-alerts` | cada hora | 08:15, 20:15 | Todas las tiendas menos PcComponentes |
+| `user-alerts` | cada 20 min (35 alertas, 30 s entre cada una) | cada 30 min (40 alertas, 40 s) | Todas las tiendas menos PcComponentes. VPS: drop-ins `/etc/systemd/system/cazaofertas-cron@user-alerts.service.d/pace.conf` (ritmo y `TimeoutStartSec=30min`; el servicio base mata a los 10 min) y `cazaofertas-cron-user-alerts.timer.d/pace.conf` |
 | `kiabi-deals` | 09:30, 18:30 | 09:30, 18:30 | |
 | `coupons-discover` | 10:00, 18:00 | 10:00, 18:00 | |
 | `miravia-deals` | timer desactivado | cada 30 min | Miravia da captcha a la IP del VPS |
@@ -42,7 +42,7 @@ Pensado para no saturar el egress de Supabase Free.
 | `flash-deals` | cada **10 min** (`StartInterval` 600) | Solo Amazon |
 | `miravia-deals` | cada **30 min** (`StartInterval` 1800) | Job aparte |
 | `check-prices` | cada 10 min | Precios + flush Telegram si toca |
-| `user-alerts` | 08:15, 20:15 | |
+| `user-alerts` | cada 30 min | |
 | `kiabi-deals` | 09:30, 18:30 | |
 | `coupons-discover` | 10:00, 18:00 | |
 
