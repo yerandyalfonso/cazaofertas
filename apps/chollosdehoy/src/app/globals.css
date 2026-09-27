@@ -326,9 +326,30 @@ a {
   }
 }
 
+/* Foco del buscador: un único anillo en la caja (el input no pinta el suyo)
+   con el naranja vivo. */
+.hero-toolbar-search input:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+
+/* Portada: la búsqueda va dentro de .hero-toolbar. */
 .hero-toolbar-search:focus-within {
-  box-shadow: inset 0 0 0 2px var(--primary);
+  box-shadow: inset 0 0 0 2px var(--accent-vivid);
   border-radius: var(--radius-sm);
+}
+
+/* Barra de las páginas interiores: el anillo sustituye al borde. */
+.search-field:focus-within {
+  box-shadow: none;
+  outline: 2px solid var(--accent-vivid);
+  outline-offset: -2px;
+}
+
+/* Sin la «×» nativa (azul, fuera de la paleta); se borra con el teclado. */
+.hero-toolbar-search input::-webkit-search-cancel-button,
+.hero-toolbar-search input::-webkit-search-decoration {
+  appearance: none;
 }
 
 .hero-toolbar-search {
@@ -552,8 +573,9 @@ a {
   content: "";
   position: absolute;
   inset: auto 0 -1px 0;
-  height: 3px;
+  height: 1px;
   background: var(--header-accent);
+  opacity: 0.7;
 }
 
 /* Descuento sobre la foto grande de la ficha. */
