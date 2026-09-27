@@ -170,8 +170,10 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
           </p>
         )}
 
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-2 pt-2">
-          <div className="min-w-0">
+        {/* Precio con grow enorme y botón con grow 1: si caben en una fila el
+            botón mantiene su tamaño; si baja solo a otra, ocupa todo el ancho. */}
+        <div className="mt-auto flex flex-wrap items-end gap-2 pt-2">
+          <div className="min-w-0 grow-[9999]">
             <span className="price block text-2xl font-extrabold leading-none tracking-tight text-ink">
               {formatEuro(product.currentPrice)}
             </span>
@@ -185,7 +187,7 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
             href={product.affiliateUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
-            className="btn btn-outline-gradient shrink-0 text-sm"
+            className="btn btn-outline-gradient grow text-sm"
           >
             Ver
             <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
