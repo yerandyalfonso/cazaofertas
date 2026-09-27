@@ -3,7 +3,7 @@
 import { Check, Copy, ExternalLink, Ticket } from "lucide-react";
 import { useState } from "react";
 import type { CouponOffer } from "@/lib/coupons";
-import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
+import { retailerColor, retailerLabel } from "@/lib/retailers";
 
 interface CouponsSectionProps {
   coupons: CouponOffer[];
@@ -15,7 +15,7 @@ function hasRedeemCode(code: string): boolean {
 
 function CouponCard({ coupon }: { coupon: CouponOffer }) {
   const [copied, setCopied] = useState(false);
-  const color = RETAILER_COLORS[coupon.retailer] ?? "#4f7f6a";
+  const color = retailerColor(coupon.retailer);
   const showCode = hasRedeemCode(coupon.code);
 
   async function copyCode() {

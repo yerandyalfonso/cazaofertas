@@ -13,7 +13,7 @@ import type { CouponOffer } from "@/lib/coupons";
 import { formatCouponExpiry } from "@/lib/coupons";
 import {
   MARKETPLACE_RETAILERS,
-  RETAILER_COLORS,
+  retailerColor,
   retailerLabel,
 } from "@/lib/retailers";
 
@@ -24,7 +24,7 @@ interface CouponsPageContentProps {
 function CouponCard({ coupon }: { coupon: CouponOffer }) {
   const [copied, setCopied] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
-  const color = RETAILER_COLORS[coupon.retailer] ?? "#4f7f6a";
+  const color = retailerColor(coupon.retailer);
   const expiry = formatCouponExpiry(coupon.expiresAt);
   const hasRedeemCode =
     Boolean(coupon.code) &&

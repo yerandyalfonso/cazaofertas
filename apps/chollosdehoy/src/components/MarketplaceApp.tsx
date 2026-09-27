@@ -223,7 +223,7 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[var(--overlay)]"
             onClick={() => setMobileFiltersOpen(false)}
             aria-label="Cerrar filtros"
           />

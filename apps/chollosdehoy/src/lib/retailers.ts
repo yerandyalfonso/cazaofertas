@@ -7,14 +7,20 @@ export const RETAILER_LABELS: Record<string, string> = {
   pccomponentes: "PcComponentes",
 };
 
+/** Color de marca de cada tienda: variables CSS definidas en globals.css. */
 export const RETAILER_COLORS: Record<string, string> = {
-  amazon: "#FF9900",
-  kiabi: "#E4002B",
-  carrefour: "#004E9F",
-  miravia: "#6C2BD9",
-  aliexpress: "#FF4747",
-  pccomponentes: "#F26122",
+  amazon: "var(--retailer-amazon)",
+  kiabi: "var(--retailer-kiabi)",
+  carrefour: "var(--retailer-carrefour)",
+  miravia: "var(--retailer-miravia)",
+  aliexpress: "var(--retailer-aliexpress)",
+  pccomponentes: "var(--retailer-pccomponentes)",
 };
+
+/** Color de una tienda, o el primario si no tiene uno propio. */
+export function retailerColor(id: string): string {
+  return RETAILER_COLORS[id] ?? "var(--primary)";
+}
 
 export function retailerLabel(id: string | null | undefined): string {
   if (!id) return "Tienda";

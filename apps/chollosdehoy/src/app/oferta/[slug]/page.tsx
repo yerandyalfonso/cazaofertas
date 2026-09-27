@@ -300,7 +300,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   </span>
                 )}
                 {flashLabel && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--urgent-bg)] px-2.5 py-1 text-[var(--urgent-fg-strong)]">
                     <Zap className="h-3.5 w-3.5" aria-hidden />
                     {flashLabel}
                   </span>

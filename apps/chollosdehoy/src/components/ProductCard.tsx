@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ExternalLink, Zap } from "lucide-react";
 import { flashDealLabel } from "@/lib/flash";
 import { formatDiscount, formatEuro } from "@/lib/money";
-import { RETAILER_COLORS, retailerLabel } from "@/lib/retailers";
+import { retailerColor, retailerLabel } from "@/lib/retailers";
 import { DealLevel, type MarketplaceProduct } from "@/lib/types";
 
 function dealBadgeClass(level: DealLevel): string {
@@ -28,7 +28,7 @@ const imageWrapClass =
   "relative overflow-hidden bg-white";
 
 export function ProductCard({ product, view }: ProductCardProps) {
-  const retailerColor = RETAILER_COLORS[product.retailer] ?? "#4f7f6a";
+  const retailerTint = retailerColor(product.retailer);
   const flashLabel = flashDealLabel(product.expiresAt);
 
   if (view === "list") {
@@ -51,7 +51,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <RetailerTag retailer={product.retailer} color={retailerColor} />
+            <RetailerTag retailer={product.retailer} color={retailerTint} />
           </div>
 
           <Link href={`/oferta/${product.slug}`}>
@@ -73,7 +73,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
           )}
 
           {flashLabel && (
-            <p className="flex items-center gap-1 text-xs font-semibold text-amber-700">
+            <p className="flex items-center gap-1 text-xs font-semibold text-[var(--urgent-fg)]">
               <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
               {flashLabel}
             </p>
@@ -144,7 +144,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
       </Link>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <RetailerTag retailer={product.retailer} color={retailerColor} />
+        <RetailerTag retailer={product.retailer} color={retailerTint} />
 
         <Link href={`/oferta/${product.slug}`}>
           <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-[var(--text)] group-hover:text-[var(--primary)]">
@@ -165,7 +165,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
         )}
 
         {flashLabel && (
-          <p className="flex items-center gap-1 text-xs font-semibold text-amber-700">
+          <p className="flex items-center gap-1 text-xs font-semibold text-[var(--urgent-fg)]">
             <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {flashLabel}
           </p>

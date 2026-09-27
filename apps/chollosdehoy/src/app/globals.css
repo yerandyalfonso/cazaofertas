@@ -1,23 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f3f6f4;
-  --surface: #ffffff;
-  --surface-muted: #eef3f0;
-  --border: #d8e3dd;
-  --border-strong: #b8ccc2;
-  --text: #15201c;
-  --text-muted: #5c6f66;
-  --primary: #4f7f6a;
-  --primary-hover: #3f6a57;
-  --primary-soft: #e4efe9;
-  --accent: #2f6fed;
-  --danger: #d64545;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 8px 24px rgba(21, 32, 28, 0.06);
-  --shadow-sm: 0 1px 2px rgba(21, 32, 28, 0.04);
+  /* ── 1. Primitivos: valores en bruto. No usar directamente en componentes. ── */
+  --sage-50: #f3f6f4;
+  --sage-100: #eef3f0;
+  --sage-150: #e4efe9;
+  --sage-200: #d8e3dd;
+  --sage-300: #b8ccc2;
+  --sage-500: #5c6f66;
+  --sage-600: #4f7f6a;
+  --sage-700: #3f6a57;
+  --ink-900: #15201c;
+  --white: #ffffff;
+  --amber-50: #fffbeb;
+  --amber-700: #b45309;
+  --amber-800: #92400e;
+  --red-600: #d64545;
+  --blue-600: #2f6fed;
+
+  /* Colores de marca de cada tienda (solo el punto/etiqueta de la tienda). */
+  --retailer-amazon: #ff9900;
+  --retailer-kiabi: #e4002b;
+  --retailer-carrefour: #004e9f;
+  --retailer-miravia: #6c2bd9;
+  --retailer-aliexpress: #ff4747;
+  --retailer-pccomponentes: #f26122;
+
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+
+  /* ── 2. Semánticos: para qué sirve cada color. Estos sí en componentes. ── */
+  --bg: var(--sage-50);
+  --surface: var(--white);
+  --surface-muted: var(--sage-100);
+  --border: var(--sage-200);
+  --border-strong: var(--sage-300);
+  --text: var(--ink-900);
+  --text-muted: var(--sage-500);
+  --primary: var(--sage-600);
+  --primary-hover: var(--sage-700);
+  --primary-soft: var(--sage-150);
+  --accent: var(--blue-600);
+  --danger: var(--red-600);
+  /* Urgencia (ofertas flash con fecha de fin). */
+  --urgent-bg: var(--amber-50);
+  --urgent-fg: var(--amber-700);
+  --urgent-fg-strong: var(--amber-800);
+  --overlay: rgb(21 32 28 / 0.4);
+
+  --radius: var(--radius-12);
+  --radius-sm: var(--radius-8);
+  --shadow: 0 8px 24px rgb(21 32 28 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(21 32 28 / 0.04);
+
+  /* ── 3. Componente ── */
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary);
+  --badge-discount-bg: var(--text);
+  --badge-discount-fg: var(--white);
+  --badge-radius: var(--radius-6);
 }
 
 * {
@@ -176,9 +217,9 @@ a {
 .badge-deal,
 .badge-great,
 .badge-historic {
-  background: var(--text);
-  color: #fff;
-  border-radius: 6px;
+  background: var(--badge-discount-bg);
+  color: var(--badge-discount-fg);
+  border-radius: var(--badge-radius);
   font-variant-numeric: tabular-nums;
 }
 
