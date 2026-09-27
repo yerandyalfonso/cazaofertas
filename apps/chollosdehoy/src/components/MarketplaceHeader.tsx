@@ -44,18 +44,18 @@ export function MarketplaceHeader({
   const isFiltered = activeFilterCount > 0 || resultCount !== totalCount;
 
   return (
-    <header className="hero-header sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur-md">
+    <header className="hero-header sticky top-0 z-30 border-b border-line bg-page/95 backdrop-blur-md">
       <div className="mx-auto max-w-[1600px] px-4 py-3 md:py-4">
         {/* Marca + acciones secundarias */}
         <div className="mb-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex min-w-0 items-baseline gap-3">
-            <span className="text-lg font-bold tracking-tight text-[var(--text)] md:text-xl">
+            <span className="text-lg font-bold tracking-tight text-ink md:text-xl">
               Chollos de Hoy
             </span>
-            <span className="hidden truncate text-xs text-[var(--text-muted)] sm:inline">
+            <span className="hidden truncate text-xs text-muted sm:inline">
               {isFiltered ? (
                 <>
-                  <span className="price font-semibold text-[var(--text)]">
+                  <span className="price font-semibold text-ink">
                     {new Intl.NumberFormat("es-ES").format(resultCount)}
                   </span>
                   {" de "}
@@ -69,9 +69,9 @@ export function MarketplaceHeader({
 
           <Link
             href="/cupones"
-            className="btn btn-ghost shrink-0 text-sm shadow-[var(--shadow-sm)]"
+            className="btn btn-ghost shrink-0 text-sm shadow-card"
           >
-            <Ticket className="h-4 w-4 text-[var(--primary)]" />
+            <Ticket className="h-4 w-4 text-primary" />
             <span className="hidden sm:inline">Cupones</span>
           </Link>
         </div>
@@ -79,7 +79,7 @@ export function MarketplaceHeader({
         {/* Barra de búsqueda + acciones unificada */}
         <div className="hero-toolbar">
           <label className="hero-toolbar-search">
-            <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+            <Search className="h-4 w-4 shrink-0 text-muted" />
             <input
               type="search"
               name="q"
@@ -96,7 +96,7 @@ export function MarketplaceHeader({
             {filters.query && (
               <button
                 type="button"
-                className="rounded-md p-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                className="rounded-md p-1 text-muted hover:bg-surface-muted hover:text-ink"
                 onClick={() => onFiltersChange({ ...filters, query: "" })}
                 aria-label="Borrar búsqueda"
               >
@@ -164,7 +164,7 @@ export function MarketplaceHeader({
         {/* Chips de filtros activos */}
         {activeFilterCount > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-[var(--text-muted)]">
+            <span className="text-xs font-medium text-muted">
               Filtros activos:
             </span>
             {filters.parentSlug && (
@@ -183,7 +183,7 @@ export function MarketplaceHeader({
             )}
             <button
               type="button"
-              className="text-xs font-semibold text-[var(--primary)] hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
               onClick={() => onFiltersChange(DEFAULT_FILTERS)}
             >
               Limpiar todo

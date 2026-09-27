@@ -73,12 +73,12 @@ export function FilterSidebar({
     <aside
       className={`card flex h-full flex-col ${mobile ? "rounded-none border-0 shadow-none" : ""}`}
     >
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <div className="flex items-center gap-2 font-semibold">
-          <SlidersHorizontal className="h-4 w-4 text-[var(--primary)]" />
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
           Filtros
           {activeCount > 0 && (
-            <span className="badge bg-[var(--primary-soft)] text-[var(--primary)]">
+            <span className="badge bg-primary-soft text-primary">
               {activeCount}
             </span>
           )}
@@ -97,7 +97,7 @@ export function FilterSidebar({
 
       <div className="scrollbar-thin flex-1 space-y-6 overflow-y-auto p-4">
         <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Categorías
           </h3>
           <ul className="space-y-1">
@@ -112,7 +112,7 @@ export function FilterSidebar({
                       <button
                         type="button"
                         onClick={() => toggleParent(parent.slug)}
-                        className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                        className="rounded p-1 text-muted hover:bg-surface-muted"
                         aria-label="Expandir subcategorías"
                       >
                         <ChevronDown
@@ -122,17 +122,17 @@ export function FilterSidebar({
                     )}
                     <Link
                       href={categoryHref(parent.slug)}
-                      className="flex flex-1 items-center justify-between rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm transition hover:bg-[var(--surface-muted)]"
+                      className="flex flex-1 items-center justify-between rounded-control px-2 py-1.5 text-left text-sm transition hover:bg-surface-muted"
                     >
                       <span>{parent.name}</span>
-                      <span className="text-xs text-[var(--text-muted)]">
+                      <span className="text-xs text-muted">
                         {parent.productCount}
                       </span>
                     </Link>
                   </div>
 
                   {expanded && subs.length > 0 && (
-                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-[var(--border)] pl-2">
+                    <ul className="ml-6 mt-1 space-y-0.5 border-l border-line pl-2">
                       {subs.map((sub) => (
                         <li key={sub.id}>
                           {/* Sin página propia (General o pocas ofertas): va al padre. */}
@@ -142,7 +142,7 @@ export function FilterSidebar({
                                 ? categoryHref(parent.slug, sub.slug)
                                 : categoryHref(parent.slug)
                             }
-                            className="flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2 py-1 text-left text-sm text-[var(--text-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                            className="flex w-full items-center justify-between rounded-control px-2 py-1 text-left text-sm text-muted transition hover:bg-surface-muted hover:text-ink"
                           >
                             <span>{sub.name}</span>
                             <span className="text-xs">{sub.productCount}</span>
@@ -158,7 +158,7 @@ export function FilterSidebar({
         </section>
 
         <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Tienda
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -171,8 +171,8 @@ export function FilterSidebar({
                   onClick={() => toggleRetailer(id)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                     active
-                      ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+                      ? "border-primary bg-primary-soft text-primary"
+                      : "border-line bg-surface text-muted hover:border-line-strong"
                   }`}
                 >
                   {retailerLabel(id)}
@@ -183,7 +183,7 @@ export function FilterSidebar({
         </section>
 
         <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Descuento mínimo
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -194,8 +194,8 @@ export function FilterSidebar({
                 onClick={() => patch({ minDiscount: value })}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                   filters.minDiscount === value
-                    ? "border-[var(--primary)] bg-[var(--primary)] text-white"
-                    : "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                    ? "border-primary bg-primary text-white"
+                    : "border-line text-muted hover:bg-surface-muted"
                 }`}
               >
                 {value === 0 ? "Todos" : `≥ ${value}%`}
@@ -205,7 +205,7 @@ export function FilterSidebar({
         </section>
 
         <section>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             Precio (€)
           </h3>
           <div className="grid grid-cols-2 gap-2">
@@ -250,7 +250,7 @@ export function FilterSidebar({
               type="checkbox"
               checked={filters.onlyTopDeals}
               onChange={(e) => patch({ onlyTopDeals: e.target.checked })}
-              className="h-4 w-4 accent-[var(--primary)]"
+              className="h-4 w-4 accent-primary"
             />
             Solo top chollos
           </label>
@@ -259,7 +259,7 @@ export function FilterSidebar({
               type="checkbox"
               checked={filters.onlyFeatured}
               onChange={(e) => patch({ onlyFeatured: e.target.checked })}
-              className="h-4 w-4 accent-[var(--primary)]"
+              className="h-4 w-4 accent-primary"
             />
             Destacados
           </label>
@@ -267,7 +267,7 @@ export function FilterSidebar({
       </div>
 
       {activeCount > 0 && (
-        <div className="border-t border-[var(--border)] p-4">
+        <div className="border-t border-line p-4">
           <button
             type="button"
             onClick={() => onChange(DEFAULT_FILTERS)}

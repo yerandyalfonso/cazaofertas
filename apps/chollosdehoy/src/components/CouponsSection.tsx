@@ -32,7 +32,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
   return (
     <article
       className={`card flex flex-col gap-3 p-4 ${
-        coupon.highlight ? "border-[var(--primary)] bg-[var(--primary-soft)]/30" : ""
+        coupon.highlight ? "border-primary bg-primary-soft/30" : ""
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -48,8 +48,8 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
       </div>
 
       <div>
-        <h3 className="font-semibold text-[var(--text)]">{coupon.title}</h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <h3 className="font-semibold text-ink">{coupon.title}</h3>
+        <p className="mt-1 text-sm text-muted">
           {coupon.description}
         </p>
       </div>
@@ -64,7 +64,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
           >
             {copied ? (
               <>
-                <Check className="h-4 w-4 text-[var(--primary)]" />
+                <Check className="h-4 w-4 text-primary" />
                 Copiado
               </>
             ) : (
@@ -95,8 +95,8 @@ export function CouponsSection({ coupons }: CouponsSectionProps) {
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <Ticket className="h-5 w-5 text-[var(--primary)]" />
-        <h2 className="text-lg font-bold text-[var(--text)]">
+        <Ticket className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-bold text-ink">
           Cupones y códigos
         </h2>
       </div>

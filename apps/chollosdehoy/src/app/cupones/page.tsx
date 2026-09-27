@@ -15,16 +15,16 @@ export default async function CuponesPage() {
 
   return (
     <div className="marketplace-shell min-h-screen">
-      <header className="border-b border-[var(--border)] bg-gradient-to-br from-[var(--primary-soft)] to-[var(--surface)]">
+      <header className="border-b border-line bg-gradient-to-br from-primary-soft to-surface">
         <div className="mx-auto max-w-4xl px-4 py-6">
           <Link href="/" className="btn btn-ghost mb-4 text-sm">
             <ArrowLeft className="h-4 w-4" />
             Volver al marketplace
           </Link>
-          <h1 className="text-2xl font-bold text-[var(--text)] md:text-3xl">
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">
             Cupones por tienda
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
+          <p className="mt-2 max-w-2xl text-sm text-muted">
             Códigos y promociones detectados automáticamente en las tiendas.
             Solo se listan los activos según su vigencia.
           </p>

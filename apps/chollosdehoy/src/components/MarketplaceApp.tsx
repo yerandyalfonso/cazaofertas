@@ -156,14 +156,14 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
             />
           )}
 
-          <p aria-live="polite" className="text-center text-sm text-[var(--text-muted)] empty:hidden">
+          <p aria-live="polite" className="text-center text-sm text-muted empty:hidden">
             {loading ? "Cargando ofertas…" : ""}
           </p>
 
           {catalog.items.length === 0 && !loading ? (
             <div className="card flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
               <p className="text-lg font-semibold">No hay ofertas con estos filtros</p>
-              <p className="max-w-md text-sm text-[var(--text-muted)]">
+              <p className="max-w-md text-sm text-muted">
                 Prueba a ampliar la búsqueda, bajar el descuento mínimo o quitar alguna
                 categoría.
               </p>
@@ -223,11 +223,11 @@ export function MarketplaceApp({ bootstrap, footer }: MarketplaceAppProps) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-[var(--overlay)]"
+            className="absolute inset-0 bg-overlay"
             onClick={() => setMobileFiltersOpen(false)}
             aria-label="Cerrar filtros"
           />
-          <div className="absolute inset-y-0 left-0 w-[min(100%,320px)] overscroll-contain bg-[var(--surface)] shadow-2xl">
+          <div className="absolute inset-y-0 left-0 w-[min(100%,320px)] overscroll-contain bg-surface shadow-2xl">
             <FilterSidebar
               categories={bootstrap.categories}
               filters={filters}

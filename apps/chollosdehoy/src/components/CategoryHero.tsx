@@ -21,10 +21,10 @@ export function CategoryHero({ categories, totalProducts }: CategoryHeroProps) {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)] md:text-[1.75rem]">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink md:text-[1.75rem]">
         Chollos de hoy
       </h1>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <p className="mt-1 text-sm text-muted">
         {new Intl.NumberFormat("es-ES").format(totalProducts)} ofertas de Amazon,
         Miravia y otras tiendas, con el precio comprobado.
       </p>
@@ -35,7 +35,7 @@ export function CategoryHero({ categories, totalProducts }: CategoryHeroProps) {
           return (
             <li key={cat.id}>
               <Link href={categoryHref(cat.slug)} className="group block text-center">
-                <span className="relative block aspect-square overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-muted)]">
+                <span className="relative block aspect-square overflow-hidden rounded-control bg-surface-muted">
                   {meta?.image_url ? (
                     <Image
                       src={meta.image_url}
@@ -46,7 +46,7 @@ export function CategoryHero({ categories, totalProducts }: CategoryHeroProps) {
                     />
                   ) : null}
                 </span>
-                <span className="mt-1.5 block text-xs font-medium leading-tight text-[var(--text)] group-hover:underline">
+                <span className="mt-1.5 block text-xs font-medium leading-tight text-ink group-hover:underline">
                   {cat.name}
                 </span>
               </Link>

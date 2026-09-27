@@ -230,7 +230,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   ];
 
   return (
-    <div className="marketplace-shell bg-[var(--bg)]">
+    <div className="marketplace-shell bg-page">
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.
@@ -241,16 +241,16 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       <nav
         aria-label="Migas de pan"
-        className="mx-auto flex max-w-5xl items-center gap-1.5 px-4 pt-5 text-xs text-[var(--text-muted)]"
+        className="mx-auto flex max-w-5xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
       >
-        <Link href="/" className="hover:text-[var(--text)]">
+        <Link href="/" className="hover:text-ink">
           Inicio
         </Link>
         {categoryPath.map((part) => (
           <span key={part.name} className="flex min-w-0 items-center gap-1.5">
             <ChevronRight className="h-3 w-3 shrink-0" />
             {part.href ? (
-              <Link href={part.href} className="truncate hover:text-[var(--text)]">
+              <Link href={part.href} className="truncate hover:text-ink">
                 {part.name}
               </Link>
             ) : (
@@ -264,7 +264,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10">
           {/* Imagen */}
           <div className="md:sticky md:top-6 md:self-start">
-            <div className="relative aspect-square overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-white">
+            <div className="relative aspect-square overflow-hidden rounded-card border border-line bg-white">
               {product.imageUrl ? (
                 <Image
                   src={product.imageUrl}
@@ -275,7 +275,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   priority
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
+                <div className="flex h-full items-center justify-center text-sm text-muted">
                   Sin imagen
                 </div>
               )}
@@ -284,23 +284,23 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
           {/* Compra */}
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
               {product.brand ? `${product.brand} · ` : ""}
               {retailer}
             </p>
-            <h1 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-[var(--text)] md:text-[1.6rem]">
+            <h1 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-ink md:text-[1.6rem]">
               {product.title}
             </h1>
 
             {(product.dealLevel === DealLevel.HISTORICAL_LOW || flashLabel) && (
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
                 {product.dealLevel === DealLevel.HISTORICAL_LOW && !unavailable && (
-                  <span className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-[var(--primary)]">
+                  <span className="rounded-full bg-primary-soft px-2.5 py-1 text-primary">
                     Precio más bajo registrado
                   </span>
                 )}
                 {flashLabel && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--urgent-bg)] px-2.5 py-1 text-[var(--urgent-fg-strong)]">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-urgent-soft px-2.5 py-1 text-urgent-strong">
                     <Zap className="h-3.5 w-3.5" aria-hidden />
                     {flashLabel}
                   </span>
@@ -308,25 +308,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </div>
             )}
 
-            <div className="mt-6 border-y border-[var(--border)] py-5">
+            <div className="mt-6 border-y border-line py-5">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="price text-3xl font-semibold tracking-tight text-[var(--text)]">
+                <span className="price text-3xl font-semibold tracking-tight text-ink">
                   {formatEuro(product.currentPrice)}
                 </span>
                 {product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
-                    <span className="price text-base text-[var(--text-muted)] line-through">
+                    <span className="price text-base text-muted line-through">
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
                 {product.discountPercentage >= 1 && (
-                  <span className="text-sm font-semibold text-[var(--primary)]">
+                  <span className="text-sm font-semibold text-primary">
                     {formatDiscount(product.discountPercentage)}
                   </span>
                 )}
               </div>
               {savings !== null && savings > 0 && (
-                <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+                <p className="mt-1.5 text-sm text-muted">
                   Ahorras {formatEuro(savings)}
                 </p>
               )}
@@ -334,7 +334,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             {unavailable ? (
               <>
-                <p className="mt-6 flex items-start gap-2 text-sm text-[var(--text-muted)]">
+                <p className="mt-6 flex items-start gap-2 text-sm text-muted">
                   <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                   {product.isActive
                     ? "Esta oferta está agotada o ha caducado. El precio mostrado es el último que comprobamos."
@@ -357,7 +357,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   Ver en {retailer}
                   <ExternalLink className="h-4 w-4" />
                 </a>
-                <p className="mt-2.5 text-center text-xs text-[var(--text-muted)]">
+                <p className="mt-2.5 text-center text-xs text-muted">
                   Enlace de afiliado. El precio puede cambiar en la tienda.
                 </p>
               </>
@@ -365,9 +365,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
             {variants.length > 0 && (
               <div className="mt-6">
-                <h2 className="text-sm font-medium text-[var(--text)]">
+                <h2 className="text-sm font-medium text-ink">
                   Opciones
-                  <span className="ml-1.5 font-normal text-[var(--text-muted)]">
+                  <span className="ml-1.5 font-normal text-muted">
                     {variants.length < variantTotal
                       ? `${variants.length} de ${variantTotal}`
                       : variantTotal}
@@ -376,7 +376,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <VariantList variants={orderedVariants.slice(0, VISIBLE_VARIANTS)} currentId={product.id} />
                 {variants.length > VISIBLE_VARIANTS && (
                   <details className="group mt-2">
-                    <summary className="cursor-pointer list-none text-sm font-medium text-[var(--primary)] hover:underline">
+                    <summary className="cursor-pointer list-none text-sm font-medium text-primary hover:underline">
                       <span className="group-open:hidden">Ver las {variants.length} opciones</span>
                       <span className="hidden group-open:inline">Ver menos</span>
                     </summary>
@@ -386,12 +386,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </div>
             )}
 
-            <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--text-muted)]">
+            <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
               <a
                 href={telegramAlertForAsin(product.asin)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-[var(--text)] hover:underline"
+                className="inline-flex items-center gap-1.5 font-medium text-ink hover:underline"
               >
                 <BellRing className="h-4 w-4" />
                 Avísame si baja de precio
@@ -400,7 +400,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 href={TELEGRAM_GROUP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 hover:text-[var(--text)] hover:underline"
+                className="inline-flex items-center gap-1.5 hover:text-ink hover:underline"
               >
                 <Send className="h-4 w-4" />
                 Grupo de Telegram
@@ -410,14 +410,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </article>
 
         {(descriptionItems.length > 0 || details.length > 0) && (
-          <div className="mt-12 grid gap-10 border-t border-[var(--border)] pt-10 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="mt-12 grid gap-10 border-t border-line pt-10 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             {descriptionItems.length > 0 ? (
               <section>
-                <h2 className="text-lg font-semibold text-[var(--text)]">Descripción</h2>
+                <h2 className="text-lg font-semibold text-ink">Descripción</h2>
                 <DescriptionList items={featured} />
                 {rest.length > 0 && (
                   <details className="group mt-4">
-                    <summary className="cursor-pointer list-none text-sm font-medium text-[var(--primary)] hover:underline">
+                    <summary className="cursor-pointer list-none text-sm font-medium text-primary hover:underline">
                       <span className="group-open:hidden">Ver descripción completa</span>
                       <span className="hidden group-open:inline">Ver menos</span>
                     </summary>
@@ -430,12 +430,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
             )}
 
             <section>
-              <h2 className="text-lg font-semibold text-[var(--text)]">Detalles del producto</h2>
-              <dl className="mt-4 divide-y divide-[var(--border)] border-y border-[var(--border)] text-sm">
+              <h2 className="text-lg font-semibold text-ink">Detalles del producto</h2>
+              <dl className="mt-4 divide-y divide-line border-y border-line text-sm">
                 {details.map((row) => (
                   <div key={row.label} className="grid grid-cols-[7.5rem_1fr] gap-3 py-2.5">
-                    <dt className="text-[var(--text-muted)]">{row.label}</dt>
-                    <dd className="min-w-0 break-words text-[var(--text)]">{row.value}</dd>
+                    <dt className="text-muted">{row.label}</dt>
+                    <dd className="min-w-0 break-words text-ink">{row.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -445,7 +445,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
         {alternatives.length > 0 && (
           <section id="alternativas" className="mt-12 scroll-mt-4">
-            <h2 className="mb-4 text-lg font-semibold text-[var(--text)]">
+            <h2 className="mb-4 text-lg font-semibold text-ink">
               Ofertas similares disponibles
             </h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -462,18 +462,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {/* CTA fijo en móvil */}
       {!unavailable && (
         <>
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 py-3 md:hidden">
             <div className="mx-auto flex max-w-5xl items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="price text-lg font-semibold leading-tight text-[var(--text)]">
+                <p className="price text-lg font-semibold leading-tight text-ink">
                   {formatEuro(product.currentPrice)}
                   {product.discountPercentage >= 1 && (
-                    <span className="ml-2 text-xs font-semibold text-[var(--primary)]">
+                    <span className="ml-2 text-xs font-semibold text-primary">
                       {formatDiscount(product.discountPercentage)}
                     </span>
                   )}
                 </p>
-                <p className="truncate text-xs text-[var(--text-muted)]">en {retailer}</p>
+                <p className="truncate text-xs text-muted">en {retailer}</p>
               </div>
               <a
                 href={product.affiliateUrl}
@@ -507,15 +507,15 @@ function VariantList({
       {variants.map((variant) => {
         const current = variant.id === currentId;
         const label = variant.variantLabel ?? truncate(variant.title, 40);
-        const className = `flex flex-col rounded-[var(--radius-sm)] border px-3 py-2 text-left text-sm transition ${
+        const className = `flex flex-col rounded-control border px-3 py-2 text-left text-sm transition ${
           current
-            ? "border-[var(--text)] bg-[var(--surface)]"
-            : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]"
+            ? "border-ink bg-surface"
+            : "border-line bg-surface hover:border-line-strong"
         }`;
         const body = (
           <>
-            <span className="font-medium text-[var(--text)]">{label}</span>
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="font-medium text-ink">{label}</span>
+            <span className="text-xs text-muted">
               {formatEuro(variant.currentPrice)}
             </span>
           </>
@@ -540,10 +540,10 @@ function VariantList({
 
 function DescriptionList({ items }: { items: DescriptionItem[] }) {
   return (
-    <ul className="mt-4 space-y-3 text-[0.95rem] leading-relaxed text-[var(--text)]">
+    <ul className="mt-4 space-y-3 text-[0.95rem] leading-relaxed text-ink">
       {items.map((item, index) => (
         <li key={index} className="flex gap-3">
-          <span aria-hidden className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-[var(--text-muted)]" />
+          <span aria-hidden className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-muted" />
           <span className="max-w-[68ch]">
             {item.title && <strong className="font-semibold">{item.title}. </strong>}
             {item.text}

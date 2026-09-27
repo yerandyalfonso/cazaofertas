@@ -62,26 +62,26 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
               <span className="badge badge-great">Destacado</span>
             )}
             {coupon.source === "affiliate" && (
-              <span className="badge bg-[var(--primary-soft)] text-[var(--primary)]">
+              <span className="badge bg-primary-soft text-primary">
                 Afiliado
               </span>
             )}
             {coupon.source === "scrape" && (
-              <span className="badge bg-[var(--surface-muted)] text-[var(--text-muted)]">
+              <span className="badge bg-surface-muted text-muted">
                 Detectado
               </span>
             )}
             {expiry && (
-              <span className="text-xs text-[var(--text-muted)]">
+              <span className="text-xs text-muted">
                 Hasta {expiry}
               </span>
             )}
           </div>
 
-          <h2 className="mt-2 text-lg font-semibold text-[var(--text)]">
+          <h2 className="mt-2 text-lg font-semibold text-ink">
             {coupon.title}
           </h2>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+          <p className="mt-1 text-sm leading-relaxed text-muted">
             {coupon.description}
           </p>
 
@@ -92,14 +92,14 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
               aria-live="polite"
               className="coupon-code-btn mt-4"
             >
-              <Scissors className="h-4 w-4 shrink-0 text-[var(--primary)]" />
+              <Scissors className="h-4 w-4 shrink-0 text-primary" />
               <span className="font-mono text-sm font-bold tracking-wide">
                 {coupon.code}
               </span>
-              <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)]">
+              <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-muted">
                 {copied ? (
                   <>
-                    <Check className="h-3.5 w-3.5 text-[var(--primary)]" />
+                    <Check className="h-3.5 w-3.5 text-primary" />
                     Copiado
                   </>
                 ) : (
@@ -117,7 +117,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
               <button
                 type="button"
                 onClick={() => setTermsOpen((v) => !v)}
-                className="flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+                className="flex items-center gap-1 text-xs font-semibold text-primary"
                 aria-expanded={termsOpen}
               >
                 Condiciones
@@ -126,7 +126,7 @@ function CouponCard({ coupon }: { coupon: CouponOffer }) {
                 />
               </button>
               {termsOpen ? (
-                <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[var(--text-muted)]">
+                <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-muted">
                   {terms}
                 </p>
               ) : null}
@@ -178,7 +178,7 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
 
   if (coupons.length === 0) {
     return (
-      <div className="card px-6 py-12 text-center text-[var(--text-muted)]">
+      <div className="card px-6 py-12 text-center text-muted">
         <p>No hay cupones activos en este momento.</p>
         <p className="mt-2 text-sm">
           Se actualizan automáticamente dos veces al día desde las tiendas.
@@ -190,10 +190,10 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
   return (
     <div className="space-y-6">
       <div
-        className="flex gap-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--text-muted)]"
+        className="flex gap-3 rounded-control border border-line bg-surface-muted px-4 py-3 text-sm text-muted"
         role="note"
       >
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--primary)]" />
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <p>
           Cupones manuales y detectados. Abre <strong>Condiciones</strong> en cada
           ficha para ver vigencia y exclusiones.
@@ -206,8 +206,8 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
           onClick={() => setRetailer(null)}
           className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
             retailer === null
-              ? "border-[var(--primary)] bg-[var(--primary)] text-white"
-              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]"
+              ? "border-primary bg-primary text-white"
+              : "border-line bg-surface text-muted"
           }`}
         >
           Todas ({coupons.length})
@@ -219,8 +219,8 @@ export function CouponsPageContent({ coupons }: CouponsPageContentProps) {
             onClick={() => setRetailer(id)}
             className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
               retailer === id
-                ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]"
+                ? "border-primary bg-primary-soft text-primary"
+                : "border-line bg-surface text-muted"
             }`}
           >
             {retailerLabel(id)} ({grouped.get(id)?.length ?? 0})

@@ -51,7 +51,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
   const to = Math.min(page * data.pageSize, data.total);
 
   return (
-    <div className="marketplace-shell bg-[var(--bg)]">
+    <div className="marketplace-shell bg-page">
       <script
         type="application/ld+json"
         // JSON escapado para que "</script>" en un título no rompa la página.
@@ -62,17 +62,17 @@ export function ListingPage({ listing }: { listing: Listing }) {
       <div>
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 pt-5">
           <nav
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-[var(--text-muted)]"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted"
             aria-label="Migas de pan"
           >
-            <Link href="/" className="hover:text-[var(--text)]">
+            <Link href="/" className="hover:text-ink">
               Inicio
             </Link>
             {listing.breadcrumbs.map((crumb, i) => (
               <span key={crumb.href} className="flex items-center gap-1.5">
                 <ChevronRight className="h-3 w-3 shrink-0" />
                 {i < listing.breadcrumbs.length - 1 ? (
-                  <Link href={crumb.href} className="truncate hover:text-[var(--text)]">
+                  <Link href={crumb.href} className="truncate hover:text-ink">
                     {crumb.name}
                   </Link>
                 ) : (
@@ -86,16 +86,16 @@ export function ListingPage({ listing }: { listing: Listing }) {
 
       <main id="contenido" className="mx-auto max-w-6xl space-y-5 px-4 py-6 md:py-8">
         <header>
-          <h1 className="text-2xl font-bold text-[var(--text)] md:text-3xl">
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">
             {listing.h1}
             {page > 1 && (
-              <span className="text-[var(--text-muted)]"> · Página {page}</span>
+              <span className="text-muted"> · Página {page}</span>
             )}
           </h1>
-          <p className="mt-2 max-w-3xl text-sm text-[var(--text-muted)]">
+          <p className="mt-2 max-w-3xl text-sm text-muted">
             {listing.intro}
           </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
+          <p className="mt-1 text-xs text-muted">
             {data.total} ofertas disponibles
           </p>
         </header>
@@ -106,11 +106,11 @@ export function ListingPage({ listing }: { listing: Listing }) {
               <Link
                 key={sub.href}
                 href={sub.href}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm transition hover:border-[var(--border-strong)]"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-line-strong"
               >
                 {sub.name}
                 {sub.count !== undefined && (
-                  <span className="ml-1.5 text-xs text-[var(--text-muted)]">
+                  <span className="ml-1.5 text-xs text-muted">
                     {sub.count}
                   </span>
                 )}
@@ -134,7 +134,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
 
         {listing.guides && listing.guides.length > 0 && (
           <section className="card p-5">
-            <h2 className="text-base font-semibold text-[var(--text)]">
+            <h2 className="text-base font-semibold text-ink">
               Guías relacionadas
             </h2>
             <ul className="mt-3 grid gap-3 md:grid-cols-3">
@@ -142,12 +142,12 @@ export function ListingPage({ listing }: { listing: Listing }) {
                 <li key={guide.href}>
                   <a
                     href={guide.href}
-                    className="block h-full rounded-[var(--radius-sm)] border border-[var(--border)] p-3 transition hover:border-[var(--border-strong)]"
+                    className="block h-full rounded-control border border-line p-3 transition hover:border-line-strong"
                   >
-                    <span className="block text-sm font-medium text-[var(--text)]">
+                    <span className="block text-sm font-medium text-ink">
                       {guide.title}
                     </span>
-                    <span className="mt-1 line-clamp-2 block text-xs text-[var(--text-muted)]">
+                    <span className="mt-1 line-clamp-2 block text-xs text-muted">
                       {guide.excerpt}
                     </span>
                   </a>
@@ -162,12 +162,12 @@ export function ListingPage({ listing }: { listing: Listing }) {
             className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
             aria-label="Paginación"
           >
-            <p className="text-sm text-[var(--text-muted)]">
+            <p className="text-sm text-muted">
               Mostrando{" "}
-              <span className="font-medium text-[var(--text)]">
+              <span className="font-medium text-ink">
                 {from}–{to}
               </span>{" "}
-              de <span className="font-medium text-[var(--text)]">{data.total}</span>{" "}
+              de <span className="font-medium text-ink">{data.total}</span>{" "}
               ofertas
             </p>
             <div className="flex flex-wrap items-center gap-1">
@@ -184,7 +184,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
                 p === "…" ? (
                   <span
                     key={`ellipsis-${index}`}
-                    className="px-2 text-sm text-[var(--text-muted)]"
+                    className="px-2 text-sm text-muted"
                   >
                     …
                   </span>
@@ -193,10 +193,10 @@ export function ListingPage({ listing }: { listing: Listing }) {
                     key={p}
                     href={withPage(basePath, p)}
                     aria-current={p === page ? "page" : undefined}
-                    className={`min-w-[2.25rem] rounded-[var(--radius-sm)] px-2 py-1.5 text-center text-sm font-semibold transition ${
+                    className={`min-w-[2.25rem] rounded-control px-2 py-1.5 text-center text-sm font-semibold transition ${
                       p === page
-                        ? "bg-[var(--primary)] text-white"
-                        : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                        ? "bg-primary text-white"
+                        : "text-muted hover:bg-surface-muted"
                     }`}
                   >
                     {p}

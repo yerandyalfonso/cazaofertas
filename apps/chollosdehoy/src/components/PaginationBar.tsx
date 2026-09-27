@@ -31,9 +31,9 @@ export function PaginationBar({
       className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
       aria-label="Paginación del catálogo"
     >
-      <p className="text-sm text-[var(--text-muted)]">
-        Mostrando <span className="font-medium text-[var(--text)]">{from}–{to}</span>{" "}
-        de <span className="font-medium text-[var(--text)]">{total}</span> ofertas
+      <p className="text-sm text-muted">
+        Mostrando <span className="font-medium text-ink">{from}–{to}</span>{" "}
+        de <span className="font-medium text-ink">{total}</span> ofertas
       </p>
 
       <div className="flex flex-wrap items-center gap-1">
@@ -51,7 +51,7 @@ export function PaginationBar({
           p === "…" ? (
             <span
               key={`ellipsis-${index}`}
-              className="px-2 text-sm text-[var(--text-muted)]"
+              className="px-2 text-sm text-muted"
             >
               …
             </span>
@@ -61,10 +61,10 @@ export function PaginationBar({
               type="button"
               disabled={loading}
               onClick={() => onPageChange(p)}
-              className={`tap-target min-w-[2.25rem] rounded-[var(--radius-sm)] px-2 py-1.5 text-sm font-semibold transition ${
+              className={`tap-target min-w-[2.25rem] rounded-control px-2 py-1.5 text-sm font-semibold transition ${
                 p === page
-                  ? "bg-[var(--primary)] text-white"
-                  : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+                  ? "bg-primary text-white"
+                  : "text-muted hover:bg-surface-muted"
               }`}
             >
               {p}

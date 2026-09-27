@@ -33,10 +33,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
 
   if (view === "list") {
     return (
-      <article className="card group flex gap-4 p-3 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow)] md:p-4">
+      <article className="card group flex gap-4 p-3 transition hover:border-line-strong hover:shadow-raised md:p-4">
         <Link
           href={`/oferta/${product.slug}`}
-          className={`${imageWrapClass} h-24 w-24 shrink-0 rounded-[var(--radius-sm)] border border-[var(--border)] md:h-28 md:w-28`}
+          className={`${imageWrapClass} h-24 w-24 shrink-0 rounded-control border border-line md:h-28 md:w-28`}
         >
           {product.imageUrl ? (
             <Image
@@ -55,16 +55,16 @@ export function ProductCard({ product, view }: ProductCardProps) {
           </div>
 
           <Link href={`/oferta/${product.slug}`}>
-            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--text)] group-hover:text-[var(--primary)] md:text-base">
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-ink group-hover:text-primary md:text-base">
               {product.title}
             </h3>
           </Link>
 
           {product.category && (
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-muted">
               {product.category.parentName ?? product.category.name}
               {product.variantCount > 1 && (
-                <span className="font-medium text-[var(--primary)]">
+                <span className="font-medium text-primary">
                   {" · "}
                   {product.variantCount} opciones
                 </span>
@@ -73,7 +73,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
           )}
 
           {flashLabel && (
-            <p className="flex items-center gap-1 text-xs font-semibold text-[var(--urgent-fg)]">
+            <p className="flex items-center gap-1 text-xs font-semibold text-urgent">
               <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
               {flashLabel}
             </p>
@@ -82,12 +82,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
           <div className="mt-auto flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="price text-xl font-semibold text-[var(--text)]">
+                <span className="price text-xl font-semibold text-ink">
                   {formatEuro(product.currentPrice)}
                 </span>
                 {product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
-                    <span className="text-sm text-[var(--text-muted)] line-through price">
+                    <span className="text-sm text-muted line-through price">
                       {formatEuro(product.previousPrice)}
                     </span>
                   )}
@@ -116,10 +116,10 @@ export function ProductCard({ product, view }: ProductCardProps) {
   }
 
   return (
-    <article className="card group flex h-full flex-col overflow-hidden transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow)]">
+    <article className="card group flex h-full flex-col overflow-hidden transition hover:border-line-strong hover:shadow-raised">
       <Link
         href={`/oferta/${product.slug}`}
-        className={`${imageWrapClass} relative block aspect-square border-b border-[var(--border)]`}
+        className={`${imageWrapClass} relative block aspect-square border-b border-line`}
       >
         {product.imageUrl ? (
           <Image
@@ -130,7 +130,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
+          <div className="flex h-full items-center justify-center text-sm text-muted">
             Sin imagen
           </div>
         )}
@@ -147,16 +147,16 @@ export function ProductCard({ product, view }: ProductCardProps) {
         <RetailerTag retailer={product.retailer} color={retailerTint} />
 
         <Link href={`/oferta/${product.slug}`}>
-          <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-[var(--text)] group-hover:text-[var(--primary)]">
+          <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-ink group-hover:text-primary">
             {product.title}
           </h3>
         </Link>
 
         {product.category && (
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-muted">
             {product.category.parentName ?? product.category.name}
             {product.variantCount > 1 && (
-              <span className="font-medium text-[var(--primary)]">
+              <span className="font-medium text-primary">
                 {" · "}
                 {product.variantCount} opciones
               </span>
@@ -165,7 +165,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
         )}
 
         {flashLabel && (
-          <p className="flex items-center gap-1 text-xs font-semibold text-[var(--urgent-fg)]">
+          <p className="flex items-center gap-1 text-xs font-semibold text-urgent">
             <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {flashLabel}
           </p>
@@ -173,12 +173,12 @@ export function ProductCard({ product, view }: ProductCardProps) {
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <div>
-            <div className="price text-lg font-semibold text-[var(--text)]">
+            <div className="price text-lg font-semibold text-ink">
               {formatEuro(product.currentPrice)}
             </div>
             {product.previousPrice &&
               product.previousPrice > product.currentPrice && (
-                <div className="text-xs text-[var(--text-muted)] line-through price">
+                <div className="text-xs text-muted line-through price">
                   {formatEuro(product.previousPrice)}
                 </div>
               )}
@@ -201,7 +201,7 @@ export function ProductCard({ product, view }: ProductCardProps) {
 /** Tienda en texto discreto con un punto de su color (sin píldora). */
 function RetailerTag({ retailer, color }: { retailer: string; color: string }) {
   return (
-    <span translate="no" className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+    <span translate="no" className="inline-flex items-center gap-1.5 text-xs text-muted">
       <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
       {retailerLabel(retailer)}
     </span>

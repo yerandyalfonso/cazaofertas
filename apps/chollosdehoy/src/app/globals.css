@@ -61,6 +61,29 @@
   --badge-radius: var(--radius-6);
 }
 
+/* Tokens semánticos como utilidades de Tailwind: text-muted, bg-surface,
+   border-line, rounded-card… (en vez de text-[var(--text-muted)]). */
+@theme inline {
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-page: var(--bg);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-urgent: var(--urgent-fg);
+  --color-urgent-strong: var(--urgent-fg-strong);
+  --color-urgent-soft: var(--urgent-bg);
+  --color-overlay: var(--overlay);
+  --radius-control: var(--radius-sm);
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow);
+}
+
 * {
   box-sizing: border-box;
 }

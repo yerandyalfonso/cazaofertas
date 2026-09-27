@@ -17,19 +17,19 @@ export async function SiteFooter() {
     .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-8">
+    <footer className="border-t border-line bg-surface py-8">
       <div className="mx-auto grid max-w-[1600px] gap-6 px-4 text-sm md:grid-cols-[1fr_2fr_1fr]">
         <div>
-          <Link href="/" className="font-semibold text-[var(--text)]">
+          <Link href="/" className="font-semibold text-ink">
             Chollos de Hoy
           </Link>
-          <p className="mt-1 text-[var(--text-muted)]">
+          <p className="mt-1 text-muted">
             Marketplace de ofertas · Actualizado en tiempo real
           </p>
         </div>
 
         <nav aria-label="Categorías">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
             Categorías
           </p>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
@@ -37,7 +37,7 @@ export async function SiteFooter() {
               <li key={parent.id}>
                 <Link
                   href={categoryHref(parent.slug)}
-                  className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                  className="text-muted hover:text-ink"
                 >
                   {parent.name}
                 </Link>
@@ -47,7 +47,7 @@ export async function SiteFooter() {
         </nav>
 
         <nav aria-label="Tiendas">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
             Tiendas
           </p>
           <ul className="space-y-1">
@@ -55,7 +55,7 @@ export async function SiteFooter() {
               <li key={retailer.id}>
                 <Link
                   href={retailerHref(retailer.id)}
-                  className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                  className="text-muted hover:text-ink"
                 >
                   {retailerLabel(retailer.id)}
                 </Link>
@@ -64,7 +64,7 @@ export async function SiteFooter() {
             <li>
               <Link
                 href="/cupones"
-                className="text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="text-muted hover:text-ink"
               >
                 Cupones
               </Link>
