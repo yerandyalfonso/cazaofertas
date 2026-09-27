@@ -13,6 +13,10 @@ import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { discountFrom, resolveReferencePrice } from "@/services/referencePrice";
+import {
+  AMAZON_FOREIGN_DELIVERY_ERROR,
+  foreignDeliverySkippedAsins,
+} from "@/providers/price/AmazonHtmlPriceProvider";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import {
   notifyMatchingUsers,
@@ -295,7 +299,9 @@ export async function runPriceDetection(
         await touchLastCheckedOnScrapeMiss(client, product.id, nowMiss);
         stats.errors.push({
           asin: product.asin,
-          message: "El proveedor no devolvió precio para este ASIN.",
+          message: foreignDeliverySkippedAsins.has(product.asin.toUpperCase())
+            ? `${AMAZON_FOREIGN_DELIVERY_ERROR} (omitido; lo revisa una IP española).`
+            : "El proveedor no devolvió precio para este ASIN.",
         });
         continue;
       }
@@ -335,7 +341,9 @@ export async function runPriceDetection(
         await touchLastCheckedOnScrapeMiss(client, product.id, now);
         stats.errors.push({
           asin: product.asin,
-          message: "El proveedor no devolvió precio para este ASIN.",
+          message: foreignDeliverySkippedAsins.has(product.asin.toUpperCase())
+            ? `${AMAZON_FOREIGN_DELIVERY_ERROR} (omitido; lo revisa una IP española).`
+            : "El proveedor no devolvió precio para este ASIN.",
         });
         continue;
       }

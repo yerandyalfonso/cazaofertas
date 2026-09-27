@@ -162,6 +162,13 @@ function isForeignDeliveryGlow(html: string): boolean {
 export const AMAZON_FOREIGN_DELIVERY_ERROR =
   "Amazon no muestra precio para envío fuera de España";
 
+/**
+ * ASINs omitidos por «sin precio para envío fuera de España» en esta ejecución.
+ * La revisión de precios los consulta para no contarlos como fallo (el
+ * contador de fallos desactiva productos tras varios seguidos).
+ */
+export const foreignDeliverySkippedAsins = new Set<string>();
+
 /** Última respuesta HTML venía con entrega fuera de ES (p. ej. Vercel → US). */
 let lastFetchForeignDelivery = false;
 
@@ -1250,6 +1257,7 @@ export async function scrapeAmazonProductPage(
   // IP fuera de España (VPS en Francia): Amazon quita el precio de lo que no
   // envía a ese país. No es «agotado»: se omite y lo revisa una IP española.
   if (extracted.price === null && lastFetchForeignDelivery) {
+    foreignDeliverySkippedAsins.add(asin.toUpperCase());
     throw new Error(
       `${AMAZON_FOREIGN_DELIVERY_ERROR} (${glowDeliveryText(html).slice(0, 40) || "país desconocido"}).`,
     );

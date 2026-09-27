@@ -1,3 +1,4 @@
+import { AMAZON_FOREIGN_DELIVERY_ERROR } from "@/providers/price/AmazonHtmlPriceProvider";
 import type { AmazonPriceCheckResult } from "@/services/amazonPriceCheck";
 import {
   markAsinFailureActionTaken,
@@ -67,6 +68,9 @@ async function filterAsinErrorsForAlert(
   const deactivated: string[] = [];
 
   for (const error of errors) {
+    // Omitidos por «envío fuera de España» (IP del VPS): no son fallos del
+    // producto; no avisan ni cuentan para desactivarlo.
+    if (error.message.includes(AMAZON_FOREIGN_DELIVERY_ERROR)) continue;
     const decision = await recordAsinScrapeFailure(error.asin, error.message);
     if (!decision.notify) continue;
 
