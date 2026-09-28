@@ -95,6 +95,15 @@ function blockToNode(block: EditorBlock): JSONContent | null {
           items: block.items,
         },
       };
+    case "table":
+      return {
+        type: "blogTable",
+        attrs: {
+          title: block.title ?? "",
+          columns: block.columns,
+          rows: block.rows,
+        },
+      };
     case "product":
       return {
         type: "blogProduct",
@@ -226,6 +235,25 @@ function nodeToBlock(node: JSONContent): EditorBlock | null {
         type: "faq",
         title: String(node.attrs?.title ?? "Preguntas frecuentes"),
         items,
+      };
+    }
+    case "blogTable": {
+      const columns = Array.isArray(node.attrs?.columns)
+        ? (node.attrs.columns as unknown[]).map((c) => String(c ?? ""))
+        : [""];
+      const rows = Array.isArray(node.attrs?.rows)
+        ? (node.attrs.rows as unknown[]).map((row) =>
+            columns.map((_, i) =>
+              Array.isArray(row) ? String(row[i] ?? "") : "",
+            ),
+          )
+        : [columns.map(() => "")];
+      return {
+        id,
+        type: "table",
+        title: String(node.attrs?.title ?? "").trim() || undefined,
+        columns,
+        rows,
       };
     }
     case "blogProduct":

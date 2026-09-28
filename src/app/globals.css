@@ -32,6 +32,31 @@ body {
   font-family: var(--font-display), Georgia, serif;
 }
 
+/* Letra capital del primer párrafo: ocupa exactamente 3 líneas. */
+.drop-cap::first-letter,
+.blog-html > p:first-of-type::first-letter {
+  float: left;
+  margin: 0.04em 0.08em 0 0;
+  font-family: var(--font-display), Georgia, serif;
+  /* Respaldo (Firefox): 3 líneas de 1.625em ≈ 6em de cuerpo de letra. */
+  font-size: 5.9em;
+  font-weight: 600;
+  line-height: 0.78;
+  color: var(--ink);
+}
+
+@supports (initial-letter: 3) or (-webkit-initial-letter: 3) {
+  .drop-cap::first-letter,
+  .blog-html > p:first-of-type::first-letter {
+    float: none;
+    margin: 0 0.12em 0 0;
+    font-size: inherit;
+    line-height: inherit;
+    -webkit-initial-letter: 3;
+    initial-letter: 3;
+  }
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;

@@ -415,3 +415,87 @@ export async function getCategories(): Promise<CategoryRow[]> {
 export const TELEGRAM_BOT_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ??
   "https://t.me/cazandor_de_ofertas_bot";
+
+export interface CategoryShowcase {
+  /** Nº de productos activos en la categoría (incluye subcategorías). */
+  count: number;
+  /** Mayor descuento activo, en %. */
+  maxDiscount: number;
+}
+
+/** Datos para las tarjetas de «Explora por sección», agrupados por categoría raíz (slug). */
+export async function getCategoryShowcases(): Promise<
+  Map<string, CategoryShowcase>
+> {
+  const showcases = new Map<string, CategoryShowcase>();
+  const client = getClient();
+  if (!client) return showcases;
+
+  const { data, error } = await client
+    .from("products")
+    .select(
+      "discount_percentage, categories(slug, parent:parent_id(slug))",
+    )
+    .eq("is_active", true)
+    .order("discount_percentage", { ascending: false, nullsFirst: false })
+    .limit(3000);
+
+  if (error || !data) {
+    console.error("[catalog] getCategoryShowcases", error?.message);
+    return showcases;
+  }
+
+  type Slugged = { slug: string } | { slug: string }[] | null;
+  const one = (value: Slugged) =>
+    Array.isArray(value) ? (value[0] ?? null) : value;
+
+  for (const row of data as Array<{
+    discount_percentage: number | null;
+    categories:
+      | ({ slug: string; parent: Slugged } | { slug: string; parent: Slugged }[])
+      | null;
+  }>) {
+    const category = Array.isArray(row.categories)
+      ? row.categories[0]
+      : row.categories;
+    if (!category) continue;
+    const rootSlug = one(category.parent)?.slug ?? category.slug;
+
+    const entry = showcases.get(rootSlug) ?? {
+      count: 0,
+      maxDiscount: 0,
+    };
+    entry.count += 1;
+    entry.maxDiscount = Math.max(
+      entry.maxDiscount,
+      Math.round(row.discount_percentage ?? 0),
+    );
+    showcases.set(rootSlug, entry);
+  }
+
+  return showcases;
+}
+
+/** Buscador de la cabecera: productos activos cuyo título contiene el texto. */
+export async function searchProducts(
+  query: string,
+  limit = 4,
+): Promise<CatalogProduct[]> {
+  const client = getClient();
+  const term = query.trim().replace(/[%_,()]/g, " ").trim();
+  if (!client || term.length < 2) return [];
+
+  const { data, error } = await client
+    .from("products")
+    .select(CATEGORY_SELECT)
+    .eq("is_active", true)
+    .ilike("title", `%${term}%`)
+    .order("discount_percentage", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error || !data) {
+    console.error("[catalog] searchProducts", error?.message);
+    return [];
+  }
+  return data.map((row) => mapProduct(row));
+}

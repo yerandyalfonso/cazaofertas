@@ -8,9 +8,10 @@ import {
   articleJsonLd,
   breadcrumbJsonLd,
   faqJsonLd,
+  BLOG_NAME,
   buildPageMetadata,
 } from "@/lib/seo";
-import { getArticleBySlug } from "@/services/blog";
+import { getArticleBySlug, getRelatedArticles } from "@/services/blog";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -41,6 +42,7 @@ export async function generateMetadata({
     path: `/blog/${slug}`,
     image: post.coverImage,
     type: "article",
+    siteName: BLOG_NAME,
   });
 }
 
@@ -50,6 +52,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   if (!result) notFound();
 
   const { post, products } = result;
+  const related = await getRelatedArticles(post);
   const faq = faqJsonLd(post);
   const expectedProductSlugs = collectProductSlugs(post);
   const needsDataRefresh =
@@ -63,13 +66,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           articleJsonLd(post),
           breadcrumbJsonLd([
             { name: "Inicio", path: "/" },
-            { name: "Blog", path: "/blog" },
+            { name: BLOG_NAME, path: "/blog" },
             { name: post.title, path: `/blog/${post.slug}` },
           ]),
           ...(faq ? [faq] : []),
         ]}
       />
-      <BlogArticleView post={post} products={products} />
+      <BlogArticleView post={post} products={products} related={related} />
     </>
   );
 }

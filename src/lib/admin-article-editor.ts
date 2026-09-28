@@ -286,6 +286,7 @@ export type EditorBlockKind =
   | "image"
   | "prosCons"
   | "faq"
+  | "table"
   | "product"
   | "productGrid";
 
@@ -323,6 +324,12 @@ export type EditorBlock =
       type: "faq";
       title?: string;
       items: Array<{ question: string; answer: string }>;
+    })
+  | (EditorBlockBase & {
+      type: "table";
+      title?: string;
+      columns: string[];
+      rows: string[][];
     })
   | (EditorBlockBase & { type: "product"; slug: string })
   | (EditorBlockBase & { type: "productGrid"; slugs: string[] });
@@ -382,6 +389,14 @@ export function blogBlocksToEditor(blocks: BlogBlock[]): EditorBlock[] {
             question: item.question,
             answer: item.answer,
           })),
+        };
+      case "table":
+        return {
+          id,
+          type: "table",
+          title: block.title,
+          columns: [...block.columns],
+          rows: block.rows.map((row) => [...row]),
         };
       case "product":
         return { id, type: "product", slug: block.slug };
@@ -469,6 +484,21 @@ export function editorBlocksToBlog(blocks: EditorBlock[]): BlogBlock[] {
         }
         break;
       }
+      case "table": {
+        const columns = block.columns.map((c) => c.trim());
+        const rows = block.rows
+          .map((row) => columns.map((_, i) => (row[i] ?? "").trim()))
+          .filter((row) => row.some(Boolean));
+        if (columns.some(Boolean) && rows.length > 0) {
+          result.push({
+            type: "table",
+            title: block.title?.trim() || undefined,
+            columns,
+            rows,
+          });
+        }
+        break;
+      }
       case "product":
         if (block.slug.trim()) {
           result.push({ type: "product", slug: block.slug.trim() });
@@ -518,6 +548,14 @@ export function emptyEditorBlock(kind: EditorBlockKind): EditorBlock {
         type: "faq",
         title: "Preguntas frecuentes",
         items: [{ question: "", answer: "" }],
+      };
+    case "table":
+      return {
+        id,
+        type: "table",
+        title: "Comparativa",
+        columns: ["Producto", "Precio", ""],
+        rows: [["", "", ""]],
       };
     case "product":
       return { id, type: "product", slug: "" };

@@ -467,3 +467,154 @@ export const BlogFaq = Node.create({
     return ReactNodeViewRenderer(BlogFaqView);
   },
 });
+
+function BlogTableView({ node, updateAttributes, deleteNode }: NodeViewProps) {
+  const title = String(node.attrs.title ?? "");
+  const columns: string[] = Array.isArray(node.attrs.columns)
+    ? node.attrs.columns
+    : [""];
+  const rows: string[][] = Array.isArray(node.attrs.rows)
+    ? node.attrs.rows
+    : [columns.map(() => "")];
+
+  function setColumns(next: string[]) {
+    const safe = next.length > 0 ? next : [""];
+    updateAttributes({
+      columns: safe,
+      rows: rows.map((row) => safe.map((_, i) => row[i] ?? "")),
+    });
+  }
+
+  function setCell(rowIdx: number, colIdx: number, value: string) {
+    const next = rows.map((row) => [...row]);
+    next[rowIdx]![colIdx] = value;
+    updateAttributes({ rows: next });
+  }
+
+  const cellClass =
+    "h-9 w-full min-w-[8rem] border border-stone-300 bg-white px-2 text-sm outline-none focus:border-ink";
+
+  return (
+    <AtomChrome label="Tabla comparativa" deleteNode={deleteNode}>
+      <div className="space-y-3" contentEditable={false}>
+        <input
+          value={title}
+          onChange={(event) => updateAttributes({ title: event.target.value })}
+          placeholder="Título (opcional)"
+          className="h-9 w-full border border-stone-300 bg-white px-3 text-sm font-medium outline-none focus:border-ink"
+        />
+        <div className="overflow-x-auto">
+          <table className="border-separate border-spacing-1">
+            <thead>
+              <tr>
+                {columns.map((column, colIdx) => (
+                  <th key={`col-${colIdx}`} className="align-top">
+                    <input
+                      value={column}
+                      onChange={(event) => {
+                        const next = [...columns];
+                        next[colIdx] = event.target.value;
+                        setColumns(next);
+                      }}
+                      placeholder={`Columna ${colIdx + 1}`}
+                      className={`${cellClass} font-semibold`}
+                    />
+                    {columns.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setColumns(columns.filter((_, i) => i !== colIdx))
+                        }
+                        className="mt-1 text-[11px] text-stone-500 hover:text-rose-700"
+                      >
+                        Quitar columna
+                      </button>
+                    ) : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIdx) => (
+                <tr key={`row-${rowIdx}`}>
+                  {columns.map((_, colIdx) => (
+                    <td key={`cell-${rowIdx}-${colIdx}`}>
+                      <input
+                        value={row[colIdx] ?? ""}
+                        onChange={(event) =>
+                          setCell(rowIdx, colIdx, event.target.value)
+                        }
+                        className={cellClass}
+                      />
+                    </td>
+                  ))}
+                  <td>
+                    <button
+                      type="button"
+                      title="Quitar fila"
+                      onClick={() =>
+                        updateAttributes({
+                          rows:
+                            rows.length > 1
+                              ? rows.filter((_, i) => i !== rowIdx)
+                              : [columns.map(() => "")],
+                        })
+                      }
+                      className="inline-flex h-9 w-9 items-center justify-center text-stone-500 hover:text-rose-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={() =>
+              updateAttributes({ rows: [...rows, columns.map(() => "")] })
+            }
+            className="text-xs font-semibold text-teal-800 hover:underline"
+          >
+            + Añadir fila
+          </button>
+          <button
+            type="button"
+            onClick={() => setColumns([...columns, ""])}
+            className="text-xs font-semibold text-teal-800 hover:underline"
+          >
+            + Añadir columna
+          </button>
+        </div>
+      </div>
+    </AtomChrome>
+  );
+}
+
+export const BlogTable = Node.create({
+  name: "blogTable",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      title: { default: "" },
+      columns: { default: ["Producto", "Precio", ""] },
+      rows: { default: [["", "", ""]] },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="blog-table"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "div",
+      mergeAttributes(HTMLAttributes, { "data-type": "blog-table" }),
+    ];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(BlogTableView);
+  },
+});

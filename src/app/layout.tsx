@@ -31,11 +31,11 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   keywords: [
     "ofertas Amazon",
-    "chollos Amazon España",
+    "ofertas Amazon España",
     "historial de precios",
     "alertas Telegram",
     "mínimo histórico",
-    "CazaOferta",
+    "Una mica de tot",
   ],
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,

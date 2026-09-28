@@ -8,6 +8,7 @@ import { ProsCons } from "@/components/blog/ProsCons";
 import { FaqBlock } from "@/components/blog/FaqBlock";
 import { renderArticleInlineText } from "@/lib/article-inline-markdown";
 import type { BlogBlock } from "@/lib/blog";
+import { headingIdsForBlocks, withHeadingIds } from "@/lib/blog-toc";
 import type { CatalogProduct } from "@/lib/catalog";
 
 interface BlogContentProps {
@@ -45,14 +46,18 @@ export function BlogContent({
     !rawHtml.startsWith("[") &&
     !rawHtml.startsWith("{") &&
     (rawHtml.includes("<") || rawHtml.includes("&lt;"))
-      ? rawHtml
+      ? withHeadingIds(rawHtml)
       : undefined;
+  const headingIds = headingIdsForBlocks(blocks);
+  // Letra capital solo si el artículo abre con un párrafo (y no con HTML).
+  const dropCapIndex =
+    !safeHtml && blocks[0]?.type === "paragraph" ? 0 : -1;
 
   const articleColumn = (
-    <div className="min-w-0 space-y-8">
+    <div className="flex min-w-0 flex-col gap-7">
       {safeHtml ? (
         <div
-          className="blog-html space-y-6 text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 [&_blockquote]:border-l-2 [&_blockquote]:border-teal-800 [&_blockquote]:pl-5 [&_blockquote]:font-display [&_blockquote]:text-2xl [&_blockquote]:text-ink [&_h2]:mt-12 [&_h2]:font-display [&_h2]:text-3xl [&_h2]:tracking-tight [&_h2]:text-ink md:[&_h2]:mt-16 md:[&_h2]:text-4xl [&_h3]:mt-10 [&_h3]:font-display [&_h3]:text-2xl [&_h3]:text-ink [&_h4]:mt-8 [&_h4]:font-display [&_h4]:text-xl [&_h4]:text-ink [&_hr]:my-10 [&_hr]:border-stone-300 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_p]:text-stone-700 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
+          className="blog-html space-y-7 [&_figure]:!my-12 text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 [&_blockquote]:border-l-2 [&_blockquote]:border-teal-800 [&_blockquote]:pl-5 [&_blockquote]:font-display [&_blockquote]:text-2xl [&_blockquote]:text-ink [&_h2]:!mt-16 [&_h2]:scroll-mt-28 md:[&_h2]:!mt-20 [&_h2]:font-display [&_h2]:text-3xl [&_h2]:tracking-tight [&_h2]:text-ink md:[&_h2]:text-4xl [&_h3]:mt-10 [&_h3]:font-display [&_h3]:text-2xl [&_h3]:text-ink [&_h4]:mt-8 [&_h4]:font-display [&_h4]:text-xl [&_h4]:text-ink [&_hr]:my-10 [&_hr]:border-stone-300 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_p]:text-stone-700 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5"
           dangerouslySetInnerHTML={{ __html: safeHtml }}
         />
       ) : null}
@@ -64,7 +69,9 @@ export function BlogContent({
           return (
             <p
               key={key}
-              className="text-base leading-relaxed text-stone-700 md:text-lg md:leading-8"
+              className={`text-base leading-relaxed text-stone-700 md:text-lg md:leading-8 ${
+                index === dropCapIndex ? "drop-cap" : ""
+              }`}
             >
               {renderArticleInlineText(block.text)}
             </p>
@@ -77,8 +84,9 @@ export function BlogContent({
             return (
               <h2
                 key={key}
-                className={`font-display text-3xl tracking-tight text-ink md:text-4xl ${
-                  index === 0 ? "" : "!mt-12 md:!mt-16"
+                id={headingIds.get(index)}
+                className={`scroll-mt-28 font-display text-3xl tracking-tight text-ink md:text-4xl ${
+                  index === 0 ? "" : "mt-9 md:mt-12"
                 }`}
               >
                 {headingText}
@@ -91,7 +99,7 @@ export function BlogContent({
               <h4
                 key={key}
                 className={`font-display text-xl tracking-tight text-ink ${
-                  index === 0 ? "" : "!mt-8"
+                  index === 0 ? "" : "mt-1"
                 }`}
               >
                 {headingText}
@@ -103,7 +111,7 @@ export function BlogContent({
             <h3
               key={key}
               className={`font-display text-2xl tracking-tight text-ink ${
-                index === 0 ? "" : "!mt-10"
+                index === 0 ? "" : "mt-4"
               }`}
             >
               {headingText}
@@ -131,7 +139,7 @@ export function BlogContent({
 
         if (block.type === "image") {
           return (
-            <figure key={key} className="space-y-3">
+            <figure key={key} className="my-5 space-y-3">
               <div className="relative aspect-[16/10] overflow-hidden bg-stone-200">
                 <RemoteImage
                   src={block.src}
@@ -152,7 +160,9 @@ export function BlogContent({
 
         if (block.type === "blockquote") {
           return (
-            <BlogPullQuote key={key} text={block.text} cite={block.cite} />
+            <div key={key} className="my-5">
+              <BlogPullQuote text={block.text} cite={block.cite} />
+            </div>
           );
         }
 
@@ -163,6 +173,7 @@ export function BlogContent({
         if (block.type === "prosCons") {
           return (
             <ProsCons
+              className="my-5"
               key={key}
               pros={block.pros}
               cons={block.cons}
@@ -174,11 +185,16 @@ export function BlogContent({
         if (block.type === "faq") {
           return (
             <FaqBlock
+              className="mt-9 md:mt-12"
               key={key}
               title={block.title}
               items={block.items}
             />
           );
+        }
+
+        if (block.type === "table") {
+          return <ComparisonTable key={key} block={block} />;
         }
 
         if (block.type === "product") {
@@ -195,8 +211,8 @@ export function BlogContent({
           }
 
           return (
-            <aside key={key} className="my-2">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+            <aside key={key} className="my-5">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
                 Oferta recomendada
               </p>
               <InlineDealCard
@@ -225,8 +241,8 @@ export function BlogContent({
           }
 
           return (
-            <aside key={key} className="my-2 space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+            <aside key={key} className="my-5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
                 Productos citados
               </p>
               <div className="flex flex-col gap-3">
@@ -247,9 +263,9 @@ export function BlogContent({
       })}
 
       {showRelatedAfterHtml && density !== "asymmetric" ? (
-        <aside className="my-2 space-y-3">
+        <aside className="my-5 space-y-3">
           <EditorialDivider />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
             Productos citados
           </p>
           <div className="flex flex-col gap-3">
@@ -272,7 +288,7 @@ export function BlogContent({
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
         {articleColumn}
         <aside className="space-y-4 lg:sticky lg:top-24">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
             En este análisis
           </p>
           <div className="flex flex-col gap-4">
@@ -292,4 +308,62 @@ export function BlogContent({
   }
 
   return articleColumn;
+}
+
+function ComparisonTable({
+  block,
+}: {
+  block: Extract<BlogBlock, { type: "table" }>;
+}) {
+  return (
+    <figure className="my-5 space-y-3">
+      {block.title ? (
+        <figcaption className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
+          {block.title}
+        </figcaption>
+      ) : null}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[32rem] border-collapse text-left text-sm tabular-nums text-stone-700">
+          <thead>
+            <tr>
+              {block.columns.map((column, index) => (
+                <th
+                  key={`th-${index}`}
+                  scope="col"
+                  className="border-b border-ink py-3 pr-4 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500"
+                >
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, rowIndex) => (
+              <tr key={`tr-${rowIndex}`}>
+                {block.columns.map((_, colIndex) => {
+                  const cell = renderArticleInlineText(row[colIndex] ?? "");
+                  return colIndex === 0 ? (
+                    <th
+                      key={`td-${rowIndex}-${colIndex}`}
+                      scope="row"
+                      className="border-b border-stone-300 py-3 pr-4 font-medium text-ink"
+                    >
+                      {cell}
+                    </th>
+                  ) : (
+                    <td
+                      key={`td-${rowIndex}-${colIndex}`}
+                      className="border-b border-stone-300 py-3 pr-4"
+                    >
+                      {cell}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </figure>
+  );
 }

@@ -3,8 +3,10 @@ import { renderArticleInlineText } from "@/lib/article-inline-markdown";
 export function FaqBlock({
   title = "Preguntas frecuentes",
   items,
+  className = "",
 }: {
   title?: string;
+  className?: string;
   items: Array<{ question: string; answer: string }>;
 }) {
   const visible = items.filter(
@@ -13,10 +15,10 @@ export function FaqBlock({
   if (visible.length === 0) return null;
 
   return (
-    <section className="my-2 space-y-4" aria-labelledby="article-faq-title">
+    <section className={`space-y-5 ${className}`} aria-labelledby="article-faq-title">
       <h2
         id="article-faq-title"
-        className="font-display text-2xl tracking-tight text-ink md:text-3xl"
+        className="font-display text-3xl tracking-tight text-ink md:text-4xl"
       >
         {title}
       </h2>

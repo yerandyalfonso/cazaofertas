@@ -1,3 +1,4 @@
+import { BLOG_NAME } from "@/lib/seo";
 import { NextRequest, NextResponse } from "next/server";
 import {
   estimateBlocksReadingTime,
@@ -208,7 +209,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         excerpt,
         content,
         featured_image: body.featuredImage?.trim() || null,
-        author: body.author?.trim() || "CazaOferta",
+        author: body.author?.trim() || BLOG_NAME,
         category,
         status,
         seo_title: body.seoTitle?.trim() || null,

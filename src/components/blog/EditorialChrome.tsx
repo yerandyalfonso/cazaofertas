@@ -16,7 +16,7 @@ interface BlogPullQuoteProps {
 export function BlogPullQuote({ text, cite }: BlogPullQuoteProps) {
   return (
     <blockquote className="relative border-l-2 border-teal-800 py-1 pl-5 md:pl-6">
-      <p className="font-display text-2xl leading-snug tracking-tight text-ink md:text-3xl">
+      <p className="font-display text-2xl leading-snug tracking-tight text-ink">
         {text}
       </p>
       {cite ? (

@@ -27,6 +27,13 @@ export type BlogBlock =
       type: "faq";
       title?: string;
       items: Array<{ question: string; answer: string }>;
+    }
+  | {
+      /** Tabla comparativa opcional: cabeceras + filas de celdas de texto. */
+      type: "table";
+      title?: string;
+      columns: string[];
+      rows: string[][];
     };
 
 export interface BlogPost {
@@ -41,6 +48,8 @@ export interface BlogPost {
   category: string;
   readingTime: string;
   publishedAt: string;
+  /** Firma del artículo (`articles.author`). */
+  author?: string;
   featured?: boolean;
   coverImage: string;
   coverAlt: string;

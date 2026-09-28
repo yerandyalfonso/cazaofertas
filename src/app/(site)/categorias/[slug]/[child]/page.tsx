@@ -45,7 +45,7 @@ export async function generateMetadata({
   const title = `Ofertas de ${sub.name} · ${parent.name}`;
   return buildPageMetadata({
     title,
-    description: `Chollos y ofertas de ${sub.name.toLowerCase()} en ${parent.name.toLowerCase()}.`,
+    description: `Ofertas de ${sub.name.toLowerCase()} en ${parent.name.toLowerCase()}.`,
     path: categoryPublicPath(parent.slug, sub.slug),
   });
 }

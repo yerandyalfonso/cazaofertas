@@ -4,7 +4,7 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Aviso legal",
-  description: "Aviso legal e información de afiliación de CazaOferta.",
+  description: "Aviso legal e información de afiliación de Una mica de tot.",
   path: "/aviso-legal",
 });
 
@@ -16,7 +16,7 @@ export default function AvisoLegalPage() {
           Titular del sitio
         </h2>
         <p>
-          El sitio web <strong>CazaOferta</strong> (en adelante, «el Sitio»)
+          El sitio web <strong>Una mica de tot</strong> (en adelante, «el Sitio»)
           publica información editorial sobre ofertas de Amazon España y
           herramientas de alerta de precios. Los datos de contacto y
           titularidad se actualizarán conforme a la operativa del proyecto.
@@ -40,7 +40,7 @@ export default function AvisoLegalPage() {
           Programa de Afiliados de Amazon
         </h2>
         <p>
-          CazaOferta participa en el Programa de Afiliados de Amazon EU. Como
+          Una mica de tot participa en el Programa de Afiliados de Amazon EU. Como
           Afiliado de Amazon, obtenemos ingresos por las compras adscritas que
           cumplen los requisitos aplicables. Algunos enlaces de productos son
           enlaces de afiliado: si compras a través de ellos, podemos recibir
@@ -69,7 +69,7 @@ export default function AvisoLegalPage() {
           Propiedad intelectual
         </h2>
         <p>
-          Los textos editoriales propios del Sitio están propiedad de CazaOferta,
+          Los textos editoriales propios del Sitio están propiedad de Una mica de tot,
           salvo indicación contraria. Las marcas, imágenes y descripciones de
           producto pertenecen a sus respectivos titulares.
         </p>

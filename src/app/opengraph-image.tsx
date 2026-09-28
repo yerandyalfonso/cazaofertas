@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "CazaOferta — Revista de chollos Amazon España";
+export const alt = "Una mica de tot — Experiencias, recomendaciones y ofertas";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -31,11 +31,11 @@ export default function OpenGraphImage() {
             opacity: 0.85,
           }}
         >
-          Revista de ofertas
+          Blog
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div style={{ fontSize: 92, lineHeight: 1, letterSpacing: "-0.03em" }}>
-            CazaOferta
+            Una mica de tot
           </div>
           <div
             style={{
@@ -46,7 +46,7 @@ export default function OpenGraphImage() {
               fontFamily: "system-ui, sans-serif",
             }}
           >
-            Chollos reales de Amazon España con historial de precios y alertas.
+            Experiencias, recomendaciones y las ofertas que merecen la pena.
           </div>
         </div>
       </div>

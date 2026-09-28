@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RemoteImage } from "@/components/RemoteImage";
+import { BlogIndexGrid } from "@/components/blog/BlogIndexGrid";
 import { BLOG_IMAGES } from "@/lib/blog-images";
-import { buildPageMetadata } from "@/lib/seo";
+import { BLOG_NAME, buildPageMetadata } from "@/lib/seo";
+import { topicSlug } from "@/lib/blog-topics";
 import {
   getFeaturedArticles,
   getPublishedArticles,
@@ -10,10 +12,11 @@ import {
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
-    title: "Blog de ofertas y comparativas",
+    title: "Blog",
     description:
-      "Guías, comparativas y métodos para cazar ofertas reales en Amazon España.",
+      "Experiencias, recomendaciones y comparativas del día a día: un poco de todo.",
     path: "/blog",
+    siteName: BLOG_NAME,
   }),
 };
 
@@ -22,11 +25,23 @@ export const revalidate = 300;
 /** Índice del blog también depende de Supabase; no bloquear el build. */
 export const dynamic = "force-dynamic";
 
-export default async function BlogPage() {
-  const [posts, featured] = await Promise.all([
+export default async function BlogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tema?: string }>;
+}) {
+  const { tema } = await searchParams;
+  const [allPosts, allFeatured] = await Promise.all([
     getPublishedArticles(),
     getFeaturedArticles(),
   ]);
+
+  // Filtro por tema (/blog?tema=hogar) desde la fila de temas de la cabecera.
+  const inTopic = (post: { category: string }) =>
+    !tema || topicSlug(post.category) === tema;
+  const posts = allPosts.filter(inTopic);
+  const featured = allFeatured.filter(inTopic);
+  const topicName = tema ? posts[0]?.category : undefined;
 
   const lead = featured[0] ?? posts[0] ?? null;
   const others = lead
@@ -37,16 +52,21 @@ export default async function BlogPage() {
     return (
       <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
         <header className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
-            Editorial
-          </p>
-          <h1 className="mt-3 font-display text-4xl tracking-tight text-ink md:text-5xl">
-            Guías y comparativas
+          <h1 className="font-display text-4xl tracking-tight text-ink md:text-5xl">
+            Artículos
           </h1>
         </header>
         <div className="mt-12 border border-dashed border-stone-300 bg-white/70 px-6 py-12 text-sm text-stone-600">
-          Pronto publicaremos nuevas guías y comparativas. Mientras tanto,
-          revisa las ofertas o crea una alerta en Telegram.
+          {tema ? (
+            <>
+              Aún no hay artículos de este tema.{" "}
+              <Link href="/blog" className="text-ink underline underline-offset-4">
+                Ver todos los artículos
+              </Link>
+            </>
+          ) : (
+            "Pronto publicaremos nuevas guías y comparativas. Mientras tanto, revisa las ofertas o crea una alerta en Telegram."
+          )}
         </div>
       </div>
     );
@@ -55,15 +75,18 @@ export default async function BlogPage() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
       <header className="max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
-          Editorial
-        </p>
-        <h1 className="mt-3 font-display text-4xl tracking-tight text-ink md:text-5xl">
-          Guías y comparativas
+        {topicName ? (
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
+            Tema
+          </p>
+        ) : null}
+        <h1 className="mt-2 font-display text-4xl tracking-tight text-ink md:text-5xl">
+          {topicName ?? "Artículos"}
         </h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
-          Lecturas con fichas de producto embebidas: compara, decide y compra
-          sin salir del artículo.
+          {topicName
+            ? `${posts.length} ${posts.length === 1 ? "artículo" : "artículos"} sobre ${topicName.toLowerCase()}.`
+            : "Experiencias, recomendaciones y comparativas del día a día. Un poco de todo."}
         </p>
       </header>
 
@@ -85,7 +108,7 @@ export default async function BlogPage() {
             />
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-800">
               Destacado · {lead.category} · {lead.readingTime}
             </p>
             <h2 className="mt-3 font-display text-3xl leading-tight tracking-tight text-ink transition group-hover:text-teal-900 md:text-4xl">
@@ -101,40 +124,17 @@ export default async function BlogPage() {
         </div>
       </Link>
 
-      <div className="mt-16 grid gap-10 md:grid-cols-2 lg:grid-cols-3">
-        {others.map((post) => (
-          <article key={post.slug} className="flex flex-col">
-            <Link
-              href={`/blog/${post.slug}`}
-              prefetch={false}
-              className="group flex flex-1 flex-col"
-            >
-              <div className="relative mb-5 aspect-[16/10] overflow-hidden bg-stone-200">
-                <RemoteImage
-                  src={post.coverImage}
-                  fallbackSrc={BLOG_IMAGES.laptopDeals}
-                  alt={post.coverAlt}
-                  fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                />
-              </div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
-                {post.category} · {post.readingTime}
-              </p>
-              <h2 className="mt-3 font-display text-2xl leading-snug tracking-tight text-ink transition group-hover:text-teal-900">
-                {post.title}
-              </h2>
-              <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-600">
-                {post.excerpt}
-              </p>
-              <span className="mt-5 text-sm font-medium text-ink underline-offset-4 group-hover:underline">
-                Leer artículo
-              </span>
-            </Link>
-          </article>
-        ))}
-      </div>
+      <BlogIndexGrid
+        posts={others.map((post) => ({
+          slug: post.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          category: post.category,
+          readingTime: post.readingTime,
+          coverImage: post.coverImage,
+          coverAlt: post.coverAlt,
+        }))}
+      />
     </div>
   );
 }

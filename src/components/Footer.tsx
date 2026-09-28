@@ -7,10 +7,11 @@ export function Footer() {
     <footer className="mt-auto border-t border-stone-300 bg-ink text-paper">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
         <div className="space-y-4">
-          <p className="font-display text-3xl tracking-tight">CazaOferta</p>
+          <p className="font-display text-3xl tracking-tight">Una mica de tot</p>
           <p className="max-w-sm text-sm leading-relaxed text-stone-300">
-            Revista digital de ofertas de Amazon España. Detectamos bajadas
-            reales y te avisamos por Telegram.
+            Un blog de experiencias, recomendaciones y comparativas del día a
+            día. Y cuando algo baja de precio de verdad, te avisamos por
+            Telegram.
           </p>
           <AffiliateDisclosure className="max-w-sm text-stone-400" />
         </div>
@@ -68,7 +69,7 @@ export function Footer() {
       <div className="border-t border-white/10 px-5 py-5 text-xs text-stone-400 md:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} CazaOferta. Participamos en el
+            © {new Date().getFullYear()} Una mica de tot. Participamos en el
             Programa de Afiliados de Amazon EU.
           </p>
           <div className="flex flex-wrap gap-4">

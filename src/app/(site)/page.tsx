@@ -7,8 +7,10 @@ import { RemoteImage } from "@/components/RemoteImage";
 import {
   getActiveProducts,
   getCategories,
+  getCategoryShowcases,
   getTopDealProducts,
 } from "@/lib/catalog";
+import { CategoryShowcaseGrid } from "@/components/CategoryShowcaseGrid";
 import { BLOG_IMAGES } from "@/lib/blog-images";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, buildPageMetadata } from "@/lib/seo";
 import { telegramBotUrl } from "@/lib/telegram-links";
@@ -28,13 +30,23 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [topDeals, latest, categories, featuredPosts, allPosts] =
+  const [
+    topDeals,
+    latest,
+    categories,
+    featuredPosts,
+    allPosts,
+    showcases,
+    discountLeaders,
+  ] =
     await Promise.all([
       getTopDealProducts(4),
       getActiveProducts(8, { orderBy: "created" }),
       getCategories(),
       getFeaturedArticles(),
       getPublishedArticles(),
+      getCategoryShowcases(),
+      getActiveProducts(12, { orderBy: "discount" }),
     ]);
 
   const lead = featuredPosts[0] ?? allPosts[0];
@@ -43,6 +55,18 @@ export default async function HomePage() {
     ? allPosts.filter((post) => post.slug !== lead.slug).slice(0, 4)
     : [];
   const dealRail = (topDeals.length > 0 ? topDeals : latest).slice(0, 4);
+  const railIds = new Set(dealRail.map((product) => product.id));
+  const biggestDrops = discountLeaders
+    .filter((product) => !railIds.has(product.id))
+    .slice(0, 5);
+  const popularCategories = [...categories]
+    .filter((category) => (showcases.get(category.slug)?.count ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        (showcases.get(b.slug)?.count ?? 0) -
+        (showcases.get(a.slug)?.count ?? 0),
+    )
+    .slice(0, 8);
   const latestGrid = latest.slice(0, 4);
 
   return (
@@ -50,18 +74,21 @@ export default async function HomePage() {
       {/* Editorial first screen: blog lead + magazine grid + deals as side complement */}
       <section className="border-b border-stone-300">
         <div className="mx-auto max-w-6xl px-5 pt-10 md:px-8 md:pt-14">
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-stone-300 pb-6">
+          <div className="grid gap-6 border-b border-stone-300 pb-8 md:grid-cols-[minmax(0,1fr)_18rem] md:items-end md:gap-12">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-800">
-                CazaOferta · Revista
+                Una mica de tot · Blog
               </p>
-              <h1 className="mt-3 font-display text-4xl leading-[0.95] tracking-tight text-ink md:text-6xl">
-                Guías que cazan chollos.
+              <h1 className="mt-4 text-balance font-display text-4xl leading-[1.02] tracking-tight text-ink md:text-6xl">
+                Un poco de todo,{" "}
+                <span className="block text-stone-500">
+                  contado desde el <em className="italic">día a día</em>.
+                </span>
               </h1>
             </div>
-            <p className="max-w-sm text-sm leading-relaxed text-stone-600 md:text-right">
-              Comparativas y métodos primero. Las ofertas del día acompañan la
-              lectura, no la sustituyen.
+            <p className="border-l border-stone-300 pl-5 text-sm leading-relaxed text-stone-600 md:mb-2">
+              Experiencias, recomendaciones y comparativas honestas. Y cuando
+              algo merece la pena, te decimos dónde está más barato.
             </p>
           </div>
 
@@ -151,7 +178,7 @@ export default async function HomePage() {
                     Complemento
                   </p>
                   <h2 className="mt-1 font-display text-2xl tracking-tight text-ink">
-                    Ofertas del día
+                    Ofertas recomendadas
                   </h2>
                 </div>
                 <Link
@@ -163,7 +190,7 @@ export default async function HomePage() {
               </div>
 
               {dealRail.length > 0 ? (
-                <div className="flex flex-1 flex-col gap-6">
+                <div className="flex flex-col gap-6">
                   {dealRail.map((product) => (
                     <DealCard key={product.id} product={product} compact />
                   ))}
@@ -172,14 +199,83 @@ export default async function HomePage() {
                 <EmptyCatalogHint />
               )}
 
-              <a
-                href={telegramBotUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-8 inline-flex h-11 items-center justify-center border border-ink bg-ink px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900"
-              >
-                Alertas Telegram
-              </a>
+              {biggestDrops.length > 0 ? (
+                <section className="mt-12 border-t border-ink pt-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    Ranking
+                  </p>
+                  <h2 className="mt-1 font-display text-2xl tracking-tight text-ink">
+                    Mayores descuentos
+                  </h2>
+                  <ol className="mt-4 divide-y divide-stone-200">
+                    {biggestDrops.map((product, index) => (
+                      <li key={product.id}>
+                        <Link
+                          href={`/producto/${product.slug}`}
+                          className="group grid grid-cols-[2rem_minmax(0,1fr)_auto] items-baseline gap-3 py-3"
+                        >
+                          <span className="font-display text-2xl leading-none text-stone-300 transition-colors group-hover:text-teal-800">
+                            {index + 1}
+                          </span>
+                          <span className="line-clamp-2 text-sm leading-snug text-ink group-hover:underline group-hover:underline-offset-2">
+                            {product.title}
+                          </span>
+                          <span className="text-sm font-semibold tabular-nums text-amber-800">
+                            −{Math.round(product.discountPercentage)}%
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
+
+              {popularCategories.length > 0 ? (
+                <section className="mt-12 border-t border-ink pt-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    Atajos
+                  </p>
+                  <h2 className="mt-1 font-display text-2xl tracking-tight text-ink">
+                    Ofertas por sección
+                  </h2>
+                  <ul className="mt-4 flex flex-wrap gap-2">
+                    {popularCategories.map((category) => (
+                      <li key={category.id}>
+                        <Link
+                          href={`/categorias/${category.slug}`}
+                          className="inline-flex h-9 items-center gap-2 border border-stone-300 bg-white px-3 text-sm text-ink transition hover:border-ink"
+                        >
+                          {category.name}
+                          <span className="text-xs tabular-nums text-stone-500">
+                            {showcases.get(category.slug)?.count}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              <section className="mt-12 bg-ink p-6 text-paper">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                  Alertas gratis
+                </p>
+                <h2 className="mt-2 font-display text-2xl leading-tight tracking-tight">
+                  Que la oferta te encuentre a ti.
+                </h2>
+                <p className="mt-3 text-sm leading-relaxed text-stone-300">
+                  Dinos qué buscas y te avisamos en Telegram cuando baje de
+                  precio de verdad.
+                </p>
+                <a
+                  href={telegramBotUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex h-11 w-full items-center justify-center bg-paper px-4 text-xs font-semibold uppercase tracking-[0.14em] text-ink transition hover:bg-amber-200"
+                >
+                  Crear alerta en Telegram
+                </a>
+              </section>
             </aside>
           </div>
         </div>
@@ -244,7 +340,7 @@ export default async function HomePage() {
                 Catálogo
               </p>
               <h2 className="mt-2 font-display text-3xl tracking-tight text-ink">
-                Bajadas recientes
+                Recién rebajado
               </h2>
             </div>
             <Link
@@ -272,33 +368,22 @@ export default async function HomePage() {
             Categorías
           </p>
           <h2 className="mt-2 font-display text-3xl tracking-tight text-ink">
-            Explora por sección
+            Compra por categoría
           </h2>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {(categories.length > 0
-            ? categories
-            : [
-                { id: "1", name: "Tecnología", slug: "tecnologia" },
-                { id: "2", name: "Hogar", slug: "hogar" },
-                { id: "3", name: "Informática", slug: "informatica" },
-                { id: "4", name: "Moda", slug: "moda" },
-              ]
-          ).map((category) => (
-            <Link
-              key={category.id}
-              href={`/categorias/${category.slug}`}
-              className="border border-stone-300 bg-white/80 px-5 py-6 transition hover:border-ink hover:bg-white"
-            >
-              <p className="font-display text-xl tracking-tight text-ink">
-                {category.name}
-              </p>
-              <p className="mt-2 text-xs uppercase tracking-[0.16em] text-stone-500">
-                Ver categoría
-              </p>
-            </Link>
-          ))}
-        </div>
+        <CategoryShowcaseGrid
+          showcases={showcases}
+          categories={
+            categories.length > 0
+              ? categories
+              : [
+                  { id: "1", name: "Tecnología", slug: "tecnologia" },
+                  { id: "2", name: "Hogar", slug: "hogar" },
+                  { id: "3", name: "Informática", slug: "informatica" },
+                  { id: "4", name: "Moda", slug: "moda" },
+                ]
+          }
+        />
       </section>
 
       <section className="mx-auto max-w-6xl px-5 pb-8 md:px-8">

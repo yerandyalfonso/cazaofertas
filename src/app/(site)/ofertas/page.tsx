@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Ofertas Amazon España",
     description:
-      "Chollos de Amazon España ordenados por deal score, descuento y mínimo histórico.",
+      "Ofertas de Amazon España ordenadas por deal score, descuento y mínimo histórico.",
     path: "/ofertas",
   }),
 };
@@ -45,7 +45,7 @@ export default async function OffersPage() {
           Ofertas
         </p>
         <h1 className="mt-3 font-display text-4xl tracking-tight text-ink md:text-5xl">
-          Chollos con mejor puntuación
+          Ofertas mejor valoradas
         </h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
           Ordenados por deal score: descuento, cercanía al mínimo histórico y

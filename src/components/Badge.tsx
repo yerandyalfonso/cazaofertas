@@ -14,7 +14,7 @@ const LEVEL_STYLES: Record<DealLevel, { label: string; className: string }> = {
     className: "bg-amber-200 text-amber-950",
   },
   [DealLevel.HISTORICAL_LOW]: {
-    label: "Chollazo",
+    label: "Mínimo histórico",
     className: "bg-rose-200 text-rose-950",
   },
 };

@@ -47,7 +47,7 @@ export function ProductCard({
         className={`flex min-h-0 flex-1 flex-col ${compact ? "gap-3 p-3" : "gap-4"}`}
       >
         <div
-          className={`relative overflow-hidden bg-stone-100 ${
+          className={`relative overflow-hidden bg-white ${
             compact ? "aspect-[4/5] w-full" : "aspect-[4/5]"
           }`}
         >
@@ -101,6 +101,7 @@ export function ProductCard({
               current={product.currentPrice}
               previous={product.previousPrice}
               discountPercentage={product.discountPercentage}
+              showDiscountLabel={false}
               size="sm"
             />
           </div>

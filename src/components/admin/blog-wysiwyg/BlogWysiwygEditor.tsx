@@ -18,6 +18,7 @@ import {
   Package,
   Quote,
   Scale,
+  Table2,
   Type,
 } from "lucide-react";
 import { useMemo, useRef } from "react";
@@ -28,6 +29,7 @@ import {
   BlogProduct,
   BlogProductGrid,
   BlogProsCons,
+  BlogTable,
 } from "@/components/admin/blog-wysiwyg/extensions";
 import {
   BlogWysiwygContext,
@@ -129,6 +131,7 @@ export function BlogWysiwygEditor({
         BlogProductGrid,
         BlogProsCons,
         BlogFaq,
+        BlogTable,
       ],
       content: initialContent,
       editorProps: {
@@ -330,6 +333,26 @@ export function BlogWysiwygEditor({
             FAQ
           </ToolbarButton>
           <ToolbarButton
+            label="Tabla comparativa"
+            onClick={() =>
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: "blogTable",
+                  attrs: {
+                    title: "",
+                    columns: ["Producto", "Precio", ""],
+                    rows: [["", "", ""]],
+                  },
+                })
+                .run()
+            }
+          >
+            <Table2 className="h-3.5 w-3.5" />
+            Tabla
+          </ToolbarButton>
+          <ToolbarButton
             label="Producto"
             onClick={() =>
               editor
@@ -369,7 +392,7 @@ export function BlogWysiwygEditor({
 
         <p className="text-xs text-stone-500">
           Editor visual: bloques tipados al guardar. Usa enlace, negrita y cursiva
-          en párrafos; inserta bloques FAQ, imagen o producto desde la barra.
+          en párrafos; inserta bloques FAQ, tabla, imagen o producto desde la barra.
         </p>
       </div>
     </BlogWysiwygContext.Provider>

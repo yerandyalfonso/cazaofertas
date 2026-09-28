@@ -45,10 +45,10 @@ export function TelegramCategoryCta({
     <section className="overflow-hidden border border-stone-300 bg-ink text-paper">
       <div className="grid gap-6 p-6 md:grid-cols-[1.4fr_auto] md:items-end md:p-8">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
             Alertas · {category}
           </p>
-          <h2 className="mt-3 font-display text-2xl leading-tight tracking-tight md:text-3xl">
+          <h2 className="mt-3 font-display text-2xl leading-tight tracking-tight">
             ¿Quieres avisos solo de {category.toLowerCase()}?
           </h2>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-300">

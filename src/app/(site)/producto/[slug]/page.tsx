@@ -7,7 +7,9 @@ import { JsonLd } from "@/components/JsonLd";
 import { Price } from "@/components/Price";
 import { ProductStickyBuyBar } from "@/components/ProductStickyBuyBar";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
+import { RelatedArticles } from "@/components/blog/RelatedArticles";
 import { getActiveProducts, getProductBySlug } from "@/lib/catalog";
+import { getArticlesMentioningProduct } from "@/services/blog";
 import { formatEuro } from "@/lib/money";
 import { splitProductDescription } from "@/lib/product-description";
 import {
@@ -60,7 +62,7 @@ export async function generateMetadata({
   const title = product.title;
   const description =
     product.description ??
-    `${product.title} · precio actual ${formatEuro(product.currentPrice)} en Amazon España. Ofertas y alertas en CazaOferta.`;
+    `${product.title} · precio actual ${formatEuro(product.currentPrice)} en Amazon España. Ofertas y alertas en Una mica de tot.`;
 
   return buildPageMetadata({
     title,
@@ -77,6 +79,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
+  const mentions = await getArticlesMentioningProduct(product.slug);
   const savings =
     product.previousPrice !== null
       ? product.previousPrice - product.currentPrice
@@ -293,6 +296,12 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </div>
         </div>
       </div>
+
+      {mentions.length > 0 ? (
+        <div className="mt-16 border-t border-stone-300 pt-12 md:mt-20">
+          <RelatedArticles posts={mentions} title="Lo mencionamos en" />
+        </div>
+      ) : null}
 
       <ProductStickyBuyBar
         productId={product.id}

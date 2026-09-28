@@ -5,7 +5,7 @@ import { buildPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = buildPageMetadata({
   title: "Política de privacidad",
   description:
-    "Cómo trata CazaOferta los datos personales y el uso del bot de Telegram.",
+    "Cómo trata Una mica de tot los datos personales y el uso del bot de Telegram.",
   path: "/privacidad",
 });
 
@@ -18,7 +18,7 @@ export default function PrivacidadPage() {
         </h2>
         <p>
           El responsable del tratamiento de los datos asociados al Sitio y al
-          bot de Telegram de CazaOferta es el titular del proyecto CazaOferta.
+          bot de Telegram asociado es el titular del proyecto Una mica de tot.
         </p>
       </section>
 

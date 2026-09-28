@@ -41,10 +41,10 @@ function ProductThumb({
       <Image
         src={product.imageUrl}
         alt={product.title}
-        width={176}
-        height={176}
-        sizes="88px"
-        className="h-full w-full bg-transparent object-contain transition-transform duration-500 group-hover:scale-[1.03]"
+        width={224}
+        height={224}
+        sizes="120px"
+        className="absolute inset-0 h-full w-full bg-transparent object-contain p-2 transition-transform duration-500 group-hover:scale-[1.03]"
       />
     );
   }
@@ -76,17 +76,19 @@ export function DealCard({
 }: DealCardProps) {
   if (compact) {
     return (
-      <article className="group grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-stone-200 pb-5 last:border-b-0 last:pb-0">
+      <article className="group grid grid-cols-[120px_minmax(0,1fr)] items-stretch gap-4 border-b border-stone-200 pb-5 last:border-b-0 last:pb-0">
         <Link
           href={`/producto/${product.slug}`}
-          className="relative aspect-square overflow-hidden bg-transparent"
+          className="relative h-full min-h-[120px] overflow-hidden bg-white p-2"
         >
           <ProductThumb product={product} compact />
         </Link>
         <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            <Badge dealLevel={product.dealLevel} />
-          </div>
+          {product.discountPercentage > 0 ? (
+            <span className="inline-flex bg-ink px-2 py-1 text-xs font-semibold tabular-nums text-paper">
+              −{Math.round(product.discountPercentage)}%
+            </span>
+          ) : null}
           <Link href={`/producto/${product.slug}`}>
             <h3 className="line-clamp-2 font-display text-base leading-snug tracking-tight text-ink transition group-hover:text-teal-900">
               {product.title}
@@ -97,6 +99,7 @@ export function DealCard({
             previous={product.previousPrice}
             discountPercentage={product.discountPercentage}
             size="sm"
+            showDiscountLabel={false}
           />
           <div className="flex items-center gap-2 pt-0.5">
             <a

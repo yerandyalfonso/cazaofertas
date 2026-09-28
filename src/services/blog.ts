@@ -5,6 +5,8 @@ import {
   type BlogPost,
 } from "@/lib/blog";
 import { BLOG_IMAGES } from "@/lib/blog-images";
+import { BLOG_NAME } from "@/lib/blog-brand";
+import { foldText, topicSlug } from "@/lib/blog-topics";
 import {
   isArticleDocument,
   type ArticleDocument,
@@ -91,6 +93,11 @@ export function isBlogBlock(value: unknown): value is BlogBlock {
       );
     case "faq":
       return Array.isArray((value as { items?: unknown }).items);
+    case "table":
+      return (
+        Array.isArray((value as { columns?: unknown }).columns) &&
+        Array.isArray((value as { rows?: unknown }).rows)
+      );
     default:
       return false;
   }
@@ -216,10 +223,55 @@ function enrichFromFallback(post: BlogPost): BlogPost {
   };
 }
 
+/** El autor por defecto de la BD («CazaOferta») pasa a firmar como el blog. */
+function blogAuthor(author: string | null | undefined): string | undefined {
+  const name = author?.trim();
+  if (!name || /^caza ?ofertas?$/i.test(name)) return undefined;
+  return name;
+}
+
+/** Créditos «Imagen(es): Unsplash» que no queremos mostrar en los artículos. */
+const IMAGE_CREDIT = /\s*(?:·\s*)?Im[aá]gen(?:es)?:\s*Unsplash\.?/gi;
+
+/** Menciones al nombre antiguo del sitio dentro del texto de los artículos. */
+const OLD_BRAND = /\bCaza ?Ofertas?\b/g;
+
+function renameOldBrand(value: string): string {
+  return value.replace(OLD_BRAND, BLOG_NAME);
+}
+
+function stripImageCredits(
+  body: BlogBlock[],
+  html: string | undefined,
+): { body: BlogBlock[]; html: string | undefined } {
+  const cleanBody = body.flatMap((block): BlogBlock[] => {
+    if (block.type === "image" && block.caption) {
+      const caption = block.caption.replace(IMAGE_CREDIT, "").trim();
+      return [{ ...block, caption: caption || undefined }];
+    }
+    if (block.type === "paragraph" && IMAGE_CREDIT.test(block.text)) {
+      IMAGE_CREDIT.lastIndex = 0;
+      const text = block.text.replace(IMAGE_CREDIT, "").trim();
+      return text.replace(/[*_\s]/g, "") ? [{ ...block, text }] : [];
+    }
+    return [block];
+  });
+  const cleanHtml = html
+    ?.replace(IMAGE_CREDIT, "")
+    .replace(/<p>\s*(?:<(em|i|small)>\s*<\/\1>)?\s*<\/p>/gi, "");
+  return { body: cleanBody, html: cleanHtml };
+}
+
 function mapArticleRow(row: ArticleQueryRow): BlogPost {
   const coverImage =
     row.featured_image?.trim() || BLOG_IMAGES.laptopDeals;
   const parsed = parseContent(row.content);
+  const credited = stripImageCredits(parsed.body, parsed.html);
+  // El texto guardado aún nombra «CazaOferta»: se muestra con el nombre actual.
+  const body = JSON.parse(
+    renameOldBrand(JSON.stringify(credited.body)),
+  ) as BlogBlock[];
+  const html = credited.html ? renameOldBrand(credited.html) : undefined;
   const relatedFromJoin = productsFromArticleJoin(row).map((p) => p.slug);
 
   const mapped: BlogPost = {
@@ -232,11 +284,12 @@ function mapArticleRow(row: ArticleQueryRow): BlogPost {
     category: row.category,
     readingTime: formatReadingTime(row.reading_time),
     publishedAt: formatDate(row.created_at),
+    author: blogAuthor(row.author),
     featured: FEATURED_CATEGORIES.has(row.category),
     coverImage,
     coverAlt: row.title,
-    body: parsed.body,
-    html: parsed.html,
+    body,
+    html,
     relatedProductSlugs: relatedFromJoin,
     template: parsed.template,
     pullQuote: parsed.pullQuote,
@@ -412,4 +465,94 @@ export const getArticleBySlug = cache((slug: string) =>
 export async function getArticleSlugs(): Promise<string[]> {
   const posts = await getPublishedArticles();
   return posts.map((post) => post.slug);
+}
+
+export const getPublishedArticlesCached = unstable_cache(
+  () => getPublishedArticles(),
+  ["blog-published-articles"],
+  { revalidate: 300 },
+);
+
+/** «Sigue leyendo»: misma categoría primero, luego los más recientes. */
+export async function getRelatedArticles(
+  post: BlogPost,
+  limit = 3,
+): Promise<BlogPost[]> {
+  try {
+    const others = (await getPublishedArticlesCached()).filter(
+      (item) => item.slug !== post.slug,
+    );
+    const sameCategory = others.filter(
+      (item) => item.category === post.category,
+    );
+    const rest = others.filter((item) => item.category !== post.category);
+    return [...sameCategory, ...rest].slice(0, limit);
+  } catch (error) {
+    console.error(
+      "[blog] getRelatedArticles",
+      error instanceof Error ? error.message : error,
+    );
+    return [];
+  }
+}
+
+/** Artículos publicados que citan un producto (ficha de producto → blog). */
+export async function getArticlesMentioningProduct(
+  productSlug: string,
+  limit = 3,
+): Promise<BlogPost[]> {
+  try {
+    const posts = await getPublishedArticlesCached();
+    return posts
+      .filter((post) => collectProductSlugs(post).includes(productSlug))
+      .slice(0, limit);
+  } catch (error) {
+    console.error(
+      "[blog] getArticlesMentioningProduct",
+      error instanceof Error ? error.message : error,
+    );
+    return [];
+  }
+}
+
+export interface BlogTopic {
+  name: string;
+  slug: string;
+  count: number;
+}
+
+/** Temas del blog (categorías de los artículos), de más a menos artículos. */
+export async function getBlogTopics(limit = 8): Promise<BlogTopic[]> {
+  try {
+    const counts = new Map<string, BlogTopic>();
+    for (const post of await getPublishedArticlesCached()) {
+      const slug = topicSlug(post.category);
+      if (!slug) continue;
+      const topic = counts.get(slug) ?? { name: post.category, slug, count: 0 };
+      topic.count += 1;
+      counts.set(slug, topic);
+    }
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "es"))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Buscador de la cabecera: artículos cuyo título, extracto o tema contiene el texto. */
+export async function searchArticles(query: string, limit = 4): Promise<BlogPost[]> {
+  const needle = foldText(query.trim());
+  if (needle.length < 2) return [];
+  const posts = await getPublishedArticlesCached();
+  const scored = posts
+    .map((post) => {
+      const title = foldText(post.title);
+      const rest = foldText(`${post.excerpt} ${post.category}`);
+      const score = title.includes(needle) ? 2 : rest.includes(needle) ? 1 : 0;
+      return { post, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((item) => item.post);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BLOG_NAME } from "@/lib/blog-brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowDown, ArrowUp, Plus, Upload, X } from "lucide-react";
@@ -74,7 +75,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
   const [slug, setSlug] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [featuredImage, setFeaturedImage] = useState("");
-  const [author, setAuthor] = useState("CazaOferta");
+  const [author, setAuthor] = useState(BLOG_NAME);
   const [category, setCategory] = useState("Ofertas");
   const [status, setStatus] = useState("draft");
   const [seoTitle, setSeoTitle] = useState("");

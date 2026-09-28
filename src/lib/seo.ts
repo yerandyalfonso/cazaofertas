@@ -5,11 +5,14 @@ import type { CatalogProduct } from "@/lib/catalog";
 import type { BlogPost } from "@/lib/blog";
 import { stripArticleInlineMarkdown } from "@/lib/article-inline-markdown";
 import { ProductAvailability } from "@/types";
+import { BLOG_NAME } from "@/lib/blog-brand";
 
-export const SITE_NAME = "CazaOferta";
-export const DEFAULT_TITLE = "CazaOferta — Revista de chollos Amazon";
+export const SITE_NAME = BLOG_NAME;
+export { BLOG_NAME };
+export const DEFAULT_TITLE =
+  "Una mica de tot — Experiencias, recomendaciones y ofertas";
 export const DEFAULT_DESCRIPTION =
-  "Ofertas reales de Amazon España, puntuadas por bajada y mínimo histórico. Alertas por Telegram.";
+  "Un blog de experiencias, recomendaciones y comparativas del día a día, con las ofertas reales de Amazon España que merecen la pena.";
 
 export function buildPageMetadata(options: {
   title: string;
@@ -18,6 +21,8 @@ export function buildPageMetadata(options: {
   image?: string | null;
   type?: "website" | "article";
   noIndex?: boolean;
+  /** Marca de la sección (p. ej. el blog); sustituye a la plantilla «· SITE_NAME». */
+  siteName?: string;
 }): Metadata {
   const url = options.path.startsWith("http")
     ? options.path
@@ -28,8 +33,12 @@ export function buildPageMetadata(options: {
       : absoluteUrl(options.image)
     : absoluteUrl("/opengraph-image");
 
+  const siteName = options.siteName ?? SITE_NAME;
+
   return {
-    title: options.title,
+    title: options.siteName
+      ? { absolute: `${options.title} · ${options.siteName}` }
+      : options.title,
     description: options.description,
     alternates: { canonical: options.path },
     robots: options.noIndex
@@ -40,7 +49,7 @@ export function buildPageMetadata(options: {
       title: options.title,
       description: options.description,
       url,
-      siteName: SITE_NAME,
+      siteName,
       locale: "es_ES",
       images: [{ url: image, alt: options.title }],
     },
@@ -180,7 +189,7 @@ export function articleJsonLd(post: BlogPost) {
     dateModified: post.reviewedAt ?? post.publishedAt,
     author: {
       "@type": "Organization",
-      name: SITE_NAME,
+      name: post.author ?? BLOG_NAME,
     },
     publisher: {
       "@type": "Organization",
@@ -235,7 +244,7 @@ export function categorySeoCopy(
         "Priorizamos descuento frente a precio reciente, cercanía al mínimo histórico y estabilidad del precio en los últimos 30–90 días.",
     },
     informatica: {
-      intro: `Chollos de ${name}: portátiles, monitores, periféricos y componentes con bajada verificada en Amazon España.`,
+      intro: `Ofertas de ${name}: portátiles, monitores, periféricos y componentes con bajada verificada en Amazon España.`,
       howWePick:
         "Comparamos el precio actual con el histórico y el promedio reciente para señalar cuándo conviene comprar.",
     },
@@ -245,7 +254,7 @@ export function categorySeoCopy(
         "Miramos el descuento, el mínimo histórico y si el precio se mantiene estable tras la caída.",
     },
     belleza: {
-      intro: `Chollos de ${name} en Amazon: cuidado personal y belleza con alerta cuando bajan de verdad.`,
+      intro: `Ofertas de ${name} en Amazon: cuidado personal y belleza con alerta cuando bajan de verdad.`,
       howWePick:
         "Evita ofertas eternas: cruzamos precio actual, referencia y tendencia de las últimas semanas.",
     },
@@ -268,9 +277,9 @@ export function categorySeoCopy(
 
   return (
     known[slug] ?? {
-      intro: `Ofertas de ${name} en Amazon España, ordenadas por deal score e historial de precios de CazaOferta.`,
+      intro: `Ofertas de ${name} en Amazon España, ordenadas por deal score e historial de precios de ${SITE_NAME}.`,
       howWePick:
-        "Seleccionamos chollos por descuento real, cercanía al mínimo histórico y estabilidad del precio.",
+        "Seleccionamos ofertas por descuento real, cercanía al mínimo histórico y estabilidad del precio.",
     }
   );
 }

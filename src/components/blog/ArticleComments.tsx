@@ -100,14 +100,14 @@ export function ArticleComments({
   return (
     <section
       id="comentarios"
-      className="scroll-mt-24 border-t border-stone-200 pt-12"
+      className="scroll-mt-24 border-t border-stone-300 pt-12"
       aria-labelledby="comments-title"
     >
       <div className="mb-6 flex items-center gap-2">
         <MessageCircle className="h-5 w-5 text-teal-800" aria-hidden />
         <h2
           id="comments-title"
-          className="font-display text-2xl tracking-tight text-ink md:text-3xl"
+          className="font-display text-3xl tracking-tight text-ink md:text-4xl"
         >
           Comentarios
         </h2>
@@ -139,7 +139,7 @@ export function ArticleComments({
               </p>
               {comment.adminReply ? (
                 <div className="mt-4 border-l-4 border-teal-800 bg-teal-50/60 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-900">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-900">
                     Respuesta del equipo
                     {comment.adminRepliedAt ? (
                       <span className="ml-2 font-normal normal-case text-stone-500">
