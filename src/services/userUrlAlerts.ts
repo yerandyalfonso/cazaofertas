@@ -22,6 +22,7 @@ import {
 } from "@/providers/browser";
 import { ensureProductFromUrl } from "@/services/products";
 import { alertRecipient } from "@/services/testUsers";
+import { retailerLabel } from "@/lib/retailers";
 import { AMAZON_FOREIGN_DELIVERY_ERROR } from "@/providers/price/AmazonHtmlPriceProvider";
 import { DealLevel, ProductAvailability } from "@/types";
 import {
@@ -291,7 +292,7 @@ export async function runUserUrlAlerts(options?: {
    * ≥12 fallos durante ≥3 días, desactiva la alerta y avisa al usuario.
    */
   const recordRealFailure = async (
-    row: { id: string; user_id: string; url: string | null; keyword: string | null; product_id: string | null; fail_count: number | null; first_failed_at: string | null },
+    row: { id: string; user_id: string; url: string | null; keyword: string | null; product_id: string | null; last_known_price: number | string | null; fail_count: number | null; first_failed_at: string | null },
   ) => {
     const count = (row.fail_count ?? 0) + 1;
     const firstFailedAt = row.first_failed_at ?? new Date().toISOString();
@@ -316,18 +317,27 @@ export async function runUserUrlAlerts(options?: {
       const recipient = user ? alertRecipient(user) : null;
       if (!recipient || !isTelegramConfigured()) return;
       const { data: product } = row.product_id
-        ? await client.from("products").select("title").eq("id", row.product_id).maybeSingle()
+        ? await client
+            .from("products")
+            .select("title, retailer, current_price")
+            .eq("id", row.product_id)
+            .maybeSingle()
         : { data: null };
       const name = product?.title?.trim() || row.keyword?.trim();
+      const store = retailerLabel(product?.retailer ?? (row.url ? detectRetailerFromUrl(row.url) : null));
+      const lastPrice = toNumber(row.last_known_price) ?? toNumber(product?.current_price ?? null);
       await sendTelegramMessage({
         chatId: recipient.chatId,
         text: [
           ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
           "🔕 <b>Alerta desactivada</b>",
           "",
-          name
-            ? `Ya no podemos seguir el precio de «${escapeHtml(name.slice(0, 90))}».`
-            : "Ya no podemos seguir el precio de uno de tus productos.",
+          "Ya no podemos seguir el precio de este producto:",
+          "",
+          `📦 ${escapeHtml((name || "Producto sin nombre").slice(0, 120))}`,
+          `🏪 ${escapeHtml(store)}${lastPrice !== null ? ` · último precio: ${formatEuro(lastPrice)}` : ""}`,
+          ...(row.url ? [`🔗 ${escapeHtml(row.url)}`] : []),
+          "",
           "Si aún te interesa, crea una alerta nueva con el enlace del producto.",
         ].join("\n"),
         disableWebPagePreview: true,
