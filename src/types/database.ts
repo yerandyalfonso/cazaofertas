@@ -284,6 +284,8 @@ export type Database = {
           max_price: number | null;
           min_price: number | null;
           is_active: boolean;
+          fail_count: number;
+          first_failed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -301,6 +303,8 @@ export type Database = {
           max_price?: number | null;
           min_price?: number | null;
           is_active?: boolean;
+          fail_count?: number;
+          first_failed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -318,6 +322,8 @@ export type Database = {
           max_price?: number | null;
           min_price?: number | null;
           is_active?: boolean;
+          fail_count?: number;
+          first_failed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -43,6 +43,8 @@ export interface UserUrlAlertsResult {
   skipped: number;
   /** Motivos de fallos y omisiones: «motivo» → número de alertas. */
   reasons: Record<string, number>;
+  /** Alertas desactivadas por fallar ≥12 veces durante ≥3 días. */
+  deactivated: number;
   /** Hasta 6 ejemplos (motivo + enlace) para diagnosticar. */
   examples: Array<{ reason: string; url: string; detail?: string }>;
   finishedAt: string;
@@ -51,6 +53,9 @@ export interface UserUrlAlertsResult {
 function isForeignDeliveryError(message: string): boolean {
   return message.includes(AMAZON_FOREIGN_DELIVERY_ERROR);
 }
+
+const BROKEN_ALERT_MIN_FAILURES = 12;
+const BROKEN_ALERT_MIN_AGE_MS = 3 * 24 * 3_600_000;
 
 /** Agrupa el mensaje de error en un motivo legible (para contar y avisar). */
 function reasonFromError(message: string): string {
@@ -250,7 +255,7 @@ export async function runUserUrlAlerts(options?: {
   const { data: alerts, error } = await client
     .from("alerts")
     .select(
-      "id, user_id, url, keyword, product_id, last_known_price, last_checked_at, max_price",
+      "id, user_id, url, keyword, product_id, last_known_price, last_checked_at, max_price, fail_count, first_failed_at",
     )
     .eq("is_active", true)
     .not("url", "is", null)
@@ -269,6 +274,7 @@ export async function runUserUrlAlerts(options?: {
     failed: 0,
     skipped: 0,
     reasons: {},
+    deactivated: 0,
     examples: [],
     finishedAt: new Date().toISOString(),
   };
@@ -279,6 +285,51 @@ export async function runUserUrlAlerts(options?: {
       .from("alerts")
       .update({ last_checked_at: new Date().toISOString() })
       .eq("id", alertId);
+  };
+  /**
+   * Fallo real (no bloqueos ni «fuera de España»): suma al contador y, tras
+   * ≥12 fallos durante ≥3 días, desactiva la alerta y avisa al usuario.
+   */
+  const recordRealFailure = async (
+    row: { id: string; user_id: string; url: string | null; keyword: string | null; fail_count: number | null; first_failed_at: string | null },
+    reason: string,
+  ) => {
+    const count = (row.fail_count ?? 0) + 1;
+    const firstFailedAt = row.first_failed_at ?? new Date().toISOString();
+    const ageMs = Date.now() - new Date(firstFailedAt).getTime();
+    const deactivate = count >= BROKEN_ALERT_MIN_FAILURES && ageMs >= BROKEN_ALERT_MIN_AGE_MS;
+    await client
+      .from("alerts")
+      .update({
+        fail_count: count,
+        first_failed_at: firstFailedAt,
+        ...(deactivate ? { is_active: false } : {}),
+      })
+      .eq("id", row.id);
+    if (!deactivate) return;
+    result.deactivated += 1;
+    try {
+      const { data: user } = await client
+        .from("users")
+        .select("id, telegram_id, telegram_username, is_test")
+        .eq("id", row.user_id)
+        .maybeSingle();
+      const recipient = user ? alertRecipient(user) : null;
+      if (!recipient || !isTelegramConfigured()) return;
+      await sendTelegramMessage({
+        chatId: recipient.chatId,
+        text: [
+          ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
+          "🔕 <b>Alerta desactivada</b>",
+          "",
+          `Hemos dejado de seguir el precio de ${escapeHtml(row.keyword?.trim() || row.url || "este producto")} porque el enlace ya no funciona (${escapeHtml(reason.toLowerCase())}).`,
+          "Si lo sigues queriendo, crea una alerta nueva con el enlace actual del producto.",
+        ].join("\n"),
+        disableWebPagePreview: true,
+      });
+    } catch (error) {
+      console.warn(`[user-alerts] Alerta ${row.id}: no se pudo avisar de la desactivación`, error);
+    }
   };
   const note = (
     kind: "failed" | "skipped",
@@ -313,6 +364,7 @@ export async function runUserUrlAlerts(options?: {
     if (!alertRetailerSupported(retailer)) {
       note("failed", `Tienda sin revisión automática (${retailer})`, url);
       await moveToBack(alert.id);
+      await recordRealFailure(alert, "tienda sin revisión automática");
       console.warn(
         `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
       );
@@ -323,6 +375,7 @@ export async function runUserUrlAlerts(options?: {
     if (!externalId) {
       note("failed", "URL sin identificador de producto", url);
       await moveToBack(alert.id);
+      await recordRealFailure(alert, "la URL no identifica ningún producto");
       console.warn(`[user-alerts] Alerta ${alert.id}: URL sin identificador válido`);
       continue;
     }
@@ -404,6 +457,8 @@ export async function runUserUrlAlerts(options?: {
         .update({
           last_checked_at: nowIso,
           last_known_price: currentPrice,
+          fail_count: 0,
+          first_failed_at: null,
           ...(productId ? { product_id: productId } : {}),
         })
         .eq("id", alert.id);
@@ -627,6 +682,9 @@ export async function runUserUrlAlerts(options?: {
         message.slice(0, 160),
       );
       await moveToBack(alert.id);
+      if (!isRetailBlockedError(message) && !isForeignDeliveryError(message)) {
+        await recordRealFailure(alert, reasonFromError(message));
+      }
       console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
 

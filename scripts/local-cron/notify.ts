@@ -312,7 +312,7 @@ export async function reviewUserAlertsResult(
   const blocked = Object.entries(result.reasons ?? {})
     .filter(([reason]) => reason.startsWith("Bloqueo anti-bot"))
     .reduce((sum, [, count]) => sum + count, 0);
-  if (result.failed <= 0 && blocked < 3) return;
+  if (result.failed <= 0 && blocked < 3 && !result.deactivated) return;
 
   const reasons = Object.entries(result.reasons ?? {})
     .sort((a, b) => b[1] - a[1])
@@ -330,6 +330,9 @@ export async function reviewUserAlertsResult(
       `Revisadas: ${result.checked}`,
       `Fallidas: ${result.failed}`,
       `Omitidas: ${result.skipped}`,
+      ...(result.deactivated
+        ? [`Desactivadas por enlace roto (≥12 fallos en ≥3 días): ${result.deactivated}`]
+        : []),
       ...(reasons.length ? ["", "<b>Motivos:</b>", ...reasons] : []),
       ...(examples.length ? ["", "<b>Ejemplos:</b>", ...examples] : []),
     ],
