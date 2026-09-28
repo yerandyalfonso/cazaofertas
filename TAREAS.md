@@ -62,6 +62,8 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 
 - [x] 2026-09-28 Canal/grupo de Telegram: las ofertas se publican en el momento de detectarlas (antes, lotes cada 2 h con el precio de la detección) y se comprueba el precio justo antes de publicar (Amazon se relee si el precio tiene >10 min; no se publica si subió >2 % o está agotado).
 
+- [x] 2026-09-28 «Oferta Prime»: se lee el precio de oferta Prime que Amazon muestra por defecto (antes el «Precio sin oferta») y se etiqueta «Prime» en web y Telegram, con el precio sin Prime (`products.prime_only`, `regular_price`, migración 0054). Alertas de URL: solo bajadas ≥2 % y ≥0,10 €, sin repetir la misma (migración 0053).
+
 ## Infraestructura / mantenimiento
 
 - [x] 2026-09-27 Relé del Mac instalado (`scripts/local-cron/install-miravia-relay.sh`) y ampliado a amazon.es: el VPS sale a Amazon por la IP española del Mac (`AMAZON_EGRESS`) y a Miravia como respaldo de WARP.
