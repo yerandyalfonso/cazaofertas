@@ -14,6 +14,7 @@ import {
 } from "@/services/appSettings";
 import { dealScoringService } from "@/services/deal-scoring";
 import { sendChannelDealAlert } from "@/services/telegram/bot";
+import { scrapeAmazonProductPage } from "@/providers/price/AmazonHtmlPriceProvider";
 import { DealLevel, ProductAvailability } from "@/types";
 
 const SEND_DELAY_MS = 1_200;
@@ -28,6 +29,72 @@ type FlushClient = ReturnType<typeof createSupabaseServiceClient>;
  * ¿Ya se envió hace poco otra variante del mismo padre con un descuento
  * parecido? Evita p. ej. 21 mensajes de las mismas zapatillas en 24 h.
  */
+/** Tolerancia al comprobar el precio antes de publicar (redondeos, céntimos). */
+const PUBLISH_PRICE_TOLERANCE = 0.02;
+/** Tiendas sin relectura al publicar: precio comprobado hace como mucho 6 h. */
+const PUBLISH_MAX_PRICE_AGE_MS = 6 * 3_600_000;
+
+async function verifyPriceBeforePublish(
+  client: ReturnType<typeof createSupabaseServiceClient>,
+  product: {
+    id: string;
+    asin: string;
+    retailer: string;
+    amazon_url: string | null;
+    current_price: number | string | null;
+    last_checked_at: string | null;
+  },
+  queuedPrice: number | null,
+): Promise<{ ok: true; price: number } | { ok: false; reason: string }> {
+  const stored = toNumber(product.current_price) ?? 0;
+  const target = queuedPrice ?? stored;
+
+  if (product.retailer !== "amazon") {
+    const age = product.last_checked_at
+      ? Date.now() - new Date(product.last_checked_at).getTime()
+      : Number.POSITIVE_INFINITY;
+    if (age > PUBLISH_MAX_PRICE_AGE_MS) return { ok: false, reason: "precio sin comprobar en 6 h" };
+    if (stored > target * (1 + PUBLISH_PRICE_TOLERANCE)) return { ok: false, reason: `precio subió a ${stored} €` };
+    return { ok: true, price: stored };
+  }
+
+  try {
+    const quote = await scrapeAmazonProductPage(
+      product.amazon_url || `https://www.amazon.es/dp/${product.asin}`,
+      product.asin,
+      { timeoutMs: 15_000 },
+    );
+    const now = new Date().toISOString();
+    if (quote.price === null || quote.availability === ProductAvailability.OUT_OF_STOCK) {
+      await client
+        .from("products")
+        .update({ availability: ProductAvailability.OUT_OF_STOCK, last_checked_at: now })
+        .eq("id", product.id);
+      return { ok: false, reason: "agotado al publicar" };
+    }
+    if (Math.abs(quote.price - stored) >= 0.01) {
+      await client
+        .from("products")
+        .update({ current_price: quote.price, last_checked_at: now, updated_at: now })
+        .eq("id", product.id);
+    }
+    if (quote.price > target * (1 + PUBLISH_PRICE_TOLERANCE)) {
+      return { ok: false, reason: `la oferta acabó: ${target} € → ${quote.price} €` };
+    }
+    return { ok: true, price: quote.price };
+  } catch (error) {
+    // Sin relectura (bloqueo, fuera de España…): solo si el precio es reciente.
+    const age = product.last_checked_at
+      ? Date.now() - new Date(product.last_checked_at).getTime()
+      : Number.POSITIVE_INFINITY;
+    if (age <= 3_600_000) return { ok: true, price: stored };
+    return {
+      ok: false,
+      reason: `sin poder releer (${error instanceof Error ? error.message.slice(0, 60) : "error"})`,
+    };
+  }
+}
+
 async function recentlySentSiblingVariant(
   client: FlushClient,
   productId: string,
@@ -401,7 +468,7 @@ export async function flushPendingChannelNotifications(options?: {
       const { data: product, error: productError } = await client
         .from("products")
         .select(
-          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, parent_asin, variant_info, category_id, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
+          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, parent_asin, variant_info, category_id, last_checked_at, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
         )
         .eq("id", row.product_id)
         .maybeSingle();
@@ -437,7 +504,19 @@ export async function flushPendingChannelNotifications(options?: {
         continue;
       }
 
-      const currentPrice = toNumber(product.current_price) ?? 0;
+      // El lote sale hasta 2 h después de detectar la oferta: se comprueba el
+      // precio justo antes de publicar para no anunciar ofertas ya acabadas.
+      const verified = await verifyPriceBeforePublish(client, product, toNumber(row.new_price));
+      if (!verified.ok) {
+        await client
+          .from("channel_notifications")
+          .update({ status: "skipped_stale_price" })
+          .eq("id", row.id);
+        skippedExpired += 1;
+        console.log(`[telegram-flush] ${product.asin}: no se publica (${verified.reason}).`);
+        continue;
+      }
+      const currentPrice = verified.price;
       const previousPrice =
         toNumber(product.previous_price) ??
         toNumber(row.old_price) ??
