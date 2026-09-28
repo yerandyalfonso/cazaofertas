@@ -58,6 +58,17 @@ async function verifyPriceBeforePublish(
     return { ok: true, price: stored };
   }
 
+  // Recién leído (publicación al momento de detectar): no hace falta releer.
+  const age = product.last_checked_at
+    ? Date.now() - new Date(product.last_checked_at).getTime()
+    : Number.POSITIVE_INFINITY;
+  if (age <= 10 * 60_000) {
+    if (stored > target * (1 + PUBLISH_PRICE_TOLERANCE)) {
+      return { ok: false, reason: `precio subió a ${stored} €` };
+    }
+    return { ok: true, price: stored };
+  }
+
   try {
     const quote = await scrapeAmazonProductPage(
       product.amazon_url || `https://www.amazon.es/dp/${product.asin}`,

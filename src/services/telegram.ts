@@ -28,7 +28,8 @@ function cooldownMs(hours = DEFAULT_COOLDOWN_HOURS): number {
 
 /**
  * Encola un chollo para el grupo/canal si pasa umbral de % y cooldown.
- * El envío real lo hace `flushPendingChannelNotifications` (lote cada N horas).
+ * y lo publica al momento (`flushPendingChannelNotifications`); lo que falle
+ * queda en cola para el siguiente envío.
  */
 export async function notifyChannelDealIfEligible(
   client: TypedSupabaseClient,
@@ -199,10 +200,25 @@ export async function notifyChannelDealIfEligible(
     };
   }
 
+  // Publicar en el momento (sin esperar al lote): los precios de las ofertas
+  // cambian en minutos. El envío «reserva» cada fila, así que VPS y Mac no
+  // duplican. Si falla, queda en cola para el siguiente intento.
+  let sentNow = false;
+  try {
+    const { flushPendingChannelNotifications } = await import("@/services/telegramFlush");
+    const flushed = await flushPendingChannelNotifications({ force: true, limit: 5 });
+    sentNow = flushed.sent > 0;
+  } catch (error) {
+    console.warn(
+      "[telegram] No se pudo publicar al momento; queda en cola:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   return {
     attempted: true,
-    sent: false,
-    queued: true,
+    sent: sentNow,
+    queued: !sentNow,
     skipped: false,
     ...base,
   };
