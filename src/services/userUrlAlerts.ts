@@ -73,6 +73,37 @@ interface RetailQuote {
   availability: ProductAvailability;
 }
 
+/**
+ * Tiendas cuya ficha bloquea el anti-bot (Kiabi/DataDome) pero cuyo precio ya
+ * refresca otro job (kiabi-deals). Para sus alertas se usa el precio del
+ * catálogo si es reciente, en vez de leer la ficha.
+ */
+const CATALOG_PRICE_RETAILERS: ProductRetailer[] = ["kiabi"];
+const CATALOG_PRICE_MAX_AGE_MS = 24 * 3_600_000;
+
+async function quoteFromFreshCatalog(
+  client: ReturnType<typeof createSupabaseServiceClient>,
+  retailer: ProductRetailer,
+  productId: string | null,
+  pageUrl: string,
+): Promise<RetailQuote | null> {
+  if (!productId || !CATALOG_PRICE_RETAILERS.includes(retailer)) return null;
+  const { data } = await client
+    .from("products")
+    .select("current_price, previous_price, title, product_url, availability, last_checked_at")
+    .eq("id", productId)
+    .maybeSingle();
+  if (!data?.last_checked_at) return null;
+  if (Date.now() - new Date(data.last_checked_at).getTime() > CATALOG_PRICE_MAX_AGE_MS) return null;
+  return {
+    price: toNumber(data.current_price),
+    previousPrice: toNumber(data.previous_price),
+    title: data.title,
+    productUrl: data.product_url || pageUrl,
+    availability: (data.availability as ProductAvailability) ?? ProductAvailability.IN_STOCK,
+  };
+}
+
 /** Ficha de producto normalizada, sea la tienda que sea. */
 async function fetchRetailQuote(
   retailer: ProductRetailer,
@@ -241,6 +272,14 @@ export async function runUserUrlAlerts(options?: {
     examples: [],
     finishedAt: new Date().toISOString(),
   };
+  // Una alerta que falla u omite también pasa al final de la cola: si no,
+  // las bloqueadas (p. ej. Kiabi) ocupan siempre la cabeza del lote.
+  const moveToBack = async (alertId: string) => {
+    await client
+      .from("alerts")
+      .update({ last_checked_at: new Date().toISOString() })
+      .eq("id", alertId);
+  };
   const note = (
     kind: "failed" | "skipped",
     reason: string,
@@ -273,6 +312,7 @@ export async function runUserUrlAlerts(options?: {
     }
     if (!alertRetailerSupported(retailer)) {
       note("failed", `Tienda sin revisión automática (${retailer})`, url);
+      await moveToBack(alert.id);
       console.warn(
         `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
       );
@@ -282,6 +322,7 @@ export async function runUserUrlAlerts(options?: {
     const externalId = extractExternalId(retailer, url);
     if (!externalId) {
       note("failed", "URL sin identificador de producto", url);
+      await moveToBack(alert.id);
       console.warn(`[user-alerts] Alerta ${alert.id}: URL sin identificador válido`);
       continue;
     }
@@ -311,7 +352,9 @@ export async function runUserUrlAlerts(options?: {
         }
       }
 
-      const quote = await fetchRetailQuote(retailer, pageUrl, externalId, 12_000);
+      const quote =
+        (await quoteFromFreshCatalog(client, retailer, productId, pageUrl)) ??
+        (await fetchRetailQuote(retailer, pageUrl, externalId, 12_000));
 
       if (quote.price === null) {
         const nowIso = new Date().toISOString();
@@ -583,6 +626,7 @@ export async function runUserUrlAlerts(options?: {
         url,
         message.slice(0, 160),
       );
+      await moveToBack(alert.id);
       console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
 
