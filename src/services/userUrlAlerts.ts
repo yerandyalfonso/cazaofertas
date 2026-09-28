@@ -81,6 +81,9 @@ interface RetailQuote {
   title: string | null;
   productUrl: string;
   availability: ProductAvailability;
+  /** Oferta Prime (sin Prime cuesta `regularPrice`). */
+  primeOnly?: boolean;
+  regularPrice?: number | null;
 }
 
 /**
@@ -131,6 +134,8 @@ async function fetchRetailQuote(
       title: quote.title ?? null,
       productUrl: quote.amazonUrl ?? pageUrl,
       availability: quote.availability,
+      primeOnly: quote.primeOnly,
+      regularPrice: quote.regularPrice ?? null,
     };
   }
 
@@ -635,6 +640,13 @@ export async function runUserUrlAlerts(options?: {
           escapeHtml(title),
           `Antes: <s>${formatEuro(reference)}</s>`,
           `Ahora: <b>${formatEuro(currentPrice)}</b> (−${discountPct}%)`,
+          ...(quote.primeOnly
+            ? [
+                `⭐ Precio de oferta Prime${
+                  quote.regularPrice ? ` · sin Prime: ${formatEuro(quote.regularPrice)}` : ""
+                }`,
+              ]
+            : []),
         ].join("\n"),
         disableWebPagePreview: false,
         replyMarkup: buildOfferActionMarkup({

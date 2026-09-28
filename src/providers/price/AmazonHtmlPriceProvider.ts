@@ -449,6 +449,22 @@ function priceFromWholeFraction(
  * En fichas con acordeón, esos bloques también usan .priceToPay y el whole
  * "8," se parseaba antes como 8,00 €.
  */
+/**
+ * «Oferta Prime limitada»: fila del buy box con el precio de oferta para Prime
+ * (la que Amazon muestra por defecto). El bloque «Comprar nuevo» tiene
+ * entonces el «Precio sin oferta» (sin Prime).
+ */
+function primeDealPrice($: cheerio.CheerioAPI): number | null {
+  const root = "#primeSavingsUpsellAccordionRow";
+  if ($(root).length === 0) return null;
+  const value = firstPriceFromSelectors($, [
+    `${root} .apex-pricetopay-value span.a-offscreen`,
+    `${root} span.a-price.priceToPay:not(.a-text-price) span.a-offscreen`,
+    `${root} span.a-price:not(.a-text-price) span.a-offscreen`,
+  ]);
+  return value !== null && value >= 0.5 ? value : null;
+}
+
 function priceFromOneTimeBuyBox($: cheerio.CheerioAPI): number | null {
   const preferredRoots = [
     "#apex_desktop_newAccordionRow",
@@ -787,6 +803,9 @@ export function extractPriceFromAmazonHtml(html: string): {
   breadcrumbs?: string[];
   categorySlug?: string;
   dealExpiresAt?: string | null;
+  /** El precio es una «Oferta Prime» (sin Prime cuesta `regularPrice`). */
+  primeOnly?: boolean;
+  regularPrice?: number | null;
 } {
   const $ = cheerio.load(html);
 
@@ -823,7 +842,13 @@ export function extractPriceFromAmazonHtml(html: string): {
     priceFromPageScripts(html);
   // Producto padre con variantes: mínimo del rango (sin «antes» ni descuento).
   const rangePrice = directPrice === null ? priceFromVariantRange($) : null;
-  const price = directPrice ?? rangePrice;
+  // Oferta Prime por defecto: ese es el precio que ve quien abre la ficha;
+  // el de «Comprar nuevo» queda como precio sin Prime.
+  const primePrice = primeDealPrice($);
+  const usePrime =
+    primePrice !== null && (directPrice === null || primePrice < directPrice - 0.009);
+  const price = usePrime ? primePrice : (directPrice ?? rangePrice);
+  const regularPrice = usePrime ? directPrice : null;
 
   // Precio recomendado / lista: solo basis del buy box (nunca mini de relacionados).
   // "basisPrice"/"apex-basisprice-value"/"apex-priceperunit-value" son el
@@ -1032,6 +1057,8 @@ export function extractPriceFromAmazonHtml(html: string): {
     breadcrumbs,
     categorySlug: categorySlug ?? undefined,
     dealExpiresAt,
+    primeOnly: usePrime,
+    regularPrice,
   };
 }
 
@@ -1366,6 +1393,8 @@ export async function scrapeAmazonProductPage(
     categorySlug: extracted.categorySlug,
     dealExpiresAt: extracted.dealExpiresAt ?? null,
     variantInfo,
+    primeOnly: extracted.primeOnly,
+    regularPrice: extracted.regularPrice ?? undefined,
   };
 }
 

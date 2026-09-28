@@ -18,6 +18,9 @@ export interface ProductPriceData {
   dealExpiresAt?: string | null;
   /** Variantes (talla/color) si la ficha es de un producto con variantes. */
   variantInfo?: ProductVariantInfo | null;
+  /** El precio es una «Oferta Prime» (sin Prime: `regularPrice`). */
+  primeOnly?: boolean;
+  regularPrice?: number;
 }
 
 export interface PriceProvider {
