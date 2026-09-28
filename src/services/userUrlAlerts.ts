@@ -291,8 +291,7 @@ export async function runUserUrlAlerts(options?: {
    * ≥12 fallos durante ≥3 días, desactiva la alerta y avisa al usuario.
    */
   const recordRealFailure = async (
-    row: { id: string; user_id: string; url: string | null; keyword: string | null; fail_count: number | null; first_failed_at: string | null },
-    reason: string,
+    row: { id: string; user_id: string; url: string | null; keyword: string | null; product_id: string | null; fail_count: number | null; first_failed_at: string | null },
   ) => {
     const count = (row.fail_count ?? 0) + 1;
     const firstFailedAt = row.first_failed_at ?? new Date().toISOString();
@@ -316,14 +315,20 @@ export async function runUserUrlAlerts(options?: {
         .maybeSingle();
       const recipient = user ? alertRecipient(user) : null;
       if (!recipient || !isTelegramConfigured()) return;
+      const { data: product } = row.product_id
+        ? await client.from("products").select("title").eq("id", row.product_id).maybeSingle()
+        : { data: null };
+      const name = product?.title?.trim() || row.keyword?.trim();
       await sendTelegramMessage({
         chatId: recipient.chatId,
         text: [
           ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
           "🔕 <b>Alerta desactivada</b>",
           "",
-          `Hemos dejado de seguir el precio de ${escapeHtml(row.keyword?.trim() || row.url || "este producto")} porque el enlace ya no funciona (${escapeHtml(reason.toLowerCase())}).`,
-          "Si lo sigues queriendo, crea una alerta nueva con el enlace actual del producto.",
+          name
+            ? `Ya no podemos seguir el precio de «${escapeHtml(name.slice(0, 90))}».`
+            : "Ya no podemos seguir el precio de uno de tus productos.",
+          "Si aún te interesa, crea una alerta nueva con el enlace del producto.",
         ].join("\n"),
         disableWebPagePreview: true,
       });
@@ -364,7 +369,7 @@ export async function runUserUrlAlerts(options?: {
     if (!alertRetailerSupported(retailer)) {
       note("failed", `Tienda sin revisión automática (${retailer})`, url);
       await moveToBack(alert.id);
-      await recordRealFailure(alert, "tienda sin revisión automática");
+      await recordRealFailure(alert);
       console.warn(
         `[user-alerts] Alerta ${alert.id}: ${retailer} no soporta chequeo automático`,
       );
@@ -375,7 +380,7 @@ export async function runUserUrlAlerts(options?: {
     if (!externalId) {
       note("failed", "URL sin identificador de producto", url);
       await moveToBack(alert.id);
-      await recordRealFailure(alert, "la URL no identifica ningún producto");
+      await recordRealFailure(alert);
       console.warn(`[user-alerts] Alerta ${alert.id}: URL sin identificador válido`);
       continue;
     }
@@ -683,7 +688,7 @@ export async function runUserUrlAlerts(options?: {
       );
       await moveToBack(alert.id);
       if (!isRetailBlockedError(message) && !isForeignDeliveryError(message)) {
-        await recordRealFailure(alert, reasonFromError(message));
+        await recordRealFailure(alert);
       }
       console.warn(`[user-alerts] Alerta ${alert.id}:`, message);
     }
