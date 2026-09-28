@@ -378,7 +378,10 @@ export function buildDealAlertText(
 
   lines.push(
     "",
-    `💰 Oferta: <b>${formatEuro(deal.currentPrice)}</b>`,
+    `💰 Oferta: <b>${formatEuro(deal.currentPrice)}</b>${deal.primeOnly ? " ⭐ Prime" : ""}`,
+    ...(deal.primeOnly && deal.regularPrice
+      ? [`👤 Sin Prime: ${formatEuro(deal.regularPrice)}`]
+      : []),
     `🏷️ Antes: <s>${formatEuro(deal.previousPrice)}</s>`,
     `📉 Descuento: <b>−${Math.round(deal.discountPercentage)}%</b>`,
   );

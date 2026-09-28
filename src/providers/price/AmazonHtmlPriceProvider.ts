@@ -1299,6 +1299,8 @@ export async function previewAmazonProductPage(
   categorySlug?: string;
   dealExpiresAt?: string | null;
   variantInfo: ProductVariantInfo | null;
+  primeOnly?: boolean;
+  regularPrice?: number | null;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -1333,6 +1335,8 @@ export async function previewAmazonProductPage(
     categorySlug: extracted.categorySlug,
     dealExpiresAt: extracted.dealExpiresAt ?? null,
     variantInfo: extractAmazonVariantInfo(html, asin),
+    primeOnly: extracted.primeOnly,
+    regularPrice: extracted.regularPrice ?? null,
   };
 }
 

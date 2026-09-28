@@ -1,3 +1,4 @@
+import { primePriceFields } from "@/lib/primePrice";
 import {
   extractAsin,
   generateAffiliateUrl,
@@ -344,6 +345,7 @@ export async function runFlashDealsCheck(options?: {
       let variantInfo: ProductVariantInfo | null = null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
+      let primeFields = primePriceFields({});
 
       if (needsLiveEnrichment) {
         try {
@@ -351,6 +353,7 @@ export async function runFlashDealsCheck(options?: {
             timeoutMs: 18_000,
           });
           if (preview.price != null) price = preview.price;
+          primeFields = primePriceFields(preview);
           if (preview.listPrice != null) listPrice = preview.listPrice;
           if (preview.title?.trim()) title = preview.title.trim();
           amazonUrl = preview.amazonUrl || amazonUrl;
@@ -485,6 +488,7 @@ export async function runFlashDealsCheck(options?: {
           description,
           category_id: categoryMeta.categoryId,
           current_price: price,
+          ...primeFields,
           previous_price: reference,
           lowest_price: price,
           highest_price: Math.max(price, reference),

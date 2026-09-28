@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { PrimeTag } from "@/components/PrimeTag";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { retailerLabel } from "@/lib/retailers";
 import type { MarketplaceProduct } from "@/lib/types";
@@ -42,6 +43,7 @@ function MiniDealRow({ product }: { product: MarketplaceProduct }) {
           <span className="price font-semibold text-ink">
             {formatEuro(product.currentPrice)}
           </span>
+          {product.primeOnly && <PrimeTag className="self-center" />}
           {product.discountPercentage > 0 && (
             <>
               <span className="text-muted">·</span>

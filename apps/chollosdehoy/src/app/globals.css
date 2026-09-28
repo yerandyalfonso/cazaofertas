@@ -100,6 +100,7 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-vivid: var(--accent-vivid);
+  --color-accent: var(--accent);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-page: var(--bg);

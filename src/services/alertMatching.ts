@@ -26,6 +26,9 @@ export interface DealCandidate {
   currentPrice: number;
   previousPrice: number;
   discountPercentage: number;
+  /** Precio de «Oferta Prime» (sin Prime: `regularPrice`). */
+  primeOnly?: boolean;
+  regularPrice?: number | null;
   dealLevel: DealLevel;
   affiliateUrl: string;
   nearHistoricalLow: boolean;

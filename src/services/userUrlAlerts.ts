@@ -1,3 +1,4 @@
+import { primePriceFields } from "@/lib/primePrice";
 import { formatEuro, roundMoney, toNumber } from "@/lib/money";
 import { buildOutOfStockUpdate } from "@/lib/out-of-stock-policy";
 import { isRetailBlockedError } from "@/lib/retail-url-utils";
@@ -519,6 +520,7 @@ export async function runUserUrlAlerts(options?: {
               .from("products")
               .update({
                 current_price: currentPrice,
+                ...primePriceFields(quote),
                 previous_price: previous,
                 lowest_price: roundMoney(Math.min(lowest, currentPrice)),
                 highest_price: roundMoney(

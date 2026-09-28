@@ -47,6 +47,8 @@ type ProductRow = {
   current_price: number | string | null;
   previous_price: number | string | null;
   lowest_price: number | string | null;
+  prime_only?: boolean | null;
+  regular_price?: number | string | null;
   discount_percentage: number | string | null;
   affiliate_url: string | null;
   amazon_url: string | null;
@@ -184,6 +186,8 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     currentPrice,
     previousPrice,
     lowestPrice,
+    primeOnly: Boolean(row.prime_only),
+    regularPrice: row.prime_only ? toNumber(row.regular_price ?? null) : null,
     discountPercentage,
     affiliateUrl,
     productUrl,

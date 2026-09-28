@@ -27,6 +27,9 @@ export interface MarketplaceProduct {
   currentPrice: number;
   previousPrice: number | null;
   lowestPrice: number | null;
+  /** El precio es una «Oferta Prime» de Amazon (sin Prime: `regularPrice`). */
+  primeOnly: boolean;
+  regularPrice: number | null;
   discountPercentage: number;
   affiliateUrl: string;
   productUrl: string;

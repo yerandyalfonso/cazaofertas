@@ -11,6 +11,7 @@ import {
 import { cache, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { FillImage } from "@/components/FillImage";
+import { PrimeTag } from "@/components/PrimeTag";
 import { ProductCard } from "@/components/ProductCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -320,6 +321,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <span className={`price text-[2.5rem] font-extrabold leading-none tracking-tight ${unavailable ? "text-muted" : "text-ink"}`}>
                   {formatEuro(product.currentPrice)}
                 </span>
+                {product.primeOnly && !unavailable && <PrimeTag className="self-center text-xs" />}
                 {!unavailable &&
                   product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
@@ -331,6 +333,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {!unavailable && savings !== null && savings > 0 && (
                 <p className="price mt-2 text-sm font-semibold text-primary">
                   Ahorras {formatEuro(savings)}
+                </p>
+              )}
+              {!unavailable && product.primeOnly && (
+                <p className="price mt-1.5 text-sm text-muted">
+                  Precio de oferta para clientes Prime
+                  {product.regularPrice ? ` · sin Prime: ${formatEuro(product.regularPrice)}` : ""}
                 </p>
               )}
             </div>
@@ -467,6 +475,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <div className="min-w-0 flex-1">
                 <p className="price text-xl font-extrabold leading-tight text-ink">
                   {formatEuro(product.currentPrice)}
+                  {product.primeOnly && <PrimeTag className="ml-2 align-middle" />}
                   {product.previousPrice && product.previousPrice > product.currentPrice && (
                     <span className="ml-2 text-sm font-medium text-muted line-through">
                       {formatEuro(product.previousPrice)}

@@ -15,6 +15,7 @@ import {
 import { dealScoringService } from "@/services/deal-scoring";
 import { sendChannelDealAlert } from "@/services/telegram/bot";
 import { scrapeAmazonProductPage } from "@/providers/price/AmazonHtmlPriceProvider";
+import { primePriceFields } from "@/lib/primePrice";
 import { DealLevel, ProductAvailability } from "@/types";
 
 const SEND_DELAY_MS = 1_200;
@@ -86,7 +87,12 @@ async function verifyPriceBeforePublish(
     if (Math.abs(quote.price - stored) >= 0.01) {
       await client
         .from("products")
-        .update({ current_price: quote.price, last_checked_at: now, updated_at: now })
+        .update({
+          current_price: quote.price,
+          ...primePriceFields(quote),
+          last_checked_at: now,
+          updated_at: now,
+        })
         .eq("id", product.id);
     }
     if (quote.price > target * (1 + PUBLISH_PRICE_TOLERANCE)) {
@@ -479,7 +485,7 @@ export async function flushPendingChannelNotifications(options?: {
       const { data: product, error: productError } = await client
         .from("products")
         .select(
-          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, parent_asin, variant_info, category_id, last_checked_at, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
+          "id, asin, retailer, title, slug, brand, description, image_url, amazon_url, affiliate_url, current_price, previous_price, lowest_price, discount_percentage, availability, is_active, deal_expires_at, parent_asin, variant_info, category_id, last_checked_at, prime_only, regular_price, categories(id, name, slug, parent_id, parent:parent_id(id, name, slug))",
         )
         .eq("id", row.product_id)
         .maybeSingle();
@@ -584,6 +590,8 @@ export async function flushPendingChannelNotifications(options?: {
       }
 
       const deal: DealCandidate = {
+        primeOnly: product.prime_only,
+        regularPrice: toNumber(product.regular_price),
         productId: product.id,
         asin: product.asin,
         title: product.title,

@@ -1,3 +1,4 @@
+import { primePriceFields } from "@/lib/primePrice";
 import {
   ALERT_HEADLESS_RETAILERS,
   alertRetailerSupported,
@@ -296,6 +297,7 @@ export async function ensureProductFromAmazonUrl(
       brand: quote.brand ?? null,
       category_id: categoryId,
       current_price: price,
+      ...primePriceFields(quote),
       previous_price: previous,
       lowest_price: price,
       highest_price: Math.max(price, previous),

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Zap } from "lucide-react";
 import { FillImage } from "@/components/FillImage";
+import { PrimeTag } from "@/components/PrimeTag";
 import { flashDealLabel } from "@/lib/flash";
 import { formatDiscount, formatEuro } from "@/lib/money";
 import { retailerColor, retailerLabel } from "@/lib/retailers";
@@ -92,6 +93,7 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
                 <span className="price text-xl font-semibold text-ink">
                   {formatEuro(product.currentPrice)}
                 </span>
+                {product.primeOnly && <PrimeTag className="self-center" />}
                 {product.previousPrice &&
                   product.previousPrice > product.currentPrice && (
                     <span className="text-sm text-muted line-through price">
@@ -174,8 +176,11 @@ export function ProductCard({ product, view, layout = "vertical" }: ProductCardP
             botón mantiene su tamaño; si baja solo a otra, ocupa todo el ancho. */}
         <div className="mt-auto flex flex-wrap items-end gap-2 pt-2">
           <div className="min-w-0 grow-[9999]">
-            <span className="price block text-2xl font-extrabold leading-none tracking-tight text-ink">
-              {formatEuro(product.currentPrice)}
+            <span className="flex items-center gap-1.5">
+              <span className="price text-2xl font-extrabold leading-none tracking-tight text-ink">
+                {formatEuro(product.currentPrice)}
+              </span>
+              {product.primeOnly && <PrimeTag />}
             </span>
             {hasPrevious && (
               <span className="price mt-1 block text-sm font-medium text-muted line-through">

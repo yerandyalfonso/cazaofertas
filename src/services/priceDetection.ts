@@ -13,6 +13,7 @@ import { resolveParentSlug } from "@/lib/category-taxonomy";
 import type { DealCandidate } from "@/services/alertMatching";
 import { dealScoringService } from "@/services/deal-scoring";
 import { discountFrom, resolveReferencePrice } from "@/services/referencePrice";
+import { primePriceFields } from "@/lib/primePrice";
 import {
   AMAZON_FOREIGN_DELIVERY_ERROR,
   foreignDeliverySkippedAsins,
@@ -406,6 +407,7 @@ export async function runPriceDetection(
               ...inStockAvailabilityPatch(availability),
               ...mediaBackfillPatch(product, quote),
               ...variantPatch(quote),
+              ...primePriceFields(quote),
             })
             .eq("id", product.id);
 
@@ -462,6 +464,7 @@ export async function runPriceDetection(
             ...inStockAvailabilityPatch(availability),
             ...mediaBackfillPatch(product, quote),
             ...variantPatch(quote),
+            ...primePriceFields(quote),
             ...(quote.dealExpiresAt
               ? { deal_expires_at: quote.dealExpiresAt }
               : {}),
@@ -498,6 +501,8 @@ export async function runPriceDetection(
             parentCategoryName: parentCategory?.name ?? null,
             retailer: product.retailer,
             currentPrice: nextPrice,
+            primeOnly: quote.primeOnly,
+            regularPrice: quote.regularPrice ?? null,
             previousPrice: referencePrice ?? storedPrice,
             discountPercentage,
             dealLevel: scoring.level,
