@@ -286,6 +286,7 @@ export type Database = {
           is_active: boolean;
           fail_count: number;
           first_failed_at: string | null;
+          last_notified_price: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -305,6 +306,7 @@ export type Database = {
           is_active?: boolean;
           fail_count?: number;
           first_failed_at?: string | null;
+          last_notified_price?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -324,6 +326,7 @@ export type Database = {
           is_active?: boolean;
           fail_count?: number;
           first_failed_at?: string | null;
+          last_notified_price?: number | null;
           created_at?: string;
           updated_at?: string;
         };

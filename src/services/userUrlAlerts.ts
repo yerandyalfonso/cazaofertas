@@ -55,6 +55,10 @@ function isForeignDeliveryError(message: string): boolean {
   return message.includes(AMAZON_FOREIGN_DELIVERY_ERROR);
 }
 
+/** Bajada mínima para avisar en una alerta de URL. */
+const MIN_DROP_PERCENT = 2;
+const MIN_DROP_EUR = 0.1;
+
 const BROKEN_ALERT_MIN_FAILURES = 12;
 const BROKEN_ALERT_MIN_AGE_MS = 3 * 24 * 3_600_000;
 
@@ -256,7 +260,7 @@ export async function runUserUrlAlerts(options?: {
   const { data: alerts, error } = await client
     .from("alerts")
     .select(
-      "id, user_id, url, keyword, product_id, last_known_price, last_checked_at, max_price, fail_count, first_failed_at",
+      "id, user_id, url, keyword, product_id, last_known_price, last_checked_at, max_price, fail_count, first_failed_at, last_notified_price",
     )
     .eq("is_active", true)
     .not("url", "is", null)
@@ -528,8 +532,22 @@ export async function runUserUrlAlerts(options?: {
 
       result.checked += 1;
 
+      // Se avisa solo con bajadas de verdad (≥2 % y ≥0,10 €) y no se repite la
+      // misma: la referencia es el último precio avisado mientras la oferta
+      // siga (si el precio vuelve a subir ≥5 %, se olvida).
+      let lastNotified = toNumber(alert.last_notified_price ?? null);
+      if (lastNotified !== null && currentPrice >= lastNotified * 1.05) {
+        lastNotified = null;
+        await client.from("alerts").update({ last_notified_price: null }).eq("id", alert.id);
+      }
+      const reference =
+        lastNotified !== null && previousKnown !== null
+          ? Math.min(lastNotified, previousKnown)
+          : (lastNotified ?? previousKnown);
       const isDrop =
-        previousKnown !== null && currentPrice < previousKnown - 0.009;
+        reference !== null &&
+        reference - currentPrice >= MIN_DROP_EUR &&
+        ((reference - currentPrice) / reference) * 100 >= MIN_DROP_PERCENT;
 
       if (!isDrop) {
         if (index < rows.length - 1 && delayMs > 0) await sleep(delayMs);
@@ -575,7 +593,7 @@ export async function runUserUrlAlerts(options?: {
         amazon_url: quote.productUrl,
       });
       const discountPct = Math.round(
-        ((previousKnown - currentPrice) / previousKnown) * 100,
+        ((reference - currentPrice) / reference) * 100,
       );
 
       type LinkedProductRow = {
@@ -615,7 +633,7 @@ export async function runUserUrlAlerts(options?: {
           "📉 <b>Bajada en tu alerta de URL</b>",
           "",
           escapeHtml(title),
-          `Antes: <s>${formatEuro(previousKnown)}</s>`,
+          `Antes: <s>${formatEuro(reference)}</s>`,
           `Ahora: <b>${formatEuro(currentPrice)}</b> (−${discountPct}%)`,
         ].join("\n"),
         disableWebPagePreview: false,
@@ -626,6 +644,10 @@ export async function runUserUrlAlerts(options?: {
       });
 
       result.notified += 1;
+      await client
+        .from("alerts")
+        .update({ last_notified_price: currentPrice })
+        .eq("id", alert.id);
 
       // Misma oferta detectada por una alerta de usuario: también se ofrece
       // al canal/grupo/Facebook/Instagram y a las alertas de categoría/marca/
@@ -639,7 +661,7 @@ export async function runUserUrlAlerts(options?: {
           const category = linkedProduct?.categories ?? null;
           const scoring = dealScoringService.scoreProduct({
             currentPrice,
-            previousPrice: previousKnown,
+            previousPrice: reference,
             lowestPrice: Math.min(
               currentPrice,
               toNumber(linkedProduct?.lowest_price) ?? currentPrice,
@@ -659,7 +681,7 @@ export async function runUserUrlAlerts(options?: {
             parentCategoryName: category?.parent?.name ?? null,
             retailer,
             currentPrice,
-            previousPrice: previousKnown,
+            previousPrice: reference,
             discountPercentage: discountPct,
             dealLevel: scoring.level,
             score: scoring.score,

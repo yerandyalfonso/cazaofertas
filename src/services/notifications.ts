@@ -29,7 +29,7 @@ async function hasDuplicateNotification(
 ): Promise<boolean> {
   const { data, error } = await client
     .from("notifications")
-    .select("id, new_price, status")
+    .select("id, new_price, status, sent_at")
     .eq("user_id", userId)
     .eq("product_id", productId)
     .in("status", ["sent", "pending"]);
@@ -38,9 +38,15 @@ async function hasDuplicateNotification(
     throw new Error(`Error al comprobar notificaciones: ${error.message}`);
   }
 
-  return (data ?? []).some(
-    (row) => roundMoney(Number(row.new_price)) === roundMoney(newPrice),
-  );
+  // Mismo precio, o uno que solo baja céntimos (<2 %) respecto a lo ya avisado
+  // en los últimos 7 días: no se repite (precios que oscilan 11,35 ↔ 11,34).
+  const recentSince = Date.now() - 7 * 24 * 3_600_000;
+  return (data ?? []).some((row) => {
+    const notified = roundMoney(Number(row.new_price));
+    if (notified === roundMoney(newPrice)) return true;
+    const recent = !row.sent_at || new Date(row.sent_at).getTime() >= recentSince;
+    return recent && newPrice >= notified * 0.98;
+  });
 }
 
 /** ¿Ya avisamos a este usuario de otra variante (talla/color) del mismo padre? */
