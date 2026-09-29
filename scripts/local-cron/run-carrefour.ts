@@ -5,6 +5,7 @@
  *   npm run cron:local:carrefour                 # escribe y avisa
  *   npm run cron:local:carrefour -- --dry-run    # solo muestra qué haría
  *   npm run cron:local:carrefour -- --pages=2 --limit=10
+ *   npm run cron:local:carrefour -- --backfill-images   # sube fotos ya guardadas
  */
 function readFlag(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -19,7 +20,13 @@ async function main(): Promise<void> {
     throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY en .env.local.");
   }
 
-  const { runCarrefourDealsCheck } = await import("@/services/carrefourDeals");
+  const { backfillCarrefourProductImages, runCarrefourDealsCheck } = await import(
+    "@/services/carrefourDeals"
+  );
+  if (process.argv.includes("--backfill-images")) {
+    console.log(JSON.stringify(await backfillCarrefourProductImages(), null, 2));
+    return;
+  }
   const pages = Number(readFlag("pages"));
   const limit = Number(readFlag("limit"));
   const result = await runCarrefourDealsCheck({

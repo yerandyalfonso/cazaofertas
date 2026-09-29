@@ -6,9 +6,15 @@ import {
   resolveProductBuyUrl,
   syntheticAsinForRetailer,
 } from "@/lib/retailers";
-import { createSupabaseServiceClient, type TypedSupabaseClient } from "@/lib/supabase";
+import {
+  createSupabaseServiceClient,
+  getPublicStorageUrl,
+  type TypedSupabaseClient,
+} from "@/lib/supabase";
 import {
   discoverCarrefourDealsWithBrowser,
+  downloadCarrefourImagesWithBrowser,
+  isBlockedCarrefourImageUrl,
   type CarrefourListingItem,
 } from "@/providers/retail/carrefour/carrefourBrowserDiscovery";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
@@ -101,6 +107,82 @@ async function loadCarrefourCatalogForItems(
   }
 
   return byAsin;
+}
+
+// Bucket público ya existente (blog/Instagram); las fotos van en `carrefour/`.
+const IMAGE_BUCKET = "article-images";
+
+function imageExtension(contentType: string): string {
+  if (/png/i.test(contentType)) return "png";
+  if (/webp/i.test(contentType)) return "webp";
+  return "jpg";
+}
+
+/**
+ * Sube a Supabase Storage las fotos de `static.carrefour.es` (403 para
+ * Telegram y vistas previas) y devuelve url original → url pública propia.
+ */
+async function mirrorCarrefourImages(
+  client: TypedSupabaseClient,
+  images: Array<{ externalId: string; imageUrl?: string | null }>,
+): Promise<Map<string, string>> {
+  const mirrored = new Map<string, string>();
+  const pending = images.filter((image) => isBlockedCarrefourImageUrl(image.imageUrl));
+  if (pending.length === 0) return mirrored;
+
+  const downloads = await downloadCarrefourImagesWithBrowser(
+    pending.map((image) => image.imageUrl!),
+  );
+  for (const image of pending) {
+    const download = downloads.get(image.imageUrl!);
+    if (!download) continue;
+    const id = image.externalId.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    const path = `carrefour/${id}.${imageExtension(download.contentType)}`;
+    const { error } = await client.storage.from(IMAGE_BUCKET).upload(path, download.body, {
+      contentType: download.contentType,
+      upsert: true,
+    });
+    if (error) {
+      console.warn(`[carrefour-deals] no se pudo subir ${path}: ${error.message}`);
+      continue;
+    }
+    mirrored.set(image.imageUrl!, getPublicStorageUrl(IMAGE_BUCKET, path));
+  }
+  return mirrored;
+}
+
+/** Espeja las fotos de productos Carrefour ya guardados con `static.carrefour.es`. */
+export async function backfillCarrefourProductImages(): Promise<{
+  pending: number;
+  mirrored: number;
+}> {
+  const client = createSupabaseServiceClient();
+  const { data, error } = await client
+    .from("products")
+    .select("id, external_id, asin, image_url")
+    .eq("retailer", "carrefour")
+    .like("image_url", "https://static.carrefour.es/%");
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const mirrored = await mirrorCarrefourImages(
+    client,
+    rows.map((row) => ({
+      externalId: row.external_id ?? row.asin,
+      imageUrl: row.image_url,
+    })),
+  );
+  let updated = 0;
+  for (const row of rows) {
+    const url = row.image_url ? mirrored.get(row.image_url) : undefined;
+    if (!url) continue;
+    const { error: updateError } = await client
+      .from("products")
+      .update({ image_url: url })
+      .eq("id", row.id);
+    if (!updateError) updated += 1;
+  }
+  return { pending: rows.length, mirrored: updated };
 }
 
 async function resolveCarrefourCategoryMeta(
@@ -273,6 +355,13 @@ export async function runCarrefourDealsCheck(options?: {
     skippedNoDiscount: discovery.items.length - withDiscount.length,
     preview: dryRun ? [] : undefined,
   };
+
+  if (!dryRun) {
+    const mirrored = await mirrorCarrefourImages(client, queue);
+    for (const item of queue) {
+      if (item.imageUrl) item.imageUrl = mirrored.get(item.imageUrl) ?? item.imageUrl;
+    }
+  }
 
   for (const item of queue) {
     result.processed += 1;

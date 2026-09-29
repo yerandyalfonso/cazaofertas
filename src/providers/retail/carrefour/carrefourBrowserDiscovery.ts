@@ -275,3 +275,44 @@ export async function discoverCarrefourDealsWithBrowser(options?: {
     feedErrors,
   };
 }
+
+/** `static.carrefour.es` da 403 a servidores (Telegram, OG, curl): hay que espejarlas. */
+export function isBlockedCarrefourImageUrl(url: string | null | undefined): boolean {
+  return Boolean(url && /^https:\/\/static\.carrefour\.es\//i.test(url));
+}
+
+/**
+ * Descarga imágenes de `static.carrefour.es` navegando a cada una con el mismo
+ * Chrome con ventana que pasa Cloudflare. Devuelve url → bytes (las que fallan
+ * no aparecen).
+ */
+export async function downloadCarrefourImagesWithBrowser(
+  urls: string[],
+  options?: { timeoutMs?: number },
+): Promise<Map<string, { body: Buffer; contentType: string }>> {
+  const result = new Map<string, { body: Buffer; contentType: string }>();
+  const unique = [...new Set(urls.filter(isBlockedCarrefourImageUrl))];
+  if (unique.length === 0) return result;
+
+  const browser = await launchCarrefourBrowser();
+  try {
+    const page = await browser.newPage({ locale: "es-ES" });
+    for (const url of unique) {
+      try {
+        const response = await page.goto(url, {
+          waitUntil: "load",
+          timeout: options?.timeoutMs ?? 20_000,
+          referer: `${CARREFOUR_ORIGIN}/`,
+        });
+        const contentType = response?.headers()["content-type"] ?? "";
+        if (!response?.ok() || !contentType.startsWith("image/")) continue;
+        result.set(url, { body: await response.body(), contentType });
+      } catch {
+        // Sin foto espejada se queda la URL original (en navegador sí carga).
+      }
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+  return result;
+}
