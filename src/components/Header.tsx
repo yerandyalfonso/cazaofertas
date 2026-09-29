@@ -25,7 +25,7 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-300/70 bg-paper/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 md:h-20 md:px-8">
-        <Link href="/" className="flex min-w-0 items-center">
+        <Link href="/" className="group flex min-w-0 items-center">
           <BlogLogo size="nav" />
         </Link>
 

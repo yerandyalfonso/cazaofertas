@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/JsonLd";
-import { ProductCard } from "@/components/ProductCard";
-import { getCategories, getOfferListingProducts } from "@/lib/catalog";
+import { CategoryHero } from "@/components/CategoryHero";
+import { ProductGridProgressive } from "@/components/ProductGridProgressive";
+import { RelatedArticles } from "@/components/blog/RelatedArticles";
+import {
+  getCategories,
+  getCategoryProducts,
+  getCategoryShowcases,
+} from "@/lib/catalog";
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
@@ -14,7 +19,7 @@ import {
   categoryPublicPath,
   PRODUCT_SUBCATEGORIES,
 } from "@/lib/site-categories";
-import { telegramAlertForCategorySlug } from "@/lib/telegram-links";
+import { getArticlesForProducts } from "@/services/blog";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -54,23 +59,22 @@ export async function generateMetadata({
 
 export default async function CategoryDetailPage({ params }: CategoryPageProps) {
   const { slug } = await params;
-  const [categories, products] = await Promise.all([
+  const [categories, products, showcases] = await Promise.all([
     getCategories(),
-    getOfferListingProducts(250),
+    getCategoryProducts(slug),
+    getCategoryShowcases(),
   ]);
   const category = categories.find((item) => item.slug === slug);
   if (!category) notFound();
 
-  const filtered = products
-    .filter(
-      (product) =>
-        product.category?.parentSlug === slug || product.category?.slug === slug,
-    )
-    .sort((a, b) => b.dealScore - a.dealScore);
+  const filtered = products;
   const copy = categorySeoCopy(category.slug, category.name);
   const intro = category.description?.trim() || copy.intro;
   const subcategories = PRODUCT_SUBCATEGORIES.filter(
     (sub) => sub.parentSlug === slug,
+  );
+  const articles = await getArticlesForProducts(
+    filtered.map((product) => product.slug),
   );
 
   return (
@@ -93,67 +97,53 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
         ]}
       />
 
-      <nav className="mb-8 text-sm text-stone-500" aria-label="Migas de pan">
-        <Link href="/categorias" className="hover:text-ink">
-          Categorías
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">{category.name}</span>
-      </nav>
+      <CategoryHero
+        rootSlug={category.slug}
+        rootName={category.name}
+        title={category.name}
+        intro={intro}
+        count={Math.max(showcases.get(slug)?.count ?? 0, filtered.length)}
+        activeSub={null}
+        crumbs={[
+          { name: "Inicio", href: "/" },
+          { name: "Categorías", href: "/categorias" },
+          { name: category.name },
+        ]}
+        subcategories={subcategories.map((sub) => ({
+          name: sub.name,
+          slug: sub.slug,
+          href: categoryPublicPath(category.slug, sub.slug),
+        }))}
+      />
 
-      <header className="max-w-3xl">
-        <h1 className="font-display text-4xl tracking-tight text-ink md:text-5xl">
-          Ofertas de {category.name}
-        </h1>
-        <p className="mt-4 text-base leading-relaxed text-stone-600">{intro}</p>
-      </header>
+      {articles.length > 0 ? (
+        <section className="mt-12">
+          <RelatedArticles
+            posts={articles}
+            title={`Del blog sobre ${category.name.toLowerCase()}`}
+          />
+        </section>
+      ) : null}
 
-      <section className="mt-8 max-w-3xl border-t border-stone-300 pt-8">
+      <section className={articles.length > 0 ? "mt-16 border-t border-stone-300 pt-12" : "mt-12"}>
+        {filtered.length > 0 ? (
+          <ProductGridProgressive products={filtered} />
+        ) : (
+          <p className="text-sm text-stone-600">
+            Todavía no hay productos activos en esta categoría. Vuelve pronto o
+            crea una alerta para enterarte al momento.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-20 max-w-3xl border-t border-stone-300 pt-8">
         <h2 className="font-display text-2xl tracking-tight text-ink">
           Cómo elegimos estas ofertas
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-stone-600">
           {copy.howWePick}
         </p>
-        <a
-          href={telegramAlertForCategorySlug(category.slug)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 inline-flex h-10 items-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
-        >
-          Alerta Telegram · {category.name}
-        </a>
       </section>
-
-      {subcategories.length > 0 ? (
-        <nav
-          className="mt-10 flex flex-wrap gap-2"
-          aria-label="Subcategorías"
-        >
-          {subcategories.map((sub) => (
-            <Link
-              key={`${category.slug}-${sub.slug}`}
-              href={categoryPublicPath(category.slug, sub.slug)}
-              className="border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:border-ink hover:text-ink"
-            >
-              {sub.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
-
-      {filtered.length > 0 ? (
-        <div className="mt-12 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-12 text-sm text-stone-600">
-          Todavía no hay productos activos en esta categoría. Vuelve pronto o
-          crea una alerta para enterarte al momento.
-        </p>
-      )}
     </div>
   );
 }

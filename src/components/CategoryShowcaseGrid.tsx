@@ -24,7 +24,7 @@ interface ShowcaseCategory {
   slug: string;
 }
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
+export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   belleza: Sparkles,
   moda: Shirt,
   hogar: Sofa,

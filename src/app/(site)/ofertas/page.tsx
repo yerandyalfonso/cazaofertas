@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import Link from "next/link";
 import { JsonLd } from "@/components/JsonLd";
 import { OffersCatalog } from "@/components/OffersCatalog";
 import {
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ...buildPageMetadata({
     title: "Ofertas Amazon España",
     description:
-      "Ofertas de Amazon España ordenadas por deal score, descuento y mínimo histórico.",
+      "Ofertas de Amazon España ordenadas por descuento real y cercanía al precio más bajo.",
     path: "/ofertas",
   }),
 };
@@ -48,10 +48,15 @@ export default async function OffersPage() {
           Ofertas mejor valoradas
         </h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
-          Ordenados por deal score: descuento, cercanía al mínimo histórico y
-          estabilidad de precio.
+          Ordenadas por descuento real y cercanía al precio más bajo que hemos
+          visto. Revisamos los precios varias veces al día.
         </p>
-        <AffiliateDisclosure className="mt-4" />
+        <Link
+          href="/categorias"
+          className="mt-4 inline-flex text-sm font-medium text-ink underline underline-offset-4 hover:text-teal-900"
+        >
+          Explorar por categorías →
+        </Link>
       </header>
 
       {list.length > 0 ? (

@@ -423,26 +423,41 @@ export interface CategoryShowcase {
   maxDiscount: number;
 }
 
-/** Datos para las tarjetas de «Explora por sección», agrupados por categoría raíz (slug). */
+/** Datos para las tarjetas de «Compra por categoría», agrupados por categoría raíz (slug). */
 export async function getCategoryShowcases(): Promise<
   Map<string, CategoryShowcase>
 > {
+  return new Map(await loadCategoryShowcasesCached());
+}
+
+// Recuento de todo el catálogo: caché de 10 minutos (Map no se serializa, por eso entradas).
+const loadCategoryShowcasesCached = unstable_cache(
+  async () => [...(await loadCategoryShowcases()).entries()],
+  ["category-showcases"],
+  { revalidate: 600 },
+);
+
+async function loadCategoryShowcases(): Promise<Map<string, CategoryShowcase>> {
   const showcases = new Map<string, CategoryShowcase>();
   const client = getClient();
   if (!client) return showcases;
 
-  const { data, error } = await client
-    .from("products")
-    .select(
-      "discount_percentage, categories(slug, parent:parent_id(slug))",
-    )
-    .eq("is_active", true)
-    .order("discount_percentage", { ascending: false, nullsFirst: false })
-    .limit(3000);
-
-  if (error || !data) {
-    console.error("[catalog] getCategoryShowcases", error?.message);
-    return showcases;
+  // Supabase devuelve como mucho 1.000 filas por consulta: se lee por páginas.
+  const PAGE = 1000;
+  const data: unknown[] = [];
+  for (let from = 0; from < 20_000; from += PAGE) {
+    const { data: page, error } = await client
+      .from("products")
+      .select("discount_percentage, categories(slug, parent:parent_id(slug))")
+      .eq("is_active", true)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error || !page) {
+      console.error("[catalog] getCategoryShowcases", error?.message);
+      break;
+    }
+    data.push(...page);
+    if (page.length < PAGE) break;
   }
 
   type Slugged = { slug: string } | { slug: string }[] | null;
@@ -498,4 +513,51 @@ export async function searchProducts(
     return [];
   }
   return data.map((row) => mapProduct(row));
+}
+
+/**
+ * Ofertas de una categoría raíz (incluye sus subcategorías), mejor puntuadas
+ * primero. Consulta directa por categoría: no depende del top global.
+ */
+export async function getCategoryProducts(
+  rootSlug: string,
+  limit = 480,
+): Promise<CatalogProduct[]> {
+  const client = getClient();
+  if (!client) return [];
+
+  const { data: cats, error: catError } = await client
+    .from("categories")
+    .select("id, slug, parent:parent_id(slug)");
+  if (catError || !cats) {
+    console.error("[catalog] getCategoryProducts categories", catError?.message);
+    return [];
+  }
+
+  type Slugged = { slug: string } | { slug: string }[] | null;
+  const parentSlug = (parent: Slugged) =>
+    (Array.isArray(parent) ? parent[0] : parent)?.slug ?? null;
+  const ids = (cats as Array<{ id: string; slug: string; parent: Slugged }>)
+    .filter((cat) => cat.slug === rootSlug || parentSlug(cat.parent) === rootSlug)
+    .map((cat) => cat.id);
+  if (ids.length === 0) return [];
+
+  const { data, error } = await client
+    .from("products")
+    .select(CATEGORY_SELECT)
+    .eq("is_active", true)
+    .in("category_id", ids)
+    .order("discount_percentage", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error || !data) {
+    console.error("[catalog] getCategoryProducts", error?.message);
+    return [];
+  }
+
+  return data
+    .map((row) => mapProduct(row))
+    .sort(
+      (a, b) =>
+        b.dealScore - a.dealScore || b.discountPercentage - a.discountPercentage,
+    );
 }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { DealCard } from "@/components/DealCard";
 import { ProductCard } from "@/components/ProductCard";
@@ -173,14 +172,9 @@ export default async function HomePage() {
             {/* Lateral: ofertas como complemento */}
             <aside className="flex flex-col border-t border-stone-300 pt-8 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
               <div className="mb-6 flex items-baseline justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    Complemento
-                  </p>
-                  <h2 className="mt-1 font-display text-2xl tracking-tight text-ink">
-                    Ofertas recomendadas
-                  </h2>
-                </div>
+                <h2 className="font-display text-2xl tracking-tight text-ink">
+                  Ofertas recomendadas
+                </h2>
                 <Link
                   href="/ofertas"
                   className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-stone-500 underline-offset-4 hover:text-ink hover:underline"
@@ -363,13 +357,21 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 py-16 md:px-8">
-        <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-            Categorías
-          </p>
-          <h2 className="mt-2 font-display text-3xl tracking-tight text-ink">
-            Compra por categoría
-          </h2>
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+              Categorías
+            </p>
+            <h2 className="mt-2 font-display text-3xl tracking-tight text-ink">
+              Compra por categoría
+            </h2>
+          </div>
+          <Link
+            href="/categorias"
+            className="shrink-0 text-sm font-medium text-stone-600 underline-offset-4 hover:text-ink hover:underline"
+          >
+            Ver todas las categorías
+          </Link>
         </div>
         <CategoryShowcaseGrid
           showcases={showcases}
@@ -387,35 +389,32 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 pb-8 md:px-8">
-        <div className="grid overflow-hidden border border-stone-300 bg-ink text-paper md:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-5 p-8 md:p-12">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">
-              Telegram
+        <div className="grid gap-8 border-t border-ink pt-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] md:gap-16">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
+              Sobre el blog
             </p>
-            <h2 className="font-display text-3xl leading-tight tracking-tight md:text-4xl">
-              Recibe solo las ofertas que te interesan.
+            <h2 className="mt-3 font-display text-3xl leading-tight tracking-tight text-ink md:text-4xl">
+              Un poco de todo, <em className="italic">y sin prisas</em>.
             </h2>
-            <p className="max-w-md text-sm leading-relaxed text-stone-300">
-              Crea alertas por palabra clave o pegando la URL de Amazon. Sin
-              ruido: solo bajadas que pasan el filtro de score.
-            </p>
-            <a
-              href={telegramBotUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 items-center bg-paper px-6 text-xs font-semibold uppercase tracking-[0.16em] text-ink transition hover:bg-amber-200"
-            >
-              Abrir bot
-            </a>
           </div>
-          <div className="relative min-h-56 border-t border-white/10 md:border-l md:border-t-0">
-            <Image
-              src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1000&q=80"
-              alt="Alertas en el móvil"
-              fill
-              className="object-cover opacity-80"
-              sizes="(max-width: 768px) 100vw, 40vw"
-            />
+          <div className="space-y-5 text-base leading-relaxed text-stone-600">
+            <p>
+              Una mica de tot nace de la vida diaria: lo que probamos en casa,
+              lo que nos recomiendan y lo que comparamos antes de comprar. Sin
+              publicidad invasiva y contando lo bueno y lo malo.
+            </p>
+            <p>
+              Cuando algo merece la pena, buscamos dónde está más barato y lo
+              vigilamos por ti. Si compras a través de nuestros enlaces,
+              podemos recibir una pequeña comisión sin coste extra.
+            </p>
+            <Link
+              href="/sobre-nosotros"
+              className="inline-flex text-sm font-medium text-ink underline underline-offset-4 hover:text-teal-900"
+            >
+              Conoce el blog →
+            </Link>
           </div>
         </div>
       </section>

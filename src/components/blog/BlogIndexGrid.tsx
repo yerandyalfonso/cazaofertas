@@ -71,9 +71,6 @@ export function BlogIndexGrid({ posts }: { posts: BlogCardData[] }) {
               <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-600">
                 {post.excerpt}
               </p>
-              <span className="mt-5 text-sm font-medium text-ink underline-offset-4 group-hover:underline">
-                Leer artículo
-              </span>
             </Link>
           </article>
         ))}

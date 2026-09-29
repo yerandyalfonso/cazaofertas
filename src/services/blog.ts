@@ -556,3 +556,27 @@ export async function searchArticles(query: string, limit = 4): Promise<BlogPost
     .sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((item) => item.post);
 }
+
+/** Artículos que citan alguno de estos productos (páginas de categoría). */
+export async function getArticlesForProducts(
+  productSlugs: string[],
+  limit = 3,
+): Promise<BlogPost[]> {
+  if (productSlugs.length === 0) return [];
+  try {
+    const wanted = new Set(productSlugs);
+    const posts = await getPublishedArticlesCached();
+    return posts
+      .map((post) => ({
+        post,
+        hits: collectProductSlugs(post).filter((slug) => wanted.has(slug))
+          .length,
+      }))
+      .filter((item) => item.hits > 0)
+      .sort((a, b) => b.hits - a.hits)
+      .slice(0, limit)
+      .map((item) => item.post);
+  } catch {
+    return [];
+  }
+}

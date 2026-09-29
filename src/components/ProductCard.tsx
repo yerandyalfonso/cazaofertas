@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { RemoteImage } from "@/components/RemoteImage";
 import Link from "next/link";
 import { Badge } from "@/components/Badge";
 import { Price } from "@/components/Price";
@@ -52,7 +52,7 @@ export function ProductCard({
           }`}
         >
           {product.imageUrl ? (
-            <Image
+            <RemoteImage
               src={product.imageUrl}
               alt={product.title}
               fill
@@ -86,7 +86,7 @@ export function ProductCard({
             className={`font-display leading-snug tracking-tight text-ink transition-colors group-hover:text-teal-900 ${
               compact
                 ? "line-clamp-2 text-base md:text-[1.05rem]"
-                : "text-xl md:text-[1.35rem]"
+                : "line-clamp-3 text-xl md:text-[1.35rem]"
             }`}
           >
             {product.title}

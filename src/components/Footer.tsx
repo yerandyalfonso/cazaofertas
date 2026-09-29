@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { TELEGRAM_BOT_URL } from "@/lib/catalog";
+import { getBlogTopics } from "@/services/blog";
 
-export function Footer() {
+export async function Footer() {
+  const topics = await getBlogTopics(6);
   return (
     <footer className="mt-auto border-t border-stone-300 bg-ink text-paper">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] md:px-8">
         <div className="space-y-4">
           <p className="font-display text-3xl tracking-tight">Una mica de tot</p>
           <p className="max-w-sm text-sm leading-relaxed text-stone-300">
@@ -22,6 +24,11 @@ export function Footer() {
           </p>
           <ul className="space-y-2 text-sm text-stone-200">
             <li>
+              <Link href="/blog" className="hover:text-white">
+                Blog
+              </Link>
+            </li>
+            <li>
               <Link href="/ofertas" className="hover:text-white">
                 Ofertas
               </Link>
@@ -32,12 +39,32 @@ export function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="/blog" className="hover:text-white">
-                Blog
+              <Link href="/sobre-nosotros" className="hover:text-white">
+                Sobre el blog
               </Link>
             </li>
           </ul>
         </div>
+
+        {topics.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+              Temas
+            </p>
+            <ul className="space-y-2 text-sm text-stone-200">
+              {topics.map((topic) => (
+                <li key={topic.slug}>
+                  <Link
+                    href={`/blog?tema=${topic.slug}`}
+                    className="hover:text-white"
+                  >
+                    {topic.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
@@ -61,7 +88,7 @@ export function Footer() {
             rel="noopener noreferrer"
             className="mt-2 inline-flex h-10 items-center bg-paper px-4 text-xs font-semibold uppercase tracking-[0.14em] text-ink transition hover:bg-amber-200"
           >
-            Abrir Telegram
+            Alertas de precio
           </a>
         </div>
       </div>

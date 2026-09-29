@@ -92,3 +92,42 @@ body {
 .animate-rise-delay-2 {
   animation: rise-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
 }
+
+/* Logo «Una mica de tot»: al pasar el ratón el icono se dibuja en verde pieza a
+   pieza (trazo recortado a cada forma) y el nombre se escribe de izquierda a
+   derecha. */
+.logo-draw path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.group:hover .logo-draw path,
+.group:focus-visible .logo-draw path {
+  stroke-dashoffset: 0;
+}
+.logo-write {
+  background-image: linear-gradient(to right, #115e59 50%, #2f3a45 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  transition: background-position 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.group:hover .logo-write,
+.group:focus-visible .logo-write {
+  background-position: 0 0;
+}
+.group:hover .logo-write-1 {
+  transition-delay: 0.6s;
+}
+.group:hover .logo-write-2 {
+  transition-delay: 0.9s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-draw path,
+  .logo-write {
+    transition-duration: 0.01s;
+    transition-delay: 0s !important;
+  }
+}

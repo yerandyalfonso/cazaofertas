@@ -2,20 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/JsonLd";
-import { ProductCard } from "@/components/ProductCard";
-import { getCategories, getOfferListingProducts } from "@/lib/catalog";
+import { CategoryHero } from "@/components/CategoryHero";
+import { ProductGridProgressive } from "@/components/ProductGridProgressive";
+import { getCategories, getCategoryProducts } from "@/lib/catalog";
 import {
   categoryPublicPath,
   getBlogCategory,
   getSubcategoryByPath,
   productMatchesSubcategory,
+  PRODUCT_SUBCATEGORIES,
 } from "@/lib/site-categories";
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
   itemListJsonLd,
 } from "@/lib/seo";
-import { telegramAlertForCategorySlug } from "@/lib/telegram-links";
 
 interface SubcategoryPageProps {
   params: Promise<{ slug: string; child: string }>;
@@ -61,7 +62,7 @@ export default async function SubcategoryDetailPage({
 
   const [categories, products] = await Promise.all([
     getCategories(),
-    getOfferListingProducts(500),
+    getCategoryProducts(slug),
   ]);
   const parentCategory = categories.find((item) => item.slug === slug);
   if (!parentCategory) notFound();
@@ -95,48 +96,43 @@ export default async function SubcategoryDetailPage({
         ]}
       />
 
-      <nav className="mb-8 text-sm text-stone-500" aria-label="Migas de pan">
-        <Link href="/categorias" className="hover:text-ink">
-          Categorías
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/categorias/${parent.slug}`} className="hover:text-ink">
-          {parent.name}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-ink">{sub.name}</span>
-      </nav>
+      <CategoryHero
+        rootSlug={parent.slug}
+        rootName={parent.name}
+        title={sub.name}
+        intro={`Ofertas de ${sub.name.toLowerCase()} dentro de ${parent.name.toLowerCase()}, ordenadas por descuento real.`}
+        count={filtered.length}
+        activeSub={sub.slug}
+        crumbs={[
+          { name: "Inicio", href: "/" },
+          { name: "Categorías", href: "/categorias" },
+          { name: parent.name, href: `/categorias/${parent.slug}` },
+          { name: sub.name },
+        ]}
+        subcategories={PRODUCT_SUBCATEGORIES.filter(
+          (item) => item.parentSlug === parent.slug,
+        ).map((item) => ({
+          name: item.name,
+          slug: item.slug,
+          href: categoryPublicPath(parent.slug, item.slug),
+        }))}
+      />
 
-      <header className="max-w-3xl">
-        <p className="text-sm font-medium text-stone-500">{parent.name}</p>
-        <h1 className="mt-1 font-display text-4xl tracking-tight text-ink md:text-5xl">
-          Ofertas de {sub.name}
-        </h1>
-        <p className="mt-4 text-base leading-relaxed text-stone-600">
-          Productos clasificados en {sub.name.toLowerCase()} dentro de{" "}
-          {parent.name.toLowerCase()}.
-        </p>
-        <a
-          href={telegramAlertForCategorySlug(parent.slug)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 inline-flex h-10 items-center bg-ink px-4 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
-        >
-          Alerta Telegram · {parent.name}
-        </a>
-      </header>
-
-      {filtered.length > 0 ? (
-        <div className="mt-12 grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-12 text-sm text-stone-600">
-          Todavía no hay productos en esta subcategoría.
-        </p>
-      )}
+      <section className="mt-12">
+        {filtered.length > 0 ? (
+          <ProductGridProgressive products={filtered} />
+        ) : (
+          <p className="text-sm text-stone-600">
+            Todavía no hay productos en esta subcategoría.{" "}
+            <Link
+              href={`/categorias/${parent.slug}`}
+              className="text-ink underline underline-offset-4"
+            >
+              Ver todo {parent.name.toLowerCase()}
+            </Link>
+          </p>
+        )}
+      </section>
     </div>
   );
 }

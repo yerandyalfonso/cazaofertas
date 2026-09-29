@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { RemoteImage } from "@/components/RemoteImage";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/Badge";
 import { JsonLd } from "@/components/JsonLd";
@@ -11,7 +12,11 @@ import { RelatedArticles } from "@/components/blog/RelatedArticles";
 import { getActiveProducts, getProductBySlug } from "@/lib/catalog";
 import { getArticlesMentioningProduct } from "@/services/blog";
 import { formatEuro } from "@/lib/money";
-import { splitProductDescription } from "@/lib/product-description";
+import {
+  buildDescriptionBlocks,
+  splitProductDescription,
+  type DescriptionBlock,
+} from "@/lib/product-description";
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
@@ -85,6 +90,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       ? product.previousPrice - product.currentPrice
       : 0;
   const descriptionParts = splitProductDescription(product.description);
+  const descriptionBlocks = buildDescriptionBlocks(descriptionParts);
   const category = product.category;
   const breadcrumbItems = [
     { name: "Inicio", path: "/" },
@@ -121,7 +127,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         </Link>
         <span className="mx-2">/</span>
         <Link href="/ofertas" className="hover:text-ink">
-          Catálogo
+          Ofertas
         </Link>
         {category?.parentSlug && category.parentName ? (
           <>
@@ -154,7 +160,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
-        <div className="relative w-full bg-transparent">
+        <div className="relative w-full self-start bg-white p-6 md:p-10 lg:sticky lg:top-28">
           {product.imageUrl ? (
             <RemoteImage
               src={product.imageUrl}
@@ -171,7 +177,6 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
         <div className="space-y-6">
           <div className="flex flex-wrap gap-2">
-            <Badge dealLevel={product.dealLevel} />
             {product.discountPercentage > 0 ? (
               <Badge variant="discount">
                 −{Math.round(product.discountPercentage)}%
@@ -182,7 +187,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             ) : null}
           </div>
 
-          <h1 className="font-display text-4xl leading-tight tracking-tight text-ink md:text-5xl">
+          <h1 className="text-balance font-display text-3xl leading-tight tracking-tight text-ink md:text-4xl">
             {product.title}
           </h1>
 
@@ -200,35 +205,35 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             current={product.currentPrice}
             previous={product.previousPrice}
             discountPercentage={product.discountPercentage}
+            showDiscountLabel={false}
             size="lg"
           />
+          {savings > 0 ? (
+            <p className="-mt-3 text-sm text-teal-800">
+              Ahorras {formatEuro(savings)}
+            </p>
+          ) : null}
 
           {descriptionParts.length > 0 ? (
             <div className="space-y-3 border-y border-stone-200 py-5">
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">
                 Descripción
               </h2>
-              {descriptionParts.length === 1 ? (
-                <p className="text-base leading-relaxed text-stone-700">
-                  {descriptionParts[0]}
-                </p>
-              ) : (
-                <ul className="space-y-2.5 text-base leading-relaxed text-stone-700">
-                  {descriptionParts.map((part, index) => (
-                    <li key={`${index}-${part.slice(0, 32)}`} className="flex gap-2.5">
-                      <span
-                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-800/70"
-                        aria-hidden
-                      />
-                      <span>{part}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <DescriptionBlocks blocks={descriptionBlocks.slice(0, 4)} />
+              {descriptionBlocks.length > 4 ? (
+                <details className="group">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-ink underline underline-offset-4 group-open:hidden [&::-webkit-details-marker]:hidden">
+                    Ver todas las características
+                  </summary>
+                  <div className="pt-3">
+                    <DescriptionBlocks blocks={descriptionBlocks.slice(4)} />
+                  </div>
+                </details>
+              ) : null}
             </div>
           ) : null}
 
-          <dl className="grid grid-cols-2 gap-4 border-y border-stone-300 py-5 text-sm">
+          <dl className="grid grid-cols-2 gap-4 border-b border-stone-300 pb-5 text-sm">
             <div>
               <dt className="text-stone-500">Precio actual</dt>
               <dd className="mt-1 font-medium text-ink">
@@ -236,39 +241,9 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
               </dd>
             </div>
             <div>
-              <dt className="text-stone-500">Precio anterior</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {product.previousPrice !== null
-                  ? formatEuro(product.previousPrice)
-                  : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-stone-500">Ahorro</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {savings > 0 ? formatEuro(savings) : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-stone-500">Mínimo histórico</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {product.lowestPrice !== null
-                  ? formatEuro(product.lowestPrice)
-                  : "—"}
-              </dd>
-            </div>
-            <div>
               <dt className="text-stone-500">Disponibilidad</dt>
               <dd className="mt-1 font-medium text-ink">
                 {availabilityLabel(product.availability)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-stone-500">Última comprobación</dt>
-              <dd className="mt-1 font-medium text-ink">
-                {product.lastCheckedAt
-                  ? new Date(product.lastCheckedAt).toLocaleString("es-ES")
-                  : "—"}
               </dd>
             </div>
           </dl>
@@ -310,6 +285,57 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         currentPrice={product.currentPrice}
         previousPrice={product.previousPrice}
       />
+    </div>
+  );
+}
+
+/** Descripción de Amazon ordenada: puntos con título, subtítulos y listas cortas. */
+function DescriptionBlocks({ blocks }: { blocks: DescriptionBlock[] }) {
+  return (
+    <div className="space-y-4 text-base leading-relaxed text-stone-700">
+      {blocks.map((block, index) => {
+        const key = `${block.type}-${index}`;
+        if (block.type === "heading") {
+          return (
+            <p key={key} className="pt-2 font-display text-lg text-ink">
+              {block.text}
+            </p>
+          );
+        }
+        if (block.type === "checks") {
+          return (
+            <ul
+              key={key}
+              className="grid gap-x-6 gap-y-2 text-[0.9375rem] sm:grid-cols-2"
+            >
+              {block.items.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <Check
+                    aria-hidden
+                    strokeWidth={2}
+                    className="mt-1 h-4 w-4 shrink-0 text-teal-800"
+                  />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={key} className="flex gap-3">
+            <span
+              className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-800/70"
+              aria-hidden
+            />
+            <span>
+              {block.lead ? (
+                <strong className="font-semibold text-ink">{block.lead}. </strong>
+              ) : null}
+              {block.text}
+            </span>
+          </p>
+        );
+      })}
     </div>
   );
 }

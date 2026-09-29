@@ -8,6 +8,11 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [x] 2026-09-26 Corregir el artículo «5 productos básicos para la limpieza del hogar»: FAQ con texto de prueba («wewewe», «qeqe») y enlace a `127.0.0.1` en el primer H2.
 - [x] 2026-09-26 Seed: ya no siembra artículos en `seed`//api/seed; `seed:blog` solo inserta los que falten como borrador, sin sobrescribir.
 - [ ] Ampliar a 1.500+ palabras las guías que se quieran posicionar mejor.
+- [x] 2026-09-29 Rediseño de la web pública y nueva marca «Una mica de tot» (rama `rediseno-blog-una-mica-de-tot`, falta integrar en `main` y desplegar). Detalle en `docs/diseno-una-mica-de-tot.md`. Arreglado de paso: el filtro por categoría de Ofertas no mostraba nada (comparaba subcategoría con categoría raíz), las categorías mostraban solo las ofertas del top global (Bebé: 18 de 774) y los recuentos se cortaban en 1.000 filas.
+- [ ] Temas del blog: «Guías» y «Comparativas» son formatos, no temas. Recategorizar esos artículos (Hogar, Bebé, Cocina…) o añadir un campo «formato» aparte.
+- [ ] Personalizar `/sobre-nosotros` con quién escribe el blog (hoy es un texto genérico).
+- [ ] Categorías con más de 480 ofertas: solo se cargan las 480 mejores; paginar en el servidor si se quieren todas.
+- [ ] Gráfico de historial de precios en la ficha (datos ya disponibles en `getPriceHistory`).
 - [x] 2026-09-26 SEO del blog: JSON-LD `FAQPage` para los bloques de preguntas frecuentes (desplegado 26-09).
 - [x] 2026-09-26 Avisos de SEO en el editor: longitud del título y la descripción, imagen destacada y `alt` de las imágenes (falta desplegar).
 - [x] 2026-09-26 Enlazado interno blog ↔ marketplace (desplegado 26-09): el artículo enlaza a la categoría del marketplace de sus productos, y las categorías del marketplace muestran «Guías relacionadas». Los artículos sin productos (guías de Amazon) no llevan enlace.
