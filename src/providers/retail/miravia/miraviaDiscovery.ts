@@ -552,13 +552,38 @@ export async function scrapeMiraviaProductPage(
       /content=["']([^"']+)["']\s+property=["']og:image["']/i,
     )?.[1];
 
-  // Preferir el clickTrackInfo que mencione este item_id.
   let sale: number | null = null;
   let list: number | null = null;
-  let skuId: string | null = null;
+  let skuId: string | null = trimmed.match(/\/p\/i\d+-s(\d+)/i)?.[1] ?? null;
+
+  // Fuente principal: el precio que pinta la ficha (skuInfos[sku].price.salePrice).
+  // Si la URL no trae SKU, el primero de skuInfos es el seleccionado por defecto.
+  // (price puede traer antes «lowestPrice»; si el SKU de la URL ya no está,
+  // Miravia muestra otra variante: se usa la primera).
+  const skuPrices: { sku: string; sale: number | null; list: number | null }[] = [];
+  for (const match of html.matchAll(/"(\d{8,})":\{"price":\{/g)) {
+    const window = html.slice(match.index!, match.index! + 4000);
+    const block = window.match(/"salePrice":\{([^}]*)\}/)?.[1] ?? "";
+    const num = (key: string) =>
+      Number(block.match(new RegExp(`"${key}":"?([\\d.]+)`))?.[1]);
+    const toEuro = (v: number) => (Number.isFinite(v) && v > 0 ? roundMoney(v) : null);
+    skuPrices.push({ sku: match[1]!, sale: toEuro(num("priceNumber")), list: toEuro(num("originalPriceNumber")) });
+  }
+  const skuPrice =
+    skuPrices.find((p) => p.sku === skuId && p.sale != null) ??
+    skuPrices.find((p) => p.sale != null);
+  if (skuPrice) {
+    sale = skuPrice.sale;
+    list = skuPrice.list;
+    skuId = skuPrice.sku;
+  }
+
+  // Respaldo: clickTrackInfo de este mismo SKU. Ojo: la ficha trae muchos
+  // clickTrackInfo de productos recomendados que también llevan item_id de
+  // esta ficha, así que solo vale si el sku_id coincide.
   const trackRe =
     /(?:clickTrackInfo|clickTrackInfo=)"?([^"&<]{20,800})/gi;
-  for (const match of html.matchAll(trackRe)) {
+  for (const match of sale != null ? [] : html.matchAll(trackRe)) {
     const raw = match[1] ?? "";
     let decoded = raw;
     try {
@@ -567,9 +592,10 @@ export async function scrapeMiraviaProductPage(
       /* keep raw */
     }
     if (!decoded.includes(`item_id:${externalIdFromInput}`)) continue;
+    const trackSku = decoded.match(/sku_id:(\d+)/)?.[1];
+    if (!skuId || trackSku !== skuId) continue;
     const saleCents = decoded.match(/item_discount_price:([\d.]+)/)?.[1];
     const listCents = decoded.match(/item_price:([\d.]+)/)?.[1];
-    skuId = decoded.match(/sku_id:(\d+)/)?.[1] ?? skuId;
     sale = trackPriceToEuro(saleCents);
     list = trackPriceToEuro(listCents);
     if (sale != null) break;

@@ -246,7 +246,9 @@ export async function runRetailPriceCheck(options?: {
       let { previousPrice: reference, observedAt } = resolveReferencePrice({
         nextPrice: resolvedPrice,
         listPrice: resolvedListPrice,
-        storedCurrent,
+        // Sin revisión previa el precio guardado no es fiable (p. ej. precios
+        // de Miravia leídos de productos recomendados): no vale como «antes».
+        storedCurrent: product.last_checked_at ? storedCurrent : null,
         storedPrevious: toNumber(product.previous_price),
         storedObservedAt: product.previous_price_observed_at,
         now: new Date(now),
