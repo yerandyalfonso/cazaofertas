@@ -1,0 +1,277 @@
+import type { Browser, Page } from "playwright";
+import { isCarrefourFoodContext } from "@/lib/carrefour-category";
+import { roundMoney } from "@/lib/money";
+import { normalizeCarrefourProductUrl } from "@/providers/retail/carrefour/carrefourHttp";
+
+const CARREFOUR_ORIGIN = "https://www.carrefour.es";
+const PAGE_SIZE = 24;
+
+/**
+ * Listados no alimentación con muchas rebajas. Configurable con
+ * CARREFOUR_BROWSER_FEED_URLS (separadas por comas).
+ */
+export const DEFAULT_CARREFOUR_BROWSER_FEED_URLS = [
+  "https://www.carrefour.es/exclusivo-online/cat28650681/c",
+] as const;
+
+/** Producto tal cual lo trae `__INITIAL_STATE__.plp.results.items` del listado. */
+interface CarrefourPlpItem {
+  product_id?: string;
+  sku_id?: string;
+  name?: string;
+  brand?: string;
+  ean?: string;
+  url?: string;
+  price?: string;
+  strikethrough_price?: string;
+  /** Precio de la siguiente oferta (otro vendedor o Carrefour). */
+  next_price?: string;
+  catalog?: string;
+  document_type?: string;
+  seller_id?: string;
+  seller_name?: string;
+  units_in_stock?: number;
+  parent_category?: { id?: string; name?: string };
+  images?: { desktop?: string; mobile?: string };
+}
+
+export interface CarrefourListingItem {
+  /** `VC4A-…` (mismo id que extrae `extractCarrefourProductId` de la URL). */
+  externalId: string;
+  skuId?: string;
+  productUrl: string;
+  sourceUrl: string;
+  title: string;
+  brand?: string;
+  ean?: string;
+  imageUrl?: string;
+  price: number;
+  listPrice: number | null;
+  discountPercentage: number;
+  sellerName?: string;
+  /** Vendedor externo del marketplace (no Carrefour). */
+  isMarketplace: boolean;
+  unitsInStock?: number;
+  categoryName?: string;
+}
+
+export interface CarrefourBrowserDiscoveryResult {
+  items: CarrefourListingItem[];
+  pagesFetched: number;
+  feedErrors: Array<{ url: string; message: string }>;
+}
+
+/** Formato Carrefour: "1.299 €", "1.299,99 €", "455,98 €" (punto = miles). */
+export function parseEuro(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const digits = raw.replace(/[^\d,]/g, "").replace(",", ".");
+  const value = Number(digits);
+  return digits && Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
+}
+
+function upgradeImageUrl(url: string | undefined): string | undefined {
+  // Las miniaturas del listado son `hd_350x_`; la ficha usa `hd_510x_`.
+  return url?.replace(/\/hd_\d+x_\//, "/hd_510x_/");
+}
+
+/**
+ * Precio tachado creíble, o null.
+ * - Muchos vendedores del marketplace tachan precio × 1,2 (el «precio con
+ *   IVA» sobre su precio) y sale un falso −16,67 %: se descarta.
+ * - Vendedor externo: si otra oferta del mismo producto (`next_price`) está
+ *   por debajo de su tachado, la referencia real es esa otra oferta.
+ */
+export function resolveListPrice(
+  price: number,
+  strike: number | null,
+  nextPrice: number | null,
+  isMarketplace: boolean,
+): number | null {
+  if (strike == null || strike <= price) return null;
+  if (Math.abs(strike - price * 1.2) <= 0.02) return null;
+
+  const reference =
+    isMarketplace && nextPrice != null && nextPrice > price && nextPrice < strike
+      ? nextPrice
+      : strike;
+  return reference > price ? roundMoney(reference) : null;
+}
+
+export function listingItemFromPlp(
+  raw: CarrefourPlpItem,
+  sourceUrl: string,
+): CarrefourListingItem | null {
+  const externalId = raw.product_id?.trim().toUpperCase();
+  const title = raw.name?.replace(/\s+/g, " ").trim();
+  const price = parseEuro(raw.price);
+  if (!externalId || !title || !raw.url || price == null) return null;
+  if (raw.catalog && raw.catalog !== "nonFood") return null;
+
+  const productUrl = normalizeCarrefourProductUrl(
+    new URL(raw.url, CARREFOUR_ORIGIN).toString(),
+  );
+  if (
+    isCarrefourFoodContext({
+      productUrl,
+      title,
+      breadcrumbs: raw.parent_category?.name ? [raw.parent_category.name] : [],
+    })
+  ) {
+    return null;
+  }
+
+  const isMarketplace = Boolean(raw.seller_id && raw.seller_id !== "0");
+  const listPrice = resolveListPrice(
+    price,
+    parseEuro(raw.strikethrough_price),
+    parseEuro(raw.next_price),
+    isMarketplace,
+  );
+  const discountPercentage =
+    listPrice != null ? roundMoney(((listPrice - price) / listPrice) * 100) : 0;
+
+  return {
+    externalId,
+    skuId: raw.sku_id,
+    productUrl,
+    sourceUrl,
+    title,
+    brand: raw.brand?.trim() || undefined,
+    ean: raw.ean?.trim() || undefined,
+    imageUrl: upgradeImageUrl(raw.images?.desktop ?? raw.images?.mobile),
+    price,
+    listPrice,
+    discountPercentage,
+    sellerName: raw.seller_name?.trim() || undefined,
+    isMarketplace,
+    unitsInStock: raw.units_in_stock,
+    categoryName: raw.parent_category?.name?.trim() || undefined,
+  };
+}
+
+function withOffset(feedUrl: string, offset: number): string {
+  const url = new URL(feedUrl);
+  if (offset > 0) url.searchParams.set("offset", String(offset));
+  else url.searchParams.delete("offset");
+  return url.toString();
+}
+
+async function readPlpItems(page: Page): Promise<CarrefourPlpItem[] | null> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __INITIAL_STATE__?: { plp?: { results?: { items?: unknown[] } } };
+    }).__INITIAL_STATE__;
+    const items = state?.plp?.results?.items;
+    return Array.isArray(items) ? (items as never[]) : null;
+  });
+}
+
+/**
+ * Carrefour (Cloudflare) devuelve 403 a `fetch` y a Chromium headless, incluso
+ * desde IP residencial. Solo pasa con Google Chrome instalado y ventana real,
+ * así que la abrimos fuera de pantalla. Pensado para el cron del Mac.
+ */
+async function launchCarrefourBrowser(): Promise<Browser> {
+  const { chromium } = await import("playwright");
+  return chromium.launch({
+    channel: process.env.CARREFOUR_BROWSER_CHANNEL?.trim() || "chrome",
+    headless: false,
+    args: [
+      "--disable-blink-features=AutomationControlled",
+      "--window-position=-2400,-2400",
+      "--window-size=1280,900",
+    ],
+  });
+}
+
+export function resolveCarrefourBrowserFeedUrls(): string[] {
+  const fromEnv = process.env.CARREFOUR_BROWSER_FEED_URLS?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return fromEnv?.length ? fromEnv : [...DEFAULT_CARREFOUR_BROWSER_FEED_URLS];
+}
+
+/**
+ * Recorre las primeras `pagesPerFeed` páginas de cada listado y devuelve los
+ * productos (con o sin rebaja; el servicio decide qué publicar).
+ */
+export async function discoverCarrefourDealsWithBrowser(options?: {
+  feedUrls?: string[];
+  pagesPerFeed?: number;
+  maxItems?: number;
+  delayMs?: number;
+  timeoutMs?: number;
+}): Promise<CarrefourBrowserDiscoveryResult> {
+  const feedUrls = options?.feedUrls?.length
+    ? options.feedUrls
+    : resolveCarrefourBrowserFeedUrls();
+  const pagesPerFeed = Math.max(1, options?.pagesPerFeed ?? 5);
+  const maxItems = options?.maxItems ?? 300;
+  const delayMs = options?.delayMs ?? 1_500;
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+
+  const byId = new Map<string, CarrefourListingItem>();
+  const feedErrors: Array<{ url: string; message: string }> = [];
+  let pagesFetched = 0;
+
+  const browser = await launchCarrefourBrowser();
+  try {
+    const page = await browser.newPage({ locale: "es-ES" });
+
+    feeds: for (const feedUrl of feedUrls) {
+      for (let pageIndex = 0; pageIndex < pagesPerFeed; pageIndex += 1) {
+        const url = withOffset(feedUrl, pageIndex * PAGE_SIZE);
+        try {
+          const response = await page.goto(url, {
+            waitUntil: "domcontentloaded",
+            timeout: timeoutMs,
+            referer: pageIndex > 0 ? feedUrl : `${CARREFOUR_ORIGIN}/`,
+          });
+          const status = response?.status() ?? 0;
+          if (status >= 400) {
+            const title = await page.title().catch(() => "");
+            throw new Error(
+              /cloudflare|attention required/i.test(title)
+                ? `Carrefour bloqueó la petición (Cloudflare ${status}).`
+                : `Carrefour HTTP ${status}`,
+            );
+          }
+
+          const rawItems = await readPlpItems(page);
+          if (!rawItems) {
+            throw new Error("Carrefour: listado sin __INITIAL_STATE__.plp.");
+          }
+          pagesFetched += 1;
+          if (rawItems.length === 0) break;
+
+          for (const raw of rawItems) {
+            const item = listingItemFromPlp(raw, feedUrl);
+            if (item && !byId.has(item.externalId)) {
+              byId.set(item.externalId, item);
+            }
+            if (byId.size >= maxItems) break feeds;
+          }
+
+          if (rawItems.length < PAGE_SIZE) break;
+        } catch (error) {
+          feedErrors.push({
+            url,
+            message: error instanceof Error ? error.message : "Error desconocido",
+          });
+          // Un bloqueo en una página suele repetirse en las siguientes.
+          break;
+        }
+
+        if (delayMs > 0) await page.waitForTimeout(delayMs);
+      }
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+
+  return {
+    items: [...byId.values()].slice(0, maxItems),
+    pagesFetched,
+    feedErrors,
+  };
+}
