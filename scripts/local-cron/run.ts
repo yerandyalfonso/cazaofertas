@@ -236,6 +236,15 @@ async function runUserAlertsResidential(): Promise<void> {
   });
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);
+
+  // Productos Carrefour creados por alertas: su foto (static.carrefour.es) da
+  // 403 a Telegram; se sube a Storage antes de que haya un aviso de bajada.
+  const { backfillCarrefourProductImages } = await import("@/services/carrefourDeals");
+  try {
+    console.log("carrefour images", await backfillCarrefourProductImages());
+  } catch (error) {
+    console.warn("[user-alerts-residential] fotos Carrefour:", error);
+  }
 }
 
 async function runKiabiDeals(): Promise<void> {

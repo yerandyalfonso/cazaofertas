@@ -36,6 +36,10 @@ async function main(): Promise<void> {
     limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
   });
   console.log(JSON.stringify(result, null, 2));
+  if (!result.dryRun) {
+    // Recoge fotos que se quedaron sin subir (fallos puntuales, alertas).
+    console.log("images", await backfillCarrefourProductImages());
+  }
   console.log(`[local-cron] carrefour-deals finished ${new Date().toISOString()}`);
 }
 
