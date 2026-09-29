@@ -8,7 +8,6 @@ import {
 } from "@/lib/retailers";
 import {
   createSupabaseServiceClient,
-  getPublicStorageUrl,
   type TypedSupabaseClient,
 } from "@/lib/supabase";
 import {
@@ -112,6 +111,20 @@ async function loadCarrefourCatalogForItems(
 // Bucket público ya existente (blog/Instagram); las fotos van en `carrefour/`.
 const IMAGE_BUCKET = "article-images";
 
+/**
+ * En el Mac `NEXT_PUBLIC_SUPABASE_URL` es el túnel (127.0.0.1) y no hay
+ * `NEXT_PUBLIC_SITE_URL`, así que `getPublicStorageUrl` daría una URL local.
+ * La web pública sirve Storage bajo su dominio.
+ */
+function publicImageUrl(path: string): string {
+  const base = (
+    process.env.CARREFOUR_IMAGE_PUBLIC_BASE?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    "https://blog.chollosdhoy.com"
+  ).replace(/\/$/, "");
+  return `${base}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`;
+}
+
 function imageExtension(contentType: string): string {
   if (/png/i.test(contentType)) return "png";
   if (/webp/i.test(contentType)) return "webp";
@@ -146,7 +159,7 @@ async function mirrorCarrefourImages(
       console.warn(`[carrefour-deals] no se pudo subir ${path}: ${error.message}`);
       continue;
     }
-    mirrored.set(image.imageUrl!, getPublicStorageUrl(IMAGE_BUCKET, path));
+    mirrored.set(image.imageUrl!, publicImageUrl(path));
   }
   return mirrored;
 }
