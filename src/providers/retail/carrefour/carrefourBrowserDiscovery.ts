@@ -1,6 +1,7 @@
 import type { Browser, Page } from "playwright";
 import { isCarrefourFoodContext } from "@/lib/carrefour-category";
 import { roundMoney } from "@/lib/money";
+import { extractExternalId } from "@/lib/retailers";
 import { normalizeCarrefourProductUrl } from "@/providers/retail/carrefour/carrefourHttp";
 
 const CARREFOUR_ORIGIN = "https://www.carrefour.es";
@@ -101,15 +102,19 @@ export function listingItemFromPlp(
   raw: CarrefourPlpItem,
   sourceUrl: string,
 ): CarrefourListingItem | null {
-  const externalId = raw.product_id?.trim().toUpperCase();
   const title = raw.name?.replace(/\s+/g, " ").trim();
   const price = parseEuro(raw.price);
-  if (!externalId || !title || !raw.url || price == null) return null;
+  if (!title || !raw.url || price == null) return null;
   if (raw.catalog && raw.catalog !== "nonFood") return null;
 
   const productUrl = normalizeCarrefourProductUrl(
     new URL(raw.url, CARREFOUR_ORIGIN).toString(),
   );
+  // Misma regla que las alertas por URL (`skuId` si viene, si no `VC4A-…`):
+  // así un producto no acaba con dos asin `CF-…` distintos.
+  const externalId =
+    extractExternalId("carrefour", productUrl) ?? raw.product_id?.trim().toUpperCase();
+  if (!externalId) return null;
   if (
     isCarrefourFoodContext({
       productUrl,
@@ -169,7 +174,7 @@ async function readPlpItems(page: Page): Promise<CarrefourPlpItem[] | null> {
 /**
  * Carrefour (Cloudflare) devuelve 403 a `fetch` y a Chromium headless, incluso
  * desde IP residencial. Solo pasa con Google Chrome instalado y ventana real,
- * así que la abrimos fuera de pantalla. Pensado para el cron del Mac.
+ * así que la abrimos pequeña y minimizada. Pensado para el cron del Mac.
  */
 async function launchCarrefourBrowser(): Promise<Browser> {
   const { chromium } = await import("playwright");
@@ -178,8 +183,10 @@ async function launchCarrefourBrowser(): Promise<Browser> {
     headless: false,
     args: [
       "--disable-blink-features=AutomationControlled",
-      "--window-position=-2400,-2400",
-      "--window-size=1280,900",
+      // Ventana mínima (Chrome la deja en ~500×375) en la esquina inferior
+      // derecha; `newMinimizedPage` la minimiza nada más abrirla.
+      "--window-position=5000,5000",
+      "--window-size=320,240",
     ],
   });
 }
@@ -189,7 +196,9 @@ async function launchCarrefourBrowser(): Promise<Browser> {
  * macOS devuelve el foco a la app que estabas usando (solo parpadea al abrir).
  */
 async function newMinimizedPage(browser: Browser): Promise<Page> {
-  const page = await browser.newPage({ locale: "es-ES" });
+  // viewport null: si no, Playwright agranda la ventana al tamaño emulado. Los
+  // datos salen de __INITIAL_STATE__ (SSR), no dependen del tamaño.
+  const page = await browser.newPage({ locale: "es-ES", viewport: null });
   try {
     const cdp = await page.context().newCDPSession(page);
     const { windowId } = await cdp.send("Browser.getWindowForTarget");
@@ -412,7 +421,8 @@ export async function scrapeCarrefourProductWithBrowser(
     const image = product.colors?.[0]?.images?.[0];
 
     return {
-      externalId: product.product_id?.toUpperCase() ?? null,
+      externalId:
+        extractExternalId("carrefour", productUrl) ?? product.product_id?.toUpperCase() ?? null,
       productUrl,
       title: product.name?.replace(/\s+/g, " ").trim() || null,
       brand: product.brand?.description?.trim() || null,
