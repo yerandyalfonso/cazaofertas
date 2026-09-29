@@ -112,7 +112,8 @@ export function alertRetailerSupported(retailer: ProductRetailer): boolean {
  * la alerta se guarda "en espera" y el cron local del Mac la completa.
  */
 export function requiresResidentialIp(retailer: ProductRetailer): boolean {
-  return retailer === "pccomponentes";
+  // Carrefour: además de IP residencial exige Chrome con ventana (Cloudflare).
+  return retailer === "pccomponentes" || retailer === "carrefour";
 }
 
 export function getRetailerDefinition(

@@ -248,8 +248,8 @@ export async function runUserUrlAlerts(options?: {
   delayMs?: number;
   /**
    * Tiendas a comprobar en esta corrida. Por defecto, todas menos
-   * PcComponentes (que exige IP residencial y solo corre desde el cron
-   * local del Mac vía `runUserUrlAlerts({ retailers: ["pccomponentes"] })`).
+   * PcComponentes y Carrefour (exigen IP residencial y solo corren desde el
+   * cron local del Mac vía `runUserUrlAlerts({ retailers: [...] })`).
    */
   retailers?: ProductRetailer[];
 }): Promise<UserUrlAlertsResult> {
@@ -261,7 +261,7 @@ export async function runUserUrlAlerts(options?: {
   const delayMs = options?.delayMs ?? 1_400;
   const allowedRetailers: ProductRetailer[] =
     options?.retailers ??
-    ["amazon", "kiabi", "miravia", "aliexpress", "carrefour"];
+    ["amazon", "kiabi", "miravia", "aliexpress"];
 
   const { data: alerts, error } = await client
     .from("alerts")

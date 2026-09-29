@@ -184,6 +184,26 @@ async function launchCarrefourBrowser(): Promise<Browser> {
   });
 }
 
+/**
+ * Pestaña con la ventana minimizada: Cloudflare la sigue dejando pasar y
+ * macOS devuelve el foco a la app que estabas usando (solo parpadea al abrir).
+ */
+async function newMinimizedPage(browser: Browser): Promise<Page> {
+  const page = await browser.newPage({ locale: "es-ES" });
+  try {
+    const cdp = await page.context().newCDPSession(page);
+    const { windowId } = await cdp.send("Browser.getWindowForTarget");
+    await cdp.send("Browser.setWindowBounds", {
+      windowId,
+      bounds: { windowState: "minimized" },
+    });
+    await cdp.detach();
+  } catch {
+    // Si no se puede minimizar, sigue fuera de pantalla (--window-position).
+  }
+  return page;
+}
+
 export function resolveCarrefourBrowserFeedUrls(): string[] {
   const fromEnv = process.env.CARREFOUR_BROWSER_FEED_URLS?.split(",")
     .map((value) => value.trim())
@@ -216,7 +236,7 @@ export async function discoverCarrefourDealsWithBrowser(options?: {
 
   const browser = await launchCarrefourBrowser();
   try {
-    const page = await browser.newPage({ locale: "es-ES" });
+    const page = await newMinimizedPage(browser);
 
     feeds: for (const feedUrl of feedUrls) {
       for (let pageIndex = 0; pageIndex < pagesPerFeed; pageIndex += 1) {
@@ -296,7 +316,7 @@ export async function downloadCarrefourImagesWithBrowser(
 
   const browser = await launchCarrefourBrowser();
   try {
-    const page = await browser.newPage({ locale: "es-ES" });
+    const page = await newMinimizedPage(browser);
     for (const url of unique) {
       try {
         const response = await page.goto(url, {
@@ -315,4 +335,99 @@ export async function downloadCarrefourImagesWithBrowser(
     await browser.close().catch(() => {});
   }
   return result;
+}
+
+interface CarrefourPdpOffer {
+  price?: string;
+  strikethrough_price?: string;
+  seller_id?: string;
+  units_in_stock?: number;
+}
+
+interface CarrefourPdpProduct {
+  product_id?: string;
+  name?: string;
+  brand?: { description?: string };
+  skus?: Array<{ id?: string; offers?: CarrefourPdpOffer[] }>;
+  colors?: Array<{ images?: Array<{ medium?: string; large?: string }> }>;
+}
+
+export interface CarrefourPdpQuote {
+  externalId: string | null;
+  productUrl: string;
+  title: string | null;
+  brand: string | null;
+  imageUrl: string | null;
+  price: number | null;
+  listPrice: number | null;
+  availability: "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
+}
+
+/**
+ * Ficha de producto con Chrome con ventana (alertas de usuario por URL). La
+ * primera oferta de `skus[0].offers` es la que Carrefour vende por defecto;
+ * la segunda sirve de referencia para vendedores del marketplace.
+ */
+export async function scrapeCarrefourProductWithBrowser(
+  url: string,
+  options?: { timeoutMs?: number },
+): Promise<CarrefourPdpQuote> {
+  const productUrl = normalizeCarrefourProductUrl(url);
+  const browser = await launchCarrefourBrowser();
+  try {
+    const page = await newMinimizedPage(browser);
+    const response = await page.goto(productUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: options?.timeoutMs ?? 30_000,
+      referer: `${CARREFOUR_ORIGIN}/`,
+    });
+    const status = response?.status() ?? 0;
+    if (status >= 400) {
+      throw new Error(`Carrefour HTTP ${status} para ${productUrl}`);
+    }
+
+    const product = await page.evaluate(() => {
+      const state = (window as unknown as {
+        __INITIAL_STATE__?: { pdp?: { product?: unknown } };
+      }).__INITIAL_STATE__;
+      return (state?.pdp?.product ?? null) as never;
+    }) as CarrefourPdpProduct | null;
+    if (!product) {
+      throw new Error("Carrefour: no se encontró ficha de producto (bloqueo o URL inválida).");
+    }
+
+    const offers = product.skus?.[0]?.offers ?? [];
+    const best = offers[0];
+    const price = parseEuro(best?.price);
+    const isMarketplace = Boolean(best?.seller_id && best.seller_id !== "0");
+    const listPrice =
+      price == null
+        ? null
+        : resolveListPrice(
+            price,
+            parseEuro(best?.strikethrough_price),
+            parseEuro(offers[1]?.price),
+            isMarketplace,
+          );
+    const image = product.colors?.[0]?.images?.[0];
+
+    return {
+      externalId: product.product_id?.toUpperCase() ?? null,
+      productUrl,
+      title: product.name?.replace(/\s+/g, " ").trim() || null,
+      brand: product.brand?.description?.trim() || null,
+      imageUrl: image?.medium ?? image?.large ?? null,
+      price,
+      listPrice,
+      availability: !best
+        ? "OUT_OF_STOCK"
+        : best.units_in_stock === 0
+          ? "OUT_OF_STOCK"
+          : price != null
+            ? "IN_STOCK"
+            : "UNKNOWN",
+    };
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }

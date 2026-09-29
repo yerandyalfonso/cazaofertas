@@ -232,7 +232,7 @@ async function runUserAlertsResidential(): Promise<void> {
   const result = await runUserUrlAlerts({
     limit: 10,
     delayMs: 3_000,
-    retailers: ["pccomponentes"],
+    retailers: ["pccomponentes", "carrefour"],
   });
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);
