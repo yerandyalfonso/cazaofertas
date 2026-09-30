@@ -20,8 +20,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
-import { availabilityLabel } from "@/lib/out-of-stock-policy";
-import { splitProductDescription } from "@/lib/product-description";
 import {
   adminPriceCheckNote,
   detectRetailerFromUrl,
@@ -29,12 +27,11 @@ import {
   isProductRetailer,
   normalizeRetailer,
   PRODUCT_RETAILERS,
-  retailerBuyCtaLabel,
   retailerLabel,
   retailerScrapeSupported,
   type ProductRetailer,
 } from "@/lib/retailers";
-import { formatFullDateTime, formatRelativeTime } from "@/lib/relative-time";
+import { formatFullDateTime } from "@/lib/relative-time";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import {
   AdminPageHeader,
@@ -43,137 +40,22 @@ import {
   AdminSortButton,
 } from "@/components/admin/AdminListChrome";
 import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
+import { ProductDetailPanel } from "@/components/admin/products/ProductDetailPanel";
+import {
+  type AdminProduct,
+  type CategoryOption,
+  type SortKey,
+  type SortDir,
+  type StaleFilter,
+  type DealFilter,
+  productStatusBadges,
+  freshnessMeta,
+  emptyForm,
+  iconBtnClass,
+  toolbarFieldClass,
+} from "@/components/admin/products/productsAdmin";
 import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
 import { AdminProductsTableSkeleton } from "@/components/admin/AdminSkeleton";
-
-interface AdminProduct {
-  id: string;
-  title: string;
-  slug: string;
-  asin: string;
-  retailer: string;
-  externalId: string | null;
-  brand: string | null;
-  description?: string | null;
-  productUrl: string;
-  amazonUrl: string;
-  affiliateUrl?: string | null;
-  imageUrl?: string | null;
-  currentPrice: number;
-  previousPrice: number | null;
-  lowestPrice?: number | null;
-  highestPrice?: number | null;
-  averagePrice30d?: number | null;
-  averagePrice90d?: number | null;
-  referencePrice: number;
-  dealScore: number;
-  dealLabel: string;
-  dealLevel?: string;
-  discountPercentage: number;
-  currency?: string;
-  availability?: string;
-  availabilityLabel?: string;
-  outOfStockAt?: string | null;
-  category: { id: string; name: string; slug: string } | null;
-  isActive: boolean;
-  isFeatured?: boolean;
-  lastCheckedAt: string | null;
-  lastTelegramNotifiedAt?: string | null;
-  lastTelegramNotifiedPrice?: number | null;
-  lastTelegramNotifiedScore?: number | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-}
-
-interface CategoryOption {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-type SortKey =
-  | "title"
-  | "asin"
-  | "currentPrice"
-  | "referencePrice"
-  | "dealScore"
-  | "category"
-  | "lastCheckedAt";
-
-type SortDir = "asc" | "desc";
-type StaleFilter = "all" | "fresh" | "stale" | "never";
-type DealFilter = "all" | "offer" | "normal";
-
-function productStatusBadges(product: AdminProduct) {
-  const badges: Array<{ key: string; label: string; className: string }> = [];
-
-  if (product.availability === "OUT_OF_STOCK") {
-    badges.push({
-      key: "oos",
-      label: "Agotado",
-      className:
-        "border-amber-300 bg-amber-50 text-amber-900",
-    });
-  }
-
-  if (!product.isActive) {
-    badges.push({
-      key: "inactive",
-      label: "Inactivo",
-      className: "border-stone-300 bg-stone-100 text-stone-600",
-    });
-  }
-
-  return badges;
-}
-
-function freshnessMeta(lastCheckedAt: string | null): {
-  label: string;
-  className: string;
-  hours: number | null;
-} {
-  if (!lastCheckedAt) {
-    return { label: "Nunca", className: "text-rose-700", hours: null };
-  }
-  const ageMs = Date.now() - new Date(lastCheckedAt).getTime();
-  const hours = ageMs / 3_600_000;
-  if (hours < 6) {
-    return {
-      label: formatRelativeTime(lastCheckedAt),
-      className: "text-teal-800",
-      hours,
-    };
-  }
-  if (hours < 48) {
-    return {
-      label: formatRelativeTime(lastCheckedAt),
-      className: "text-amber-800",
-      hours,
-    };
-  }
-  return {
-    label: formatRelativeTime(lastCheckedAt),
-    className: "text-rose-700",
-    hours,
-  };
-}
-
-const emptyForm = {
-  retailer: "amazon" as ProductRetailer,
-  productUrl: "",
-  externalId: "",
-  title: "",
-  categoryId: "",
-  referencePrice: "",
-  currentPrice: "",
-  brand: "",
-  imageUrl: "",
-  description: "",
-};
-
-const iconBtnClass = "admin-icon-btn";
-
-const toolbarFieldClass = "admin-select w-auto";
 
 export default function ProductsAdminClient() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -1036,304 +918,11 @@ export default function ProductsAdminClient() {
         ) : null}
       </div>
 
-      <AdminSidePanel
-        open={Boolean(viewingProduct)}
+      <ProductDetailPanel
+        product={viewingProduct}
         onClose={() => setViewingProduct(null)}
-        eyebrow="Consulta BD"
-        title={viewingProduct?.title ?? ""}
-        size="xl"
-        headerActions={
-          viewingProduct ? (
-            <>
-              <a
-                href={`/producto/${viewingProduct.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="admin-btn admin-btn-ghost h-9 px-3 text-xs"
-              >
-                Ver en web
-              </a>
-              <a
-                href={
-                  viewingProduct.productUrl ||
-                  viewingProduct.amazonUrl ||
-                  (viewingProduct.retailer === "amazon"
-                    ? `https://www.amazon.es/dp/${viewingProduct.asin}`
-                    : "#")
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="admin-btn admin-btn-primary h-9 px-3 text-xs"
-              >
-                {retailerBuyCtaLabel(viewingProduct.retailer)}
-              </a>
-              <button
-                type="button"
-                onClick={() => {
-                  openEdit(viewingProduct);
-                }}
-                className="admin-btn admin-btn-ghost h-9 px-3 text-xs"
-              >
-                Editar
-              </button>
-            </>
-          ) : null
-        }
-      >
-        {viewingProduct ? (
-          <>
-            <div className="admin-detail-hero">
-              <div className="admin-detail-hero__image">
-                {viewingProduct.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={viewingProduct.imageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs text-[var(--text-muted)]">
-                    Sin imagen
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap gap-1.5">
-                  <AdminRetailerBadge retailer={viewingProduct.retailer} />
-                  {viewingProduct.discountPercentage > 0 ? (
-                    <span className="admin-badge">
-                      −{Math.round(viewingProduct.discountPercentage)}%
-                    </span>
-                  ) : null}
-                  <span className="admin-badge admin-badge--muted">
-                    {Math.round(viewingProduct.dealScore)} · {viewingProduct.dealLabel}
-                  </span>
-                  {productStatusBadges(viewingProduct).map((badge) => (
-                    <span
-                      key={badge.key}
-                      className={`inline-flex rounded-sm border px-1.5 py-0.5 text-xs font-semibold ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-[var(--text)]">
-                  {viewingProduct.currentPrice.toFixed(2)} €
-                  {viewingProduct.previousPrice != null ? (
-                    <span className="ml-2 text-base font-medium text-[var(--text-muted)] line-through">
-                      {viewingProduct.previousPrice.toFixed(2)} €
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  {viewingProduct.brand ?? "Sin marca"}
-                  {viewingProduct.category?.name
-                    ? ` · ${viewingProduct.category.name}`
-                    : ""}
-                </p>
-                <p className="mt-2 font-mono text-[11px] text-[var(--text-muted)]">
-                  {viewingProduct.externalId ?? viewingProduct.asin}
-                </p>
-              </div>
-            </div>
-
-            <section className="admin-detail-section">
-              <h3>Identificación</h3>
-              <dl className="admin-detail-grid">
-                {(
-                  [
-                    ["Tienda", retailerLabel(viewingProduct.retailer)],
-                    ["ASIN / ID", viewingProduct.asin],
-                    ["Externo", viewingProduct.externalId ?? "—"],
-                    ["Slug", viewingProduct.slug],
-                    ["Marca", viewingProduct.brand ?? "—"],
-                    ["Categoría", viewingProduct.category?.name ?? "—"],
-                    ["UUID", viewingProduct.id],
-                  ] as Array<[string, string]>
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd className={label === "UUID" || label === "Slug" ? "admin-detail-muted" : undefined}>
-                      {value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            <section className="admin-detail-section">
-              <h3>Precios</h3>
-              <dl className="admin-detail-grid">
-                {(
-                  [
-                    ["Actual", `${viewingProduct.currentPrice.toFixed(2)} €`],
-                    [
-                      "Anterior",
-                      viewingProduct.previousPrice != null
-                        ? `${viewingProduct.previousPrice.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Mínimo",
-                      viewingProduct.lowestPrice != null
-                        ? `${viewingProduct.lowestPrice.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Máximo",
-                      viewingProduct.highestPrice != null
-                        ? `${viewingProduct.highestPrice.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Media 30d",
-                      viewingProduct.averagePrice30d != null
-                        ? `${viewingProduct.averagePrice30d.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Media 90d",
-                      viewingProduct.averagePrice90d != null
-                        ? `${viewingProduct.averagePrice90d.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Descuento",
-                      viewingProduct.discountPercentage > 0
-                        ? `−${Math.round(viewingProduct.discountPercentage)}%`
-                        : "—",
-                    ],
-                    [
-                      "Score",
-                      `${Math.round(viewingProduct.dealScore)} · ${viewingProduct.dealLabel}`,
-                    ],
-                    ["Nivel", viewingProduct.dealLevel ?? "—"],
-                    ["Moneda", viewingProduct.currency ?? "EUR"],
-                  ] as Array<[string, string]>
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            <section className="admin-detail-section">
-              <h3>Estado</h3>
-              <dl className="admin-detail-grid">
-                {(
-                  [
-                    [
-                      "Disponibilidad",
-                      viewingProduct.availabilityLabel ??
-                        availabilityLabel(viewingProduct.availability),
-                    ],
-                    [
-                      "Agotado desde",
-                      viewingProduct.outOfStockAt
-                        ? new Date(viewingProduct.outOfStockAt).toLocaleString("es-ES")
-                        : "—",
-                    ],
-                    ["Activo", viewingProduct.isActive ? "Sí" : "No"],
-                    ["Destacado", viewingProduct.isFeatured ? "Sí" : "No"],
-                    [
-                      "Última revisión",
-                      viewingProduct.lastCheckedAt
-                        ? new Date(viewingProduct.lastCheckedAt).toLocaleString("es-ES")
-                        : "—",
-                    ],
-                    [
-                      "Último Telegram",
-                      viewingProduct.lastTelegramNotifiedAt
-                        ? new Date(viewingProduct.lastTelegramNotifiedAt).toLocaleString("es-ES")
-                        : "—",
-                    ],
-                    [
-                      "Precio notificado",
-                      viewingProduct.lastTelegramNotifiedPrice != null
-                        ? `${viewingProduct.lastTelegramNotifiedPrice.toFixed(2)} €`
-                        : "—",
-                    ],
-                    [
-                      "Score notificado",
-                      viewingProduct.lastTelegramNotifiedScore != null
-                        ? String(Math.round(viewingProduct.lastTelegramNotifiedScore))
-                        : "—",
-                    ],
-                    [
-                      "Creado",
-                      viewingProduct.createdAt
-                        ? new Date(viewingProduct.createdAt).toLocaleString("es-ES")
-                        : "—",
-                    ],
-                    [
-                      "Actualizado",
-                      viewingProduct.updatedAt
-                        ? new Date(viewingProduct.updatedAt).toLocaleString("es-ES")
-                        : "—",
-                    ],
-                  ] as Array<[string, string]>
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            <section className="admin-detail-section">
-              <h3>Enlaces</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-[var(--text-muted)]">
-                    URL producto
-                  </p>
-                  <p className="admin-detail-muted mt-1">
-                    {viewingProduct.productUrl || viewingProduct.amazonUrl || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-[var(--text-muted)]">
-                    Affiliate
-                  </p>
-                  <p className="admin-detail-muted mt-1">
-                    {viewingProduct.affiliateUrl || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-[var(--text-muted)]">
-                    Imagen
-                  </p>
-                  <p className="admin-detail-muted mt-1">
-                    {viewingProduct.imageUrl || "—"}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-detail-section">
-              <h3>Descripción</h3>
-              {(() => {
-                const parts = splitProductDescription(viewingProduct.description);
-                if (parts.length === 0) {
-                  return (
-                    <p className="text-sm text-[var(--text-muted)]">Sin descripción</p>
-                  );
-                }
-                return (
-                  <ul className="space-y-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                    {parts.map((part, index) => (
-                      <li key={`${index}-${part.slice(0, 24)}`}>• {part}</li>
-                    ))}
-                  </ul>
-                );
-              })()}
-            </section>
-          </>
-        ) : null}
-      </AdminSidePanel>
+        onEdit={openEdit}
+      />
 
       <AdminSidePanel
         open={open}

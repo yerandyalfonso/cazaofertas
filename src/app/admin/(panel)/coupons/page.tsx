@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useAdminLoad } from "@/components/admin/useAdminLoad";
-import { ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import {
   AdminPageHeader,
@@ -11,59 +11,18 @@ import {
   AdminSortButton,
 } from "@/components/admin/AdminListChrome";
 import { AdminTableSkeleton } from "@/components/admin/AdminSkeleton";
-import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import {
+  type AdminCoupon,
+  type FormState,
+  type SortKey,
+  type SortDir,
+  type ActiveFilter,
+  EMPTY,
+  isInternalCode,
+} from "@/components/admin/coupons/couponsAdmin";
+import { CouponFormPanel } from "@/components/admin/coupons/CouponFormPanel";
 import { retailerLabel } from "@/lib/retailers";
-
-type AdminCoupon = {
-  id: string;
-  retailer: string;
-  title: string;
-  code: string;
-  description: string;
-  terms: string;
-  url: string;
-  starts_at: string | null;
-  expires_at: string | null;
-  highlight: boolean;
-  is_active: boolean;
-  source: string;
-};
-
-type FormState = {
-  id?: string;
-  retailer: string;
-  title: string;
-  code: string;
-  description: string;
-  terms: string;
-  url: string;
-  startsAt: string;
-  expiresAt: string;
-  highlight: boolean;
-  isActive: boolean;
-};
-
-type SortKey = "title" | "retailer" | "code" | "expires_at" | "is_active";
-type SortDir = "asc" | "desc";
-type ActiveFilter = "all" | "active" | "inactive";
-
-const EMPTY: FormState = {
-  retailer: "amazon",
-  title: "",
-  code: "",
-  description: "",
-  terms: "",
-  url: "",
-  startsAt: "",
-  expiresAt: "",
-  highlight: false,
-  isActive: true,
-};
-
-function isInternalCode(code: string): boolean {
-  return /^(PROMO-|CUPONES-|CLUB-|MV-|AWIN-|CLIP-)/i.test(code);
-}
 
 export default function AdminCouponsPage() {
   const toast = useAdminToast();
@@ -376,142 +335,14 @@ export default function AdminCouponsPage() {
         ) : null}
       </AdminSearchToolbar>
 
-      <AdminSidePanel
+      <CouponFormPanel
         open={showForm}
+        form={form}
+        setForm={setForm}
+        saving={saving}
         onClose={closeForm}
-        eyebrow={form.id ? "Editar" : "Alta"}
-        title={form.id ? "Editar cupón" : "Nuevo cupón"}
-        size="lg"
-        footer={
-          <>
-            <button type="button" onClick={closeForm} className="admin-btn admin-btn-ghost">
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              form="admin-coupon-form"
-              disabled={saving}
-              className="admin-btn admin-btn-primary"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              {form.id ? "Guardar cambios" : "Crear cupón"}
-            </button>
-          </>
-        }
-      >
-        <form id="admin-coupon-form" onSubmit={save} className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
-
-            <label className="admin-field-label block text-sm">
-              <span>Tienda (slug)</span>
-              <input
-                required
-                value={form.retailer}
-                onChange={(e) => setForm((f) => ({ ...f, retailer: e.target.value }))}
-                className="admin-input"
-                placeholder="amazon"
-              />
-            </label>
-            <label className="admin-field-label block text-sm">
-              <span>Código</span>
-              <input
-                required
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                className="admin-input font-mono"
-                placeholder="MODA15"
-              />
-            </label>
-            <label className="admin-field-label block text-sm md:col-span-2">
-              <span>Título</span>
-              <input
-                required
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                className="admin-input"
-              />
-            </label>
-            <label className="admin-field-label block text-sm md:col-span-2">
-              <span>Descripción</span>
-              <textarea
-                value={form.description}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, description: e.target.value }))
-                }
-                className="admin-input"
-              />
-            </label>
-            <label className="admin-field-label block text-sm md:col-span-2">
-              <span>Condiciones</span>
-              <textarea
-                value={form.terms}
-                onChange={(e) => setForm((f) => ({ ...f, terms: e.target.value }))}
-                className="admin-input"
-              />
-            </label>
-            <label className="admin-field-label block text-sm md:col-span-2">
-              <span>URL</span>
-              <input
-                required
-                type="url"
-                value={form.url}
-                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                className="admin-input"
-              />
-            </label>
-            <label className="admin-field-label block text-sm">
-              <span>Inicio</span>
-              <input
-                type="date"
-                value={form.startsAt}
-                onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
-                className="admin-input"
-              />
-            </label>
-            <label className="admin-field-label block text-sm">
-              <span>Caduca</span>
-              <input
-                type="date"
-                value={form.expiresAt}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, expiresAt: e.target.value }))
-                }
-                className="admin-input"
-              />
-            </label>
-          
-          </div>
-
-          <div className="flex flex-wrap gap-4 text-sm">
-
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.highlight}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, highlight: e.target.checked }))
-                }
-              />
-              Destacado
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, isActive: e.target.checked }))
-                }
-              />
-              Activo
-            </label>
-          
-          </div>
-        </form>
-      </AdminSidePanel>
+        onSubmit={save}
+      />
 
       {!loading && coupons.length === 0 ? (
         <AdminEmptyState
