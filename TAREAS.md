@@ -9,7 +9,7 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 - [Admin](#admin)
 - [Alertas de usuario y bot de Telegram](#alertas-de-usuario-y-bot-de-telegram)
 - [Canales (Telegram, Facebook, Instagram)](#canales-telegram-facebook-instagram)
-- [Tiendas](#tiendas): [Amazon](#amazon) · [Miravia](#miravia) · [Kiabi](#kiabi) · [Carrefour](#carrefour) · [PcComponentes](#pccomponentes) · [MediaMarkt](#mediamarkt)
+- [Tiendas](#tiendas): [Amazon](#amazon) · [Miravia](#miravia) · [Kiabi](#kiabi) · [Carrefour](#carrefour) · [AliExpress](#aliexpress) · [PcComponentes](#pccomponentes) · [MediaMarkt](#mediamarkt)
 - [Infraestructura / mantenimiento](#infraestructura--mantenimiento)
 - [Descartadas](#descartadas)
 
@@ -58,6 +58,13 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Admin
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
+- [ ] Mejora visual del admin con las skills de diseño (`frontend-design`, `ui-ux-pro-max`): revisar jerarquía, tablas, estados vacíos/carga, móvil y modo oscuro; partir de `AdminShell` y los componentes compartidos (`AdminListChrome`, `AdminField`, `AdminEmptyState`…) para que el cambio llegue a todas las páginas.
+- [ ] Ajustes → configuración de las tiendas nuevas: hoy solo Amazon, Miravia y Kiabi tienen feeds editables; Carrefour y MediaMarkt dependen del `.env.local` del Mac (`CARREFOUR_DEALS_ENABLED`, `_MIN_DISCOUNT`, `_PAGES_PER_FEED`, `CARREFOUR_DEAL_FEED_URLS`; `MEDIAMARKT_DEALS_ENABLED`, `_MIN_DISCOUNT`, `_PAGES_PER_FEED`, `_INCLUDE_MARKETPLACE`, `MEDIAMARKT_FEED_URLS`). Pasarlos a `appSettings` con el env como valor por defecto, y dejar hueco para AliExpress y PcComponentes (hoy solo alertas).
+- [ ] Productos: filtro por tienda (la lista muestra la tienda pero no filtra) y aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`).
+- [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
+- [ ] Estadísticas: desglose de clics y productos activos por tienda, para ver qué aporta cada integración nueva.
+- [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.
+- [ ] Panel de las alertas de usuario: ver/pausar alertas por usuario y tienda, y las que esperan al Mac (`requiresResidentialIp`), útil también para el test de carga.
 - [x] 2026-09-26 Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`).
 - [x] 2026-09-26 Productos: usar `AdminSortButton` compartido y quitar el import `X` sin usar.
 - [x] 2026-09-26 Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).
@@ -71,6 +78,7 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Canales (Telegram, Facebook, Instagram)
 
 - [ ] Facebook/Instagram: la cola nunca se vaciaba (nadie llamaba a `maybeFlushMetaBatch` desde que existen los lotes, 22-09) y un lote fallido se perdía. Corregido y desplegado 26-09: interruptor «Publicar en Facebook/Instagram» en admin → Ajustes (arranca apagado), vaciado desde `check-prices` del VPS (`CAZAOFERTAS_META_FLUSH=1`), el lote vuelve a la cola si falla, se apaga solo ante un bloqueo 368 y los pendientes de más de 48 h se descartan. **Cuando Meta desbloquee:** activar el interruptor.
+- [ ] Facebook/Instagram: mejorar el texto de las publicaciones. En Instagram no hay salto de línea entre productos del lote; revisar también la redacción en ambas redes.
 - [ ] Decidir si se quiere canal/bot de WhatsApp (estudio en `docs/estudio-whatsapp.md`).
 - [x] 2026-09-28 Canal/grupo de Telegram: las ofertas se publican en el momento de detectarlas (antes, lotes cada 2 h con el precio de la detección) y se comprueba el precio justo antes de publicar (Amazon se relee si el precio tiene >10 min; no se publica si subió >2 % o está agotado).
 
@@ -96,6 +104,10 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 - [x] 2026-09-26 Miravia: `check-prices` del VPS recibe captcha al revisar fichas de Miravia y esas fichas acaparaban el lote retail. Corregido y desplegado 26-09: con captcha el producto rota, y el VPS se salta Miravia con `RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia` (la revisa el Mac).
 - [x] 2026-09-26 Salida no bloqueada desde el VPS para Miravia, gratis: Cloudflare WARP en **modo proxy** (`127.0.0.1:40000`, no toca rutas ni DNS) y `MIRAVIA_PROXY_URL` en el VPS. Directo da captcha; por WARP carga. `check-prices` del VPS vuelve a revisar Miravia.
 
+### AliExpress
+
+- [ ] Las alertas de AliExpress usan el Chromium headless de Playwright (`withBrowserPage`), que no está instalado en el Mac (`~/Library/Caches/ms-playwright` no existe); en el VPS sí. Hoy no hay alertas de AliExpress, así que no falla nada, pero en el Mac fallarían al arrancar. Arreglo: `npx playwright install chromium` en el Mac o sacar AliExpress del `user-alerts` del Mac.
+
 ### Kiabi
 
 - [ ] Descripciones de Kiabi (26-09: 0 de 81): falta que `check-prices` las rellene, como ya hace con Miravia.
@@ -107,11 +119,14 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### PcComponentes
 
-Solo alertas de usuario por URL, desde el Mac (`user-alerts-residential`). Análisis del 30-09: hoy no puede funcionar y nadie tiene alertas de esta tienda (ninguna aparece en el log).
+Solo alertas de usuario por URL, desde el Mac (`user-alerts-residential`, que abre Google Chrome con ventana minimizada, como Carrefour). Código en `src/providers/browser/pccomponentesProductPage.ts`; el Chrome con ventana compartido está en `src/providers/browser/headedChrome.ts`.
 
-- [ ] El scraper usa el Chromium de Playwright (`withBrowserPage`) y en el Mac no está instalado (`~/Library/Caches/ms-playwright` no existe): cada alerta fallaría al arrancar.
-- [ ] Aunque se instale, Cloudflare bloquea la ficha de producto con Chrome headless («Un momento…», 403); los listados (`/portatiles`) sí cargan. Opciones: reutilizar el Chrome con ventana de Carrefour (`carrefourBrowserDiscovery`) o leer el precio del listado/buscador por nombre.
-- [ ] El id es el slug de la URL (hasta 80 caracteres): una URL con `?utm…` o `/` final da de alta el mismo producto dos veces. Normalizar la URL antes de extraerlo.
+- [ ] Descubrimiento de ofertas (job `pccomponentes-deals`, como Carrefour/MediaMarkt): los listados (`/portatiles`…) cargan incluso con Chrome headless y traen JSON-LD `ItemList` con nombre, precio y URL; falta ver de dónde sacar el PVPR en el listado para no abrir cada ficha.
+- [ ] Afiliación: los enlaces van directos a pccomponentes.com. Si se entra en su programa, rellenar `affiliate_url`.
+- [x] 2026-09-30 Ficha con Google Chrome con ventana (antes Chromium headless, que Cloudflare bloquea en la ficha y que además no estaba instalado en el Mac: toda alerta fallaba al arrancar). Espera a que Cloudflare resuelva el reto («Un momento…», hasta 15 s); ~2–4 s por ficha. Probado con 3 fichas reales, incluida una con variantes (`ProductGroup`) y una inexistente («no encontrado»).
+- [x] 2026-09-30 Precio tachado: el PVPR que muestra la ficha (`#pdp-price-original`, «PVPR 749,99€»); el JSON-LD solo trae el precio actual.
+- [x] 2026-09-30 URL guardada sin query, hash ni `/` final (`normalizePcComponentesProductUrl`). El id ya salía limpio (el slug de la ruta), así que no había productos duplicados, pero la URL se guardaba con `?utm…`.
+- [x] 2026-09-30 Fotos de `img.pccomponentes.com`: cargan desde el Mac y desde el VPS (Telegram puede mostrarlas sin subirlas a Supabase, al contrario que Carrefour).
 
 ### MediaMarkt
 

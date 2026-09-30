@@ -1,4 +1,7 @@
-import { withBrowserPage } from "@/providers/browser/launch";
+import type { Page } from "playwright";
+import { roundMoney } from "@/lib/money";
+import { normalizePcComponentesProductUrl } from "@/lib/retailers";
+import { withHeadedChromePage } from "@/providers/browser/headedChrome";
 import {
   extractOfferPrice,
   findProductJsonLd,
@@ -15,50 +18,78 @@ export interface PcComponentesProductQuote {
   availability: "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
 }
 
+/** Cloudflare muestra «Un momento…» mientras resuelve el reto (unos segundos). */
+async function waitForCloudflare(page: Page, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (/just a moment|un momento/i.test(await page.title())) {
+    if (Date.now() > deadline) {
+      throw new Error("PcComponentes: bloqueado por Cloudflare (challenge sin resolver).");
+    }
+    await page.waitForTimeout(1_000);
+  }
+}
+
+function parseEuroText(raw: string | null | undefined): number | null {
+  const match = raw?.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s*€/);
+  if (!match?.[1]) return null;
+  const value = Number(match[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
+}
+
 /**
- * Solo viable desde IP residencial: Cloudflare Turnstile bloquea la petición
- * (incluso con navegador headless real) cuando llega desde una IP de
- * datacenter. Debe ejecutarse desde el cron local (Mac), nunca desde el VPS.
+ * Cloudflare bloquea la ficha con `fetch` y con Chromium headless (incluso
+ * desde IP residencial; los listados sí cargan): se abre con Google Chrome
+ * con ventana, como Carrefour. Solo funciona en el Mac (alertas
+ * residenciales), nunca en el VPS.
  */
 export async function scrapePcComponentesProductPage(
   url: string,
   options?: { timeoutMs?: number },
 ): Promise<PcComponentesProductQuote> {
-  return withBrowserPage(async (page) => {
-    const resp = await page.goto(url, {
+  const productUrl = normalizePcComponentesProductUrl(url);
+  const timeoutMs = Math.max(options?.timeoutMs ?? 0, 30_000);
+
+  return withHeadedChromePage(async (page) => {
+    const resp = await page.goto(productUrl, {
       waitUntil: "domcontentloaded",
-      timeout: options?.timeoutMs ?? 20_000,
+      timeout: timeoutMs,
+      referer: "https://www.pccomponentes.com/",
     });
-    if (resp && resp.status() >= 400) {
-      throw new Error(`PcComponentes HTTP ${resp.status()} para ${url}`);
-    }
-    await page.waitForTimeout(3_000);
-
-    const title = await page.title();
-    if (/just a moment/i.test(title)) {
-      throw new Error("PcComponentes: bloqueado por Cloudflare (challenge sin resolver).");
+    await waitForCloudflare(page, 15_000);
+    const status = resp?.status() ?? 0;
+    if (status === 404 || status === 410) {
+      throw new Error(`PcComponentes: producto no encontrado (HTTP ${status}).`);
     }
 
-    const blocks = await readJsonLdBlocks(page);
-    const product = findProductJsonLd(blocks);
+    // El JSON-LD va en `microdata-product-script` (con `@type: "product"` en
+    // minúsculas); en fichas con variantes hay además un `ProductGroup`.
+    const product = findProductJsonLd(await readJsonLdBlocks(page));
     if (!product) {
       throw new Error("PcComponentes: no se encontró ficha de producto.");
     }
 
-    const { price, listPrice, availability } = extractOfferPrice(product.offers);
+    const { price, availability } = extractOfferPrice(product.offers);
+    // Tachado: «PVPR 749,99€» junto al precio (no está en el JSON-LD).
+    const referenceText = await page
+      .locator("#pdp-price-original")
+      .first()
+      .textContent({ timeout: 2_000 })
+      .catch(() => null);
+    const reference = parseEuroText(referenceText);
     const brand =
       typeof product.brand === "string" ? product.brand : product.brand?.name ?? null;
     const imageUrl = Array.isArray(product.image)
       ? product.image[0] ?? null
       : product.image ?? null;
+    const title = await page.title();
 
     return {
-      productUrl: url,
-      title: product.name ?? title.replace(/\s*\|\s*PcComponentes.*$/i, "") ?? null,
+      productUrl,
+      title: product.name?.trim() || title.replace(/\s*\|\s*PcComponentes.*$/i, "") || null,
       brand,
       imageUrl,
-      price,
-      listPrice,
+      price: price != null ? roundMoney(price) : null,
+      listPrice: price != null && reference != null && reference > price ? reference : null,
       availability,
     };
   });

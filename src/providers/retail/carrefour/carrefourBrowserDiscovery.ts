@@ -1,7 +1,8 @@
-import type { Browser, Page } from "playwright";
+import type { Page } from "playwright";
 import { isCarrefourFoodContext } from "@/lib/carrefour-category";
 import { roundMoney } from "@/lib/money";
 import { extractExternalId } from "@/lib/retailers";
+import { launchHeadedChrome, newMinimizedPage } from "@/providers/browser/headedChrome";
 import { normalizeCarrefourProductUrl } from "@/providers/retail/carrefour/carrefourHttp";
 
 const CARREFOUR_ORIGIN = "https://www.carrefour.es";
@@ -173,45 +174,10 @@ async function readPlpItems(page: Page): Promise<CarrefourPlpItem[] | null> {
 
 /**
  * Carrefour (Cloudflare) devuelve 403 a `fetch` y a Chromium headless, incluso
- * desde IP residencial. Solo pasa con Google Chrome instalado y ventana real,
- * así que la abrimos pequeña y minimizada. Pensado para el cron del Mac.
+ * desde IP residencial: solo pasa con Google Chrome con ventana (ver
+ * `headedChrome`). Pensado para el cron del Mac.
  */
-async function launchCarrefourBrowser(): Promise<Browser> {
-  const { chromium } = await import("playwright");
-  return chromium.launch({
-    channel: process.env.CARREFOUR_BROWSER_CHANNEL?.trim() || "chrome",
-    headless: false,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      // Ventana mínima (Chrome la deja en ~500×375) en la esquina inferior
-      // derecha; `newMinimizedPage` la minimiza nada más abrirla.
-      "--window-position=5000,5000",
-      "--window-size=320,240",
-    ],
-  });
-}
-
-/**
- * Pestaña con la ventana minimizada: Cloudflare la sigue dejando pasar y
- * macOS devuelve el foco a la app que estabas usando (solo parpadea al abrir).
- */
-async function newMinimizedPage(browser: Browser): Promise<Page> {
-  // viewport null: si no, Playwright agranda la ventana al tamaño emulado. Los
-  // datos salen de __INITIAL_STATE__ (SSR), no dependen del tamaño.
-  const page = await browser.newPage({ locale: "es-ES", viewport: null });
-  try {
-    const cdp = await page.context().newCDPSession(page);
-    const { windowId } = await cdp.send("Browser.getWindowForTarget");
-    await cdp.send("Browser.setWindowBounds", {
-      windowId,
-      bounds: { windowState: "minimized" },
-    });
-    await cdp.detach();
-  } catch {
-    // Si no se puede minimizar, sigue fuera de pantalla (--window-position).
-  }
-  return page;
-}
+const launchCarrefourBrowser = launchHeadedChrome;
 
 export function resolveCarrefourBrowserFeedUrls(): string[] {
   const fromEnv = process.env.CARREFOUR_BROWSER_FEED_URLS?.split(",")

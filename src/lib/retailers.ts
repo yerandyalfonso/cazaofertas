@@ -78,8 +78,8 @@ export const RETAILER_DEFINITIONS: RetailerDefinition[] = [
     label: "PcComponentes",
     hostPatterns: [/pccomponentes\.com/i],
     urlPlaceholder: "https://www.pccomponentes.com/...",
-    // Cloudflare Turnstile bloquea fetch simple y también IP de datacenter:
-    // solo viable con navegador headless desde una IP residencial.
+    // Cloudflare bloquea fetch, Chromium headless e IP de datacenter: solo
+    // Google Chrome con ventana desde el Mac (como Carrefour).
     scrapeSupported: false,
     externalIdHint: "slug de la URL",
   },
@@ -123,7 +123,8 @@ export function alertRetailerSupported(retailer: ProductRetailer): boolean {
  * la alerta se guarda "en espera" y el cron local del Mac la completa.
  */
 export function requiresResidentialIp(retailer: ProductRetailer): boolean {
-  // Carrefour: además de IP residencial exige Chrome con ventana (Cloudflare).
+  // Carrefour y PcComponentes: además de IP residencial exigen Chrome con
+  // ventana (Cloudflare).
   // MediaMarkt: fetch simple desde el Mac; a la IP del VPS le da 403.
   return (
     retailer === "pccomponentes" ||
@@ -242,6 +243,15 @@ export function normalizeMediaMarktProductUrl(url: string): string {
   const parsed = new URL(url.trim());
   parsed.search = "";
   parsed.hash = "";
+  return parsed.toString();
+}
+
+/** Sin query, hash ni `/` final: el id (slug) y la URL guardada no cambian con `?utm…`. */
+export function normalizePcComponentesProductUrl(url: string): string {
+  const parsed = new URL(url.trim());
+  parsed.search = "";
+  parsed.hash = "";
+  parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
   return parsed.toString();
 }
 
