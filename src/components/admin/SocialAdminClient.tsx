@@ -771,26 +771,30 @@ export function SocialAdminClient({
       };
     }
 
-    setCurrentProjectId(null);
-    setProjectName("Nueva tarjeta");
-    setSelectedId("");
-    setFormatId("story");
-    setLayoutId("minimal");
-    setStyleId("sunset");
-    setColorTone(PRESET_TONE.sunset);
-    setPulseThemeId("amber");
-    setImageFit("contain");
-    setImagePadX(40);
-    setImagePadY(40);
-    setCardRadius(40);
-    setCardSurfaceColor("#ffffff");
-    setFloatRotate(-3);
-    setFloatOffsetX(0);
-    setFloatOffsetY(0);
-    setFloatZoom(1);
-    setTextPadX(44);
-    setTextPadY(40);
-    setEditorReady(true);
+    // En el siguiente ciclo, no dentro del efecto, para no encadenar renders.
+    const timer = window.setTimeout(() => {
+      setCurrentProjectId(null);
+      setProjectName("Nueva tarjeta");
+      setSelectedId("");
+      setFormatId("story");
+      setLayoutId("minimal");
+      setStyleId("sunset");
+      setColorTone(PRESET_TONE.sunset);
+      setPulseThemeId("amber");
+      setImageFit("contain");
+      setImagePadX(40);
+      setImagePadY(40);
+      setCardRadius(40);
+      setCardSurfaceColor("#ffffff");
+      setFloatRotate(-3);
+      setFloatOffsetX(0);
+      setFloatOffsetY(0);
+      setFloatZoom(1);
+      setTextPadX(44);
+      setTextPadY(40);
+      setEditorReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [applyProject, projectId, router, toast]);
 
   useEffect(() => {

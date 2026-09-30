@@ -306,19 +306,23 @@ export function CarouselEditorClient({
       };
     }
 
-    setCurrentProjectId(null);
-    setProjectName("Nuevo carrusel");
-    setSelectedId("");
-    setArticle(null);
-    setSlides([]);
-    baselineSlidesRef.current = [];
-    setAutoMode(true);
-    setTemplateId("editorial");
-    setPaletteId("ivory");
-    setFormatId("story");
-    setDisplay({ ...DEFAULT_CAROUSEL_DISPLAY });
-    setActiveIndex(0);
-    setEditorReady(true);
+    // En el siguiente ciclo, no dentro del efecto, para no encadenar renders.
+    const timer = window.setTimeout(() => {
+      setCurrentProjectId(null);
+      setProjectName("Nuevo carrusel");
+      setSelectedId("");
+      setArticle(null);
+      setSlides([]);
+      baselineSlidesRef.current = [];
+      setAutoMode(true);
+      setTemplateId("editorial");
+      setPaletteId("ivory");
+      setFormatId("story");
+      setDisplay({ ...DEFAULT_CAROUSEL_DISPLAY });
+      setActiveIndex(0);
+      setEditorReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [applyProject, projectId, router, toast]);
 
   useAdminLoad(loadArticles, editorReady);
@@ -332,7 +336,10 @@ export function CarouselEditorClient({
   useEffect(() => {
     if (skipRegenerateOnceRef.current) return;
     if (hydratingRef.current) return;
-    if (autoMode && article) regenerateSlides(article);
+    if (!autoMode || !article) return;
+    // Las condiciones se leen ahora; la regeneración, en el siguiente ciclo.
+    const timer = window.setTimeout(() => regenerateSlides(article), 0);
+    return () => window.clearTimeout(timer);
   }, [autoMode, article, regenerateSlides]);
 
   useEffect(() => {

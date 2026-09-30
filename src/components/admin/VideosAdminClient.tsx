@@ -184,40 +184,44 @@ export function VideosAdminClient({
 
   useEffect(() => {
     if (loading) return;
-    if (projectId) {
-      const project = getVideoProject(projectId);
-      if (!project) {
-        toast.error("Vídeo no encontrado.");
-        router.replace("/admin/videos");
+    // En el siguiente ciclo, no dentro del efecto, para no encadenar renders.
+    const timer = window.setTimeout(() => {
+      if (projectId) {
+        const project = getVideoProject(projectId);
+        if (!project) {
+          toast.error("Vídeo no encontrado.");
+          router.replace("/admin/videos");
+          return;
+        }
+        hydratingRef.current = true;
+        setCurrentId(project.id);
+        setProjectName(project.name);
+        setSourceMode(project.sourceMode);
+        setSelectedProductIds(project.productIds);
+        setSelectedCardIds(project.cardProjectIds);
+        setSlideSeconds(project.slideSeconds);
+        setTransition(project.transition);
+        setTransitionMs(project.transitionMs);
+        setCardStyle({ ...DEFAULT_VIDEO_CARD_STYLE, ...project.cardStyle });
+        setReady(true);
+        window.setTimeout(() => {
+          hydratingRef.current = false;
+        }, 0);
         return;
       }
-      hydratingRef.current = true;
-      setCurrentId(project.id);
-      setProjectName(project.name);
-      setSourceMode(project.sourceMode);
-      setSelectedProductIds(project.productIds);
-      setSelectedCardIds(project.cardProjectIds);
-      setSlideSeconds(project.slideSeconds);
-      setTransition(project.transition);
-      setTransitionMs(project.transitionMs);
-      setCardStyle({ ...DEFAULT_VIDEO_CARD_STYLE, ...project.cardStyle });
+      const empty = createEmptyVideoProject();
+      setCurrentId(null);
+      setProjectName(empty.name);
+      setSourceMode("products");
+      setSelectedProductIds([]);
+      setSelectedCardIds([]);
+      setSlideSeconds(3);
+      setTransition("fade");
+      setTransitionMs(500);
+      setCardStyle({ ...DEFAULT_VIDEO_CARD_STYLE });
       setReady(true);
-      window.setTimeout(() => {
-        hydratingRef.current = false;
-      }, 0);
-      return;
-    }
-    const empty = createEmptyVideoProject();
-    setCurrentId(null);
-    setProjectName(empty.name);
-    setSourceMode("products");
-    setSelectedProductIds([]);
-    setSelectedCardIds([]);
-    setSlideSeconds(3);
-    setTransition("fade");
-    setTransitionMs(500);
-    setCardStyle({ ...DEFAULT_VIDEO_CARD_STYLE });
-    setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loading, projectId, router, toast]);
 
   const filteredProducts = useMemo(() => {
