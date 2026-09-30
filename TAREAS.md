@@ -58,11 +58,11 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Admin
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
-- [ ] Productos: aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`). El filtro por tienda ya existe.
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
 - [ ] Estadísticas: desglose de clics y productos activos por tienda, para ver qué aporta cada integración nueva.
 - [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.
 - [ ] Panel de las alertas de usuario: ver/pausar alertas por usuario y tienda, y las que esperan al Mac (`requiresResidentialIp`), útil también para el test de carga.
+- [x] 2026-09-30 Productos: aviso bajo la tienda y en «Revisar precio» (desactivado, con el motivo) cuando la tienda no se puede revisar desde el admin: «Sin revisión de precio» (Carrefour, PcComponentes, AliExpress) o «Precio: lo revisa el Mac» (MediaMarkt). Arreglado también el filtro por tienda/categoría: si cambiabas el filtro mientras cargaba la siguiente página, la recarga se descartaba y salía «Requested range not satisfiable».
 - [x] 2026-09-30 Redes / Tarjetas: `api/admin/image-proxy` solo admitía Amazon, Unsplash y Supabase; las fotos de Miravia, Kiabi, Carrefour y MediaMarkt daban 400 y salían sin foto. Ahora admite sus CDNs (Carrefour solo su bucket de Google Storage y nuestro Storage).
 - [x] 2026-09-30 Mejora visual del admin (skills `frontend-design` y `ui-ux-pro-max`): marco oscuro petróleo con la página activa en amarillo, tarjetas sin sombra, botones/pestañas/etiquetas sin mayúsculas (130 etiquetas en 22 archivos; no se tocaron `SocialCardPreview`, `SocialPulseTemplate`, `CarouselSlideFrame`, `ArticleStyleGuide` ni el editor del blog, que generan lo publicado), textos mínimo 12 px, foco visible, movimiento reducido y buscador de Productos en móvil (dejaba un hueco de 220 px).
 - [x] 2026-09-30 Ajustes → Carrefour y MediaMarkt: secciones en admin → Ajustes (activo, descuento mínimo, páginas por listado, listados y, en MediaMarkt, vendedores externos), guardadas en `app_settings.retailer_deal_settings` (migración 0055, `src/services/retailerDealSettings.ts`); lo no guardado sigue saliendo del `.env.local` del Mac. Otra tienda con job (AliExpress, PcComponentes): sumarla a `src/lib/retailerDealJobs.ts`.

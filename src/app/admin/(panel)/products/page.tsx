@@ -22,6 +22,7 @@ import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import { availabilityLabel } from "@/lib/out-of-stock-policy";
 import { splitProductDescription } from "@/lib/product-description";
 import {
+  adminPriceCheckNote,
   detectRetailerFromUrl,
   getRetailerDefinition,
   isProductRetailer,
@@ -212,6 +213,8 @@ export default function ProductsAdminClient() {
   const nextOffsetRef = useRef(0);
   const hasMoreRef = useRef(true);
   const loadInFlightRef = useRef(false);
+  /** Sube en cada recarga: las respuestas de peticiones anteriores se descartan. */
+  const loadGenerationRef = useRef(0);
   const deferredQuery = useDeferredValue(query);
   const toast = useAdminToast();
 
@@ -247,9 +250,12 @@ export default function ProductsAdminClient() {
 
   const loadPage = useCallback(
     async (reset: boolean) => {
-      if (loadInFlightRef.current) return;
-      if (!reset && !hasMoreRef.current) return;
+      // Una recarga (filtro, orden, búsqueda) nunca se descarta; «cargar más»
+      // espera a que no haya otra petición en curso.
+      if (!reset && (loadInFlightRef.current || !hasMoreRef.current)) return;
 
+      const generation = reset ? ++loadGenerationRef.current : loadGenerationRef.current;
+      const isCurrent = () => generation === loadGenerationRef.current;
       loadInFlightRef.current = true;
       if (reset) {
         setLoading(true);
@@ -280,6 +286,7 @@ export default function ProductsAdminClient() {
         if (dealFilter !== "all") params.set("deal", dealFilter);
 
         const response = await fetch(`/api/admin/products?${params}`);
+        if (!isCurrent()) return;
         const data = (await response.json()) as {
           ok?: boolean;
           error?: string;
@@ -288,6 +295,7 @@ export default function ProductsAdminClient() {
           total?: number;
           hasMore?: boolean;
         };
+        if (!isCurrent()) return;
         if (!response.ok || !data.ok) {
           const message = data.error ?? "No se pudieron cargar productos.";
           setError(message);
@@ -327,12 +335,17 @@ export default function ProductsAdminClient() {
         hasMoreRef.current = more;
         setHasMore(more);
       } catch {
+        if (!isCurrent()) return;
         setError("Error de red al cargar productos.");
         toast.error("Error de red al cargar productos.");
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        loadInFlightRef.current = false;
+        // Solo la petición vigente limpia el estado de carga: si una recarga
+        // la ha sustituido, esa recarga es la que lo gestiona.
+        if (isCurrent()) {
+          setLoading(false);
+          setLoadingMore(false);
+          loadInFlightRef.current = false;
+        }
       }
     },
     [
@@ -1793,6 +1806,14 @@ export default function ProductsAdminClient() {
                     <p className="mt-1 font-mono text-[11px] text-[var(--text-muted)]">
                       {product.externalId ?? product.asin}
                     </p>
+                    {(() => {
+                      const note = adminPriceCheckNote(
+                        normalizeRetailer(product.retailer),
+                      );
+                      return note ? (
+                        <p className="mt-1 whitespace-normal text-xs text-amber-800">{note}</p>
+                      ) : null;
+                    })()}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     {product.currentPrice.toFixed(2)} €
@@ -1885,9 +1906,14 @@ export default function ProductsAdminClient() {
                             key: "price",
                             label: "Revisar precio",
                             icon: <RefreshCw className="h-4 w-4" />,
-                            disabled: !retailerScrapeSupported(
-                              normalizeRetailer(product.retailer),
-                            ),
+                            disabled:
+                              adminPriceCheckNote(
+                                normalizeRetailer(product.retailer),
+                              ) !== null,
+                            hint:
+                              adminPriceCheckNote(
+                                normalizeRetailer(product.retailer),
+                              ) ?? undefined,
                             loading: updatingAsin === product.asin,
                             onSelect: () => void onUpdatePrice(product),
                           },

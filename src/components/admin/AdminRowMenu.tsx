@@ -17,6 +17,8 @@ export interface AdminRowMenuItem {
   icon: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
+  /** Explica por qué la acción no está disponible (bajo la etiqueta). */
+  hint?: string;
   loading?: boolean;
   tone?: "default" | "danger";
   hidden?: boolean;
@@ -129,7 +131,14 @@ export function AdminRowMenu({
                     item.icon
                   )}
                 </span>
-                <span>{item.label}</span>
+                <span className="flex flex-col">
+                  <span>{item.label}</span>
+                  {item.hint ? (
+                    <span className="text-xs font-normal text-[var(--text-muted)]">
+                      {item.hint}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             ))}
           </div>,

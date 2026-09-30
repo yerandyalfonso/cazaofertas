@@ -134,6 +134,16 @@ export function requiresResidentialIp(retailer: ProductRetailer): boolean {
   );
 }
 
+/**
+ * Aviso para el admin cuando «Revisar precio» no funciona desde la web (el
+ * admin corre en el VPS). `null` = se puede revisar desde el admin.
+ */
+export function adminPriceCheckNote(retailer: ProductRetailer): string | null {
+  if (!retailerScrapeSupported(retailer)) return "Sin revisión de precio";
+  if (requiresResidentialIp(retailer)) return "Precio: lo revisa el Mac";
+  return null;
+}
+
 export function getRetailerDefinition(
   retailer: ProductRetailer,
 ): RetailerDefinition {
