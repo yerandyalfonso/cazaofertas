@@ -203,6 +203,66 @@ export async function getAdminOpsSnapshot(): Promise<{
   return { catalog, clicks, pendingTelegram };
 }
 
+export interface RetailerStatsRow {
+  /** `null` = clics de productos ya borrados. */
+  retailer: string | null;
+  activeProducts: number;
+  clicks: number;
+}
+
+/**
+ * Por tienda: productos activos y clics a tienda (sin pruebas) en los
+ * últimos N días. El clic no guarda la tienda: se toma del producto.
+ */
+export async function getRetailerStats(days: number): Promise<RetailerStatsRow[]> {
+  const client = createSupabaseServiceClient();
+  const since = startOfDaysAgo(days);
+  const clicksByProduct = new Map<string, number>();
+  let orphanClicks = 0;
+
+  for (let offset = 0; ; offset += PRODUCT_PAGE_SIZE) {
+    const { data, error } = await client
+      .from("affiliate_clicks")
+      .select("product_id")
+      .eq("is_test", false)
+      .gte("created_at", since)
+      .range(offset, offset + PRODUCT_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (!row.product_id) orphanClicks += 1;
+      else clicksByProduct.set(row.product_id, (clicksByProduct.get(row.product_id) ?? 0) + 1);
+    }
+    if (!data || data.length < PRODUCT_PAGE_SIZE) break;
+  }
+
+  const clicksByRetailer = new Map<string, number>();
+  const ids = [...clicksByProduct.keys()];
+  // Lotes pequeños: los ids van en la URL de la petición.
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const { data, error } = await client.from("products").select("id, retailer").in("id", chunk);
+    if (error) throw new Error(error.message);
+    const found = new Set<string>();
+    for (const row of data ?? []) {
+      found.add(row.id);
+      const key = (row.retailer ?? "amazon").trim() || "amazon";
+      clicksByRetailer.set(key, (clicksByRetailer.get(key) ?? 0) + (clicksByProduct.get(row.id) ?? 0));
+    }
+    for (const id of chunk) if (!found.has(id)) orphanClicks += clicksByProduct.get(id) ?? 0;
+  }
+
+  const { byRetailer } = await getAdminCatalogStats();
+  const retailers = new Set([...byRetailer.map((row) => row.retailer), ...clicksByRetailer.keys()]);
+  const rows: RetailerStatsRow[] = [...retailers].map((retailer) => ({
+    retailer,
+    activeProducts: byRetailer.find((row) => row.retailer === retailer)?.count ?? 0,
+    clicks: clicksByRetailer.get(retailer) ?? 0,
+  }));
+  rows.sort((a, b) => b.clicks - a.clicks || b.activeProducts - a.activeProducts);
+  if (orphanClicks > 0) rows.push({ retailer: null, activeProducts: 0, clicks: orphanClicks });
+  return rows;
+}
+
 export interface TopClickedProduct {
   productId: string;
   title: string;

@@ -3,8 +3,10 @@ import { retailerLabel } from "@/lib/retailers";
 import { marketplaceAbsoluteUrl } from "@/lib/site";
 import {
   getAdminClickStats,
+  getRetailerStats,
   getTopClickedProducts,
   type AdminClickStats,
+  type RetailerStatsRow,
   type TopClickedProduct,
 } from "@/services/adminDashboard";
 import {
@@ -59,7 +61,7 @@ function StatCard({
   trend?: React.ReactNode;
 }) {
   return (
-    <div className="admin-card p-5">
+    <div className="admin-card min-w-0 p-5">
       <p className="text-xs font-semibold text-stone-500">
         {label}
       </p>
@@ -75,7 +77,7 @@ function StatCard({
 function MetricList({ title, rows }: { title: string; rows: UmamiMetric[] }) {
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
-    <div className="admin-card p-5">
+    <div className="admin-card min-w-0 p-5">
       <p className="text-xs font-semibold text-stone-500">
         {title}
       </p>
@@ -101,6 +103,55 @@ function MetricList({ title, rows }: { title: string; rows: UmamiMetric[] }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function RetailerTable({
+  rows,
+  rangeLabel,
+}: {
+  rows: RetailerStatsRow[];
+  rangeLabel: string;
+}) {
+  const totalClicks = rows.reduce((sum, row) => sum + row.clicks, 0);
+  return (
+    <div className="mt-4 admin-table-wrap">
+      <table className="text-sm">
+        <caption className="px-5 pt-4 text-left text-sm font-semibold text-[var(--text)]">
+          Por tienda ({rangeLabel})
+        </caption>
+        <thead>
+          <tr className="text-left text-xs text-[var(--text-muted)]">
+            <th className="px-5 py-2.5 font-semibold">Tienda</th>
+            <th className="px-5 py-2.5 text-right font-semibold">Productos activos</th>
+            <th className="px-5 py-2.5 text-right font-semibold">Clics</th>
+            <th className="px-5 py-2.5 text-right font-semibold">% de clics</th>
+            <th className="px-5 py-2.5 text-right font-semibold">Clics por 100 productos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.retailer ?? "deleted"} className="border-t border-[var(--border)]">
+              <td className="px-5 py-2.5 font-medium">
+                {row.retailer ? retailerLabel(row.retailer) : "Productos eliminados"}
+              </td>
+              <td className="px-5 py-2.5 text-right">
+                {row.retailer ? formatNumber(row.activeProducts) : "—"}
+              </td>
+              <td className="px-5 py-2.5 text-right">{formatNumber(row.clicks)}</td>
+              <td className="px-5 py-2.5 text-right text-[var(--text-muted)]">
+                {totalClicks ? `${Math.round((row.clicks / totalClicks) * 100)}%` : "—"}
+              </td>
+              <td className="px-5 py-2.5 text-right text-[var(--text-muted)]">
+                {row.activeProducts
+                  ? formatNumber(Math.round((row.clicks / row.activeProducts) * 1000) / 10)
+                  : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -159,11 +210,13 @@ export default async function AdminStatsPage({ searchParams }: StatsPageProps) {
 
   let clickStats: AdminClickStats | null = null;
   let topProducts: TopClickedProduct[] = [];
+  let retailerStats: RetailerStatsRow[] = [];
   let clicksError: string | null = null;
   try {
-    [clickStats, topProducts] = await Promise.all([
+    [clickStats, topProducts, retailerStats] = await Promise.all([
       getAdminClickStats(),
       getTopClickedProducts(days),
+      getRetailerStats(days),
     ]);
   } catch (error) {
     clicksError = error instanceof Error ? error.message : "Error desconocido";
@@ -228,7 +281,7 @@ export default async function AdminStatsPage({ searchParams }: StatsPageProps) {
                   count: row.count,
                 }))}
               />
-              <div className="admin-card p-5">
+              <div className="admin-card min-w-0 p-5">
                 <p className="text-xs font-semibold text-stone-500">
                   Productos con más clics
                 </p>
@@ -264,6 +317,10 @@ export default async function AdminStatsPage({ searchParams }: StatsPageProps) {
                 )}
               </div>
             </div>
+            <RetailerTable
+              rows={retailerStats}
+              rangeLabel={RANGES.find((range) => range.days === days)?.label ?? ""}
+            />
           </>
         ) : null}
       </section>
