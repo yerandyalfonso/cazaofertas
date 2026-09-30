@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import {
@@ -75,9 +76,7 @@ export function CategoriesAdminClient() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   function openCreate() {
     setEditingId(null);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import {
   HelpCircle,
   Loader2,
@@ -242,9 +243,7 @@ export function KeywordsAdminClient() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   const parents = useMemo(
     () =>

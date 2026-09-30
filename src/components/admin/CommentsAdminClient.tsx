@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import {
   Check,
   EyeOff,
@@ -102,9 +103,7 @@ export default function CommentsAdminClient() {
     }
   }, [query, statusFilter, toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   const pendingCount = useMemo(
     () => comments.filter((comment) => comment.status === "pending").length,

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import {
   ChevronUp,
   Eye,
@@ -226,28 +227,6 @@ export default function ProductsAdminClient() {
 
   const PAGE_SIZE = 100;
 
-  const listQueryKey = useMemo(
-    () =>
-      JSON.stringify({
-        q: deferredQuery.trim(),
-        categoryFilter,
-        retailerFilter,
-        staleFilter,
-        dealFilter,
-        sortKey,
-        sortDir,
-      }),
-    [
-      deferredQuery,
-      categoryFilter,
-      retailerFilter,
-      staleFilter,
-      dealFilter,
-      sortKey,
-      sortDir,
-    ],
-  );
-
   const loadPage = useCallback(
     async (reset: boolean) => {
       // Una recarga (filtro, orden, búsqueda) nunca se descarta; «cargar más»
@@ -364,9 +343,9 @@ export default function ProductsAdminClient() {
     void loadPage(true);
   }, [loadPage]);
 
-  useEffect(() => {
-    void loadPage(true);
-  }, [listQueryKey, loadPage]);
+  // `loadPage` cambia con cada filtro/orden/búsqueda (`listQueryKey`).
+  const reloadList = useCallback(() => loadPage(true), [loadPage]);
+  useAdminLoad(reloadList);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

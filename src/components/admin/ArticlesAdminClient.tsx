@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -185,9 +186,7 @@ export function ArticlesAdminClient({
     }
   }, [toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   const categoryOptions = useMemo(() => {
     const set = new Set<string>();

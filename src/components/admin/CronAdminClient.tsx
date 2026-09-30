@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatRelativeTime } from "@/lib/relative-time";
@@ -215,9 +216,7 @@ export function CronAdminClient({
     }
   }, [toast]);
 
-  useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+  useAdminLoad(loadStatus);
 
   async function runCron() {
     setRunning(true);

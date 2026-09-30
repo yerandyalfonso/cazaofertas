@@ -57,8 +57,9 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 ## Admin
 
-- [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
+- [ ] Avisos `react-hooks/set-state-in-effect` restantes (11 a 30-09): ya no son de carga de datos sino de estado derivado en editores (tarjetas, vídeos, carruseles, `SocialCardPreview`/`SocialPulseTemplate`, que generan imágenes publicadas), `AdminRowMenu`, `RemoteImage`, `icon.tsx` y los comentarios del blog. Tocarlos con cuidado, uno por uno.
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
+- [x] 2026-09-30 Carga de datos del admin unificada en `useAdminLoad` (15 pantallas: listas, Operaciones, Ajustes, editores): 26 → 11 avisos `set-state-in-effect`.
 - [x] 2026-09-30 Admin → Alertas (`/admin/alerts`): resumen (activas, pausadas, esperando al Mac, con fallos, usuarios), últimas 12 pasadas de `user_alert_runs` por máquina y tabla filtrable por estado, tipo, tienda y texto, con pausar/reactivar (reactivar pone a cero los fallos). Los usuarios de prueba se ocultan salvo que se marquen.
 - [x] 2026-09-30 Operaciones → Resumen: tabla «Estado por tienda» (Al día / Atrasada / Parado, activos, última revisión, revisados en 24 h, sin revisar +48 h, agotados, último producto nuevo), sacada de los productos activos. No hay registro de ejecuciones de los jobs: si hace falta saber qué máquina corrió cada uno, sería una tabla nueva.
 - [x] 2026-09-30 Estadísticas: tabla «Por tienda» con productos activos, clics del periodo, % de clics y clics por 100 productos (los clics de productos borrados, aparte). Arreglado también el desborde horizontal de la página con títulos largos.

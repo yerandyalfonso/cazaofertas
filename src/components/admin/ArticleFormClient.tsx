@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { BLOG_NAME } from "@/lib/blog-brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -177,10 +178,8 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     }
   }, [articleId]);
 
-  useEffect(() => {
-    void loadProducts();
-    void loadArticle();
-  }, [loadProducts, loadArticle]);
+  useAdminLoad(loadProducts);
+  useAdminLoad(loadArticle);
 
   function selectTemplate(next: BlogTemplate) {
     const option = ARTICLE_TEMPLATE_OPTIONS.find((t) => t.id === next);

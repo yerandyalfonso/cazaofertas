@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
@@ -47,9 +48,7 @@ export function SocialCardListClient() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   function onDelete(project: SocialCardProject) {
     const ok = window.confirm(`¿Eliminar la tarjeta «${project.name}»?`);

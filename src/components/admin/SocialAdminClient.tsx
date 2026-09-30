@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { toPng } from "html-to-image";
 import { Download, Loader2, Save } from "lucide-react";
 import { useAdminToast } from "@/components/admin/AdminToast";
@@ -858,10 +859,7 @@ export function SocialAdminClient({
     }
   }, [toast]);
 
-  useEffect(() => {
-    if (!editorReady) return;
-    void load();
-  }, [editorReady, load]);
+  useAdminLoad(load, editorReady);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import {
@@ -320,15 +321,13 @@ export function CarouselEditorClient({
     setEditorReady(true);
   }, [applyProject, projectId, router, toast]);
 
-  useEffect(() => {
-    if (!editorReady) return;
-    void loadArticles();
-  }, [editorReady, loadArticles]);
+  useAdminLoad(loadArticles, editorReady);
 
-  useEffect(() => {
-    if (!editorReady) return;
-    void loadArticle(selectedId);
-  }, [selectedId, loadArticle, editorReady]);
+  const loadSelectedArticle = useCallback(
+    () => loadArticle(selectedId),
+    [loadArticle, selectedId],
+  );
+  useAdminLoad(loadSelectedArticle, editorReady);
 
   useEffect(() => {
     if (skipRegenerateOnceRef.current) return;

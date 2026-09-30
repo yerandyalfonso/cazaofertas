@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatFeedUrlsText } from "@/lib/feed-urls";
@@ -170,9 +171,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
     }
   }, [toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   function patch<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
     setForm((current) => (current ? { ...current, [key]: value } : current));

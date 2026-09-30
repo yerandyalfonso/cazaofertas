@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAdminLoad } from "@/components/admin/useAdminLoad";
 import { ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import {
@@ -98,9 +99,7 @@ export default function AdminCouponsPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useAdminLoad(load);
 
   const retailers = useMemo(() => {
     const set = new Set(coupons.map((c) => c.retailer));
