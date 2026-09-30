@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { inferCarrefourCategorySlug } from "@/lib/carrefour-category";
 import { resolveCategoryMetaForDeal } from "@/lib/categories";
 import { roundMoney, toNumber } from "@/lib/money";
@@ -53,7 +54,9 @@ function slugifyTitleWithId(title: string, externalId: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
-  const id = externalId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  // El id de PcComponentes es el slug de su URL (casi el título entero): un
+  // hash corto evita que la dirección repita el nombre dos veces.
+  const id = createHash("sha1").update(externalId.trim().toLowerCase()).digest("hex").slice(0, 8);
   return `${base || "producto"}-pcc-${id}`;
 }
 
