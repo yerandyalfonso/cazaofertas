@@ -578,7 +578,7 @@ export function CarouselEditorClient({
           <div>
             <Link
               href="/admin/carousels"
-              className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 hover:underline"
+              className="text-xs font-semibold text-teal-800 hover:underline"
             >
               ← Volver a carruseles
             </Link>
@@ -632,7 +632,7 @@ export function CarouselEditorClient({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_1fr]">
         <aside className="space-y-5">
           <section className="border border-stone-200 bg-white p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            <h2 className="text-xs font-semibold text-stone-500">
               Fuente
             </h2>
             <label className="mt-3 block text-sm font-medium text-ink">
@@ -684,7 +684,7 @@ export function CarouselEditorClient({
           </section>
 
           <section className="border border-stone-200 bg-white p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            <h2 className="text-xs font-semibold text-stone-500">
               Apariencia
             </h2>
             <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-stone-700">
@@ -726,7 +726,7 @@ export function CarouselEditorClient({
           </section>
 
           <section className="border border-stone-200 bg-white p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            <h2 className="text-xs font-semibold text-stone-500">
               Plantilla
             </h2>
             <div className="mt-3 space-y-2">
@@ -760,7 +760,7 @@ export function CarouselEditorClient({
           </section>
 
           <section className="border border-stone-200 bg-white p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            <h2 className="text-xs font-semibold text-stone-500">
               Formato y color
             </h2>
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -917,7 +917,7 @@ export function CarouselEditorClient({
                 <section className="mt-2 border border-stone-200 bg-white p-4 lg:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      <h2 className="text-xs font-semibold text-stone-500">
                         Editar slide activa
                       </h2>
                       <p className="mt-1 text-sm font-medium text-ink">

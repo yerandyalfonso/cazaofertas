@@ -71,7 +71,7 @@ export function CarouselListClient() {
     <div>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+          <p className="text-xs font-semibold text-teal-800">
             Redes sociales
           </p>
           <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
@@ -106,7 +106,7 @@ export function CarouselListClient() {
       ) : (
         <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
           <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
             <tr>
               <th className="px-4 py-3 font-semibold">Nombre</th>
               <th className="px-4 py-3 font-semibold">Artículo</th>

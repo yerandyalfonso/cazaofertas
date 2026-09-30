@@ -112,7 +112,7 @@ function SortButton({
     <button
       type="button"
       onClick={() => onToggle(column)}
-      className={`inline-flex items-center gap-1 font-semibold uppercase tracking-[0.12em] transition hover:text-[var(--text)] ${
+      className={`inline-flex items-center gap-1 font-semibold transition hover:text-[var(--text)] ${
         active ? "text-[var(--text)]" : "text-[var(--text-muted)]"
       }`}
     >
@@ -461,7 +461,7 @@ export function ArticlesAdminClient({
         <section className="admin-card mt-6 p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              <p className="text-xs font-semibold text-[var(--text-muted)]">
                 Productos vinculados
               </p>
               <h2 className="mt-1 text-xl font-bold text-[var(--text)]">
@@ -496,7 +496,7 @@ export function ArticlesAdminClient({
           )}
           <Link
             href={`/admin/articles/${associateArticle.id}`}
-            className="mt-4 inline-flex text-xs font-semibold uppercase tracking-[0.12em] text-[var(--primary)] hover:underline"
+            className="mt-4 inline-flex text-xs font-semibold text-[var(--primary)] hover:underline"
           >
             Editar vínculos en el formulario →
           </Link>
@@ -514,7 +514,7 @@ export function ArticlesAdminClient({
       ) : (
       <div className="admin-table-wrap admin-table-wrap--fill mt-6">
         <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-muted)] text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-muted)] text-xs text-[var(--text-muted)]">
             <tr>
               <th className="w-10 px-3 py-3">
                 <input

@@ -1365,7 +1365,7 @@ export function SocialAdminClient({
           <div className="max-w-3xl">
             <Link
               href="/admin/social"
-              className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-800 hover:underline"
+              className="text-xs font-semibold text-teal-800 hover:underline"
             >
               ← Volver a tarjetas
             </Link>
@@ -1415,7 +1415,7 @@ export function SocialAdminClient({
             placeholder="Ej. Oferta aspiradora Black Friday"
           />
         </label>
-        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+        <p className="mt-4 text-xs font-semibold text-teal-800">
           Redes
         </p>
         <p className="mt-2 text-sm leading-relaxed text-stone-600">
@@ -1476,7 +1476,7 @@ export function SocialAdminClient({
         />
 
         <div className="grid gap-4 border-t border-stone-200 pt-5 md:grid-cols-[1fr_1.4fr_auto] md:items-end">
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             Buscar
             <input
               value={query}
@@ -1486,7 +1486,7 @@ export function SocialAdminClient({
             />
           </label>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Producto
             </p>
             <ul className="admin-table-wrap mt-2 max-h-44 divide-y divide-[var(--border)]">
@@ -1570,7 +1570,7 @@ export function SocialAdminClient({
 
       <section className="mt-8">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Vista previa
           </p>
           <p className="text-xs text-stone-500">

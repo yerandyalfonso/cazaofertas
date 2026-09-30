@@ -227,7 +227,7 @@ export default function CommentsAdminClient() {
 
       <div className="admin-table-wrap mt-4">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-muted)] text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-muted)] text-xs text-[var(--text-muted)]">
             <tr>
               <th className="w-[16%] px-4 py-3">Autor</th>
               <th className="w-[22%] px-4 py-3">Artículo</th>
@@ -387,7 +387,7 @@ export default function CommentsAdminClient() {
         {selected ? (
           <div className="flex flex-col gap-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              <p className="text-xs font-semibold text-[var(--text-muted)]">
                 Comentario
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[var(--text)]">
@@ -401,7 +401,7 @@ export default function CommentsAdminClient() {
 
             {selected.article ? (
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                <p className="text-xs font-semibold text-[var(--text-muted)]">
                   Artículo
                 </p>
                 <p className="mt-2 font-medium text-[var(--text)]">
@@ -420,7 +420,7 @@ export default function CommentsAdminClient() {
             ) : null}
 
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              <p className="text-xs font-semibold text-[var(--text-muted)]">
                 Respuesta del admin
               </p>
               <textarea

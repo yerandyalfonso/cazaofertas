@@ -507,7 +507,7 @@ export function CategoriesAdminClient() {
       ) : (
       <div className="admin-table-wrap admin-table-wrap--fill mt-6">
         <table className="min-w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 border-b border-[var(--border)] text-[11px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+          <thead className="sticky top-0 z-10 border-b border-[var(--border)] text-xs text-[var(--text-muted)]">
             <tr>
               <th className="w-10 px-3 py-3">
                 <input
@@ -631,7 +631,7 @@ export function CategoriesAdminClient() {
                           type="button"
                           onClick={() => void onReactivate(category)}
                           disabled={saving}
-                          className="admin-btn admin-btn-ghost h-8 px-2 text-[10px]"
+                          className="admin-btn admin-btn-ghost h-8 px-2 text-xs"
                         >
                           Activar
                         </button>

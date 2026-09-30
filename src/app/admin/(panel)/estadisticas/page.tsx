@@ -60,7 +60,7 @@ function StatCard({
 }) {
   return (
     <div className="admin-card p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+      <p className="text-xs font-semibold text-stone-500">
         {label}
       </p>
       <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--text)]">
@@ -76,7 +76,7 @@ function MetricList({ title, rows }: { title: string; rows: UmamiMetric[] }) {
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
     <div className="admin-card p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+      <p className="text-xs font-semibold text-stone-500">
         {title}
       </p>
       {rows.length === 0 ? (
@@ -173,7 +173,7 @@ export default async function AdminStatsPage({ searchParams }: StatsPageProps) {
     <div>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
+          <p className="text-xs font-semibold text-[var(--primary)]">
             Panel
           </p>
           <h1 className="mt-2 text-4xl font-bold tracking-tight text-[var(--text)]">
@@ -229,7 +229,7 @@ export default async function AdminStatsPage({ searchParams }: StatsPageProps) {
                 }))}
               />
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Productos con más clics
                 </p>
                 {topProducts.length === 0 ? (

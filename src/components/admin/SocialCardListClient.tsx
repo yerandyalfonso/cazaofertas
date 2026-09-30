@@ -99,7 +99,7 @@ export function SocialCardListClient() {
       ) : (
         <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
           <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+          <thead className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
             <tr>
               <th className="px-4 py-3 font-semibold">Nombre</th>
               <th className="px-4 py-3 font-semibold">Producto</th>

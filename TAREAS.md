@@ -58,12 +58,13 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Admin
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
-- [ ] Mejora visual del admin con las skills de diseño (`frontend-design`, `ui-ux-pro-max`): revisar jerarquía, tablas, estados vacíos/carga, móvil y modo oscuro; partir de `AdminShell` y los componentes compartidos (`AdminListChrome`, `AdminField`, `AdminEmptyState`…) para que el cambio llegue a todas las páginas. Primera pasada hecha 30-09 (marco, paleta, botones, pestañas, tablas, foco); falta quitar las ~150 etiquetas en mayúsculas de cada página (ojo: `SocialCardPreview` y plantillas generan imágenes publicadas, no tocarlas).
 - [ ] Productos: aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`). El filtro por tienda ya existe.
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
 - [ ] Estadísticas: desglose de clics y productos activos por tienda, para ver qué aporta cada integración nueva.
 - [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.
 - [ ] Panel de las alertas de usuario: ver/pausar alertas por usuario y tienda, y las que esperan al Mac (`requiresResidentialIp`), útil también para el test de carga.
+- [ ] Redes / Tarjetas: `api/admin/image-proxy` solo admite imágenes de Amazon, Unsplash y Supabase; las de Miravia (y otras tiendas) dan 400 y salen sin foto en el editor de tarjetas.
+- [x] 2026-09-30 Mejora visual del admin (skills `frontend-design` y `ui-ux-pro-max`): marco oscuro petróleo con la página activa en amarillo, tarjetas sin sombra, botones/pestañas/etiquetas sin mayúsculas (130 etiquetas en 22 archivos; no se tocaron `SocialCardPreview`, `SocialPulseTemplate`, `CarouselSlideFrame`, `ArticleStyleGuide` ni el editor del blog, que generan lo publicado), textos mínimo 12 px, foco visible, movimiento reducido y buscador de Productos en móvil (dejaba un hueco de 220 px).
 - [x] 2026-09-30 Ajustes → Carrefour y MediaMarkt: secciones en admin → Ajustes (activo, descuento mínimo, páginas por listado, listados y, en MediaMarkt, vendedores externos), guardadas en `app_settings.retailer_deal_settings` (migración 0055, `src/services/retailerDealSettings.ts`); lo no guardado sigue saliendo del `.env.local` del Mac. Otra tienda con job (AliExpress, PcComponentes): sumarla a `src/lib/retailerDealJobs.ts`.
 - [x] 2026-09-26 Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`).
 - [x] 2026-09-26 Productos: usar `AdminSortButton` compartido y quitar el import `X` sin usar.

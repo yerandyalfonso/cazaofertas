@@ -370,7 +370,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     <div>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+          <p className="text-xs font-semibold text-teal-800">
             Editorial
           </p>
           <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
@@ -411,7 +411,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         <ArticleStyleGuide activeTemplate={template} />
 
         <section className="admin-card p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Tipo de artículo
           </p>
           <p className="mt-1 text-sm text-stone-600">
@@ -449,7 +449,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         </section>
 
         <section className="grid gap-4 admin-card p-6 md:grid-cols-2">
-          <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="md:col-span-2 text-xs font-semibold text-stone-500">
             Título
             <input
               required
@@ -463,7 +463,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             />
           </label>
 
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             Slug
             <input
               required
@@ -476,7 +476,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             />
           </label>
 
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             Estado
             <select
               value={status}
@@ -489,7 +489,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             </select>
           </label>
 
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             Categoría
             <select
               value={category}
@@ -511,7 +511,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             </select>
           </label>
 
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             Autor
             <input
               value={author}
@@ -520,7 +520,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             />
           </label>
 
-          <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="md:col-span-2 text-xs font-semibold text-stone-500">
             Extracto
             <textarea
               value={excerpt}
@@ -531,7 +531,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
           </label>
 
           <div className="md:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Imagen destacada
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -576,7 +576,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
             ) : null}
           </div>
 
-          <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="md:col-span-2 text-xs font-semibold text-stone-500">
             Cita / pull-quote (opcional)
             <textarea
               value={pullQuote}
@@ -590,7 +590,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
 
         <section className="admin-card p-6">
           <div className="mb-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Contenido
             </p>
             <p className="mt-1 text-sm text-stone-600">
@@ -609,7 +609,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         </section>
 
         <section className="grid gap-4 admin-card p-6 md:grid-cols-2">
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             SEO título
             <input
               value={seoTitle}
@@ -617,7 +617,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
               className="admin-input mt-2"
             />
           </label>
-          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <label className="text-xs font-semibold text-stone-500">
             SEO descripción
             <input
               value={seoDescription}
@@ -639,7 +639,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         </section>
 
         <section className="admin-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Productos vinculados
           </p>
           <p className="mt-1 text-sm text-stone-600">
@@ -779,7 +779,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
         <div className="flex justify-end gap-3">
           <Link
             href="/admin/articles"
-            className="inline-flex h-11 items-center px-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600"
+            className="inline-flex h-11 items-center px-4 text-xs font-semibold text-stone-600"
           >
             Cancelar
           </Link>

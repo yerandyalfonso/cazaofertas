@@ -87,7 +87,7 @@ export default async function AdminDashboardPage({
   return (
     <div>
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
+        <p className="text-xs font-semibold text-[var(--primary)]">
           Panel
         </p>
         <h1 className="mt-2 text-4xl font-bold tracking-tight text-[var(--text)]">
@@ -155,7 +155,7 @@ export default async function AdminDashboardPage({
       <section className="mt-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+            <p className="text-xs font-semibold text-teal-800">
               Afiliados
             </p>
             <h2 className="mt-2 font-display text-2xl tracking-tight text-ink">
@@ -206,7 +206,7 @@ export default async function AdminDashboardPage({
 
             {clicks.bySource.length > 0 ? (
               <div className="admin-card mt-6 p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Por origen (30 días)
                 </p>
                 <ul className="mt-4 space-y-2">
@@ -230,7 +230,7 @@ export default async function AdminDashboardPage({
             {recentClicks.length > 0 ? (
               <div className="admin-table-wrap mt-6">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+                  <thead className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
                     <tr>
                       <th className="px-4 py-3 font-semibold">Fecha</th>
                       <th className="px-4 py-3 font-semibold">Producto</th>
@@ -268,11 +268,11 @@ export default async function AdminDashboardPage({
                           </td>
                           <td className="px-4 py-3">
                             {click.is_test ? (
-                              <span className="inline-flex bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                              <span className="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
                                 Prueba
                               </span>
                             ) : (
-                              <span className="inline-flex bg-teal-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-900">
+                              <span className="inline-flex bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-900">
                                 Real
                               </span>
                             )}
@@ -293,7 +293,7 @@ export default async function AdminDashboardPage({
           href="/admin/products"
           className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Gestión
           </p>
           <h2 className="mt-2 font-display text-2xl text-ink">Productos</h2>
@@ -305,7 +305,7 @@ export default async function AdminDashboardPage({
           href="/admin/articles"
           className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Editorial
           </p>
           <h2 className="mt-2 font-display text-2xl text-ink">Artículos</h2>
@@ -317,7 +317,7 @@ export default async function AdminDashboardPage({
           href="/admin/cron"
           className="admin-card p-6 transition hover:border-[var(--primary)]"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Operaciones
           </p>
           <h2 className="mt-2 font-display text-2xl text-ink">
@@ -345,7 +345,7 @@ function AttentionPanel({ items }: { items: AttentionItem[] }) {
     <section className="mt-8" aria-labelledby="attention-title">
       <h2
         id="attention-title"
-        className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+        className="text-xs font-semibold text-[var(--text-muted)]"
       >
         Requiere atención
       </h2>
@@ -396,7 +396,7 @@ function StatCard({
 }) {
   return (
     <div className="admin-card p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+      <p className="text-xs font-semibold text-[var(--text-muted)]">
         {label}
       </p>
       <p className="mt-3 text-2xl font-bold tracking-tight text-[var(--text)]">

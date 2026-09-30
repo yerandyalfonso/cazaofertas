@@ -90,7 +90,7 @@ export function VideoListClient() {
       ) : (
         <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-stone-50 text-xs uppercase tracking-[0.08em] text-stone-500">
+            <thead className="bg-stone-50 text-xs text-stone-500">
               <tr>
                 <th className="px-4 py-3">Nombre</th>
                 <th className="px-4 py-3">Fuente</th>

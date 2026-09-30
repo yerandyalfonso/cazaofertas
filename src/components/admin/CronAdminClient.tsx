@@ -406,7 +406,7 @@ export function CronAdminClient({
     <div>
       {!embedded ? (
         <header>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+          <p className="text-xs font-semibold text-teal-800">
             Operaciones
           </p>
           <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">
@@ -450,7 +450,7 @@ export function CronAdminClient({
                 type="button"
                 disabled={pauseBusy}
                 onClick={() => void setPause("resume")}
-                className="mt-3 inline-flex h-9 items-center border border-amber-800 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-950 disabled:opacity-60"
+                className="mt-3 inline-flex h-9 items-center border border-amber-800 bg-white px-3 text-xs font-semibold text-amber-950 disabled:opacity-60"
               >
                 {pauseBusy ? "…" : "Reanudar ahora"}
               </button>
@@ -480,7 +480,7 @@ export function CronAdminClient({
           <section className="mt-8">
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Catálogo
                 </p>
                 <h2 className="mt-1 font-display text-xl text-ink">
@@ -498,7 +498,7 @@ export function CronAdminClient({
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Activos
                 </p>
                 <p className="mt-3 font-display text-2xl">
@@ -506,7 +506,7 @@ export function CronAdminClient({
                 </p>
               </div>
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Amazon
                 </p>
                 <p className="mt-3 font-display text-2xl">
@@ -514,7 +514,7 @@ export function CronAdminClient({
                 </p>
               </div>
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Otras tiendas
                 </p>
                 <p className="mt-3 font-display text-2xl">
@@ -522,7 +522,7 @@ export function CronAdminClient({
                 </p>
               </div>
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Sin revisar
                 </p>
                 <p className="mt-3 font-display text-2xl">
@@ -530,7 +530,7 @@ export function CronAdminClient({
                 </p>
               </div>
               <div className="admin-card p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                <p className="text-xs font-semibold text-stone-500">
                   Última revisión
                 </p>
                 <p className="mt-3 text-sm leading-snug text-ink">
@@ -546,7 +546,7 @@ export function CronAdminClient({
 
           {!loadingStatus && (status?.byRetailer?.length ?? 0) > 0 ? (
             <section className="admin-card mt-6 max-w-xl p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
+              <p className="text-xs font-semibold text-stone-500">
                 Por tienda
               </p>
               <ul className="mt-3 divide-y divide-stone-100">
@@ -578,7 +578,7 @@ export function CronAdminClient({
           ) : null}
 
           <section className="mt-8 admin-card p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+            <p className="text-xs font-semibold text-teal-800">
               Canales
             </p>
             <h2 className="mt-2 font-display text-2xl text-ink">
@@ -670,7 +670,7 @@ export function CronAdminClient({
       {showRun ? (
         <>
           <div className={showMonitor ? "mt-10" : ""}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Ejecución manual
             </p>
             <h2 className="mt-1 font-display text-xl text-ink">
@@ -684,7 +684,7 @@ export function CronAdminClient({
 
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             <section className="admin-card flex flex-col p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-800">
+              <p className="text-xs font-semibold text-teal-800">
                 1 · Vigilancia
               </p>
               <h3 className="mt-2 font-display text-xl text-ink">
@@ -717,7 +717,7 @@ export function CronAdminClient({
             </section>
 
             <section className="admin-card flex flex-col border-amber-200 bg-amber-50/30 p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-900">
+              <p className="text-xs font-semibold text-amber-900">
                 2 · Discovery
               </p>
               <h3 className="mt-2 font-display text-xl text-ink">
@@ -742,7 +742,7 @@ export function CronAdminClient({
                   type="button"
                   disabled={running || runningFlash || flushingTelegram}
                   onClick={() => void runFlashCron()}
-                  className="inline-flex h-11 items-center border border-amber-900 bg-amber-900 px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-amber-950 disabled:opacity-60"
+                  className="inline-flex h-11 items-center border border-amber-900 bg-amber-900 px-5 text-xs font-semibold text-paper transition hover:bg-amber-950 disabled:opacity-60"
                 >
                   {runningFlash ? "…" : "Lanzar Flash"}
                 </button>
@@ -750,7 +750,7 @@ export function CronAdminClient({
             </section>
 
             <section className="admin-card flex flex-col p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-800">
+              <p className="text-xs font-semibold text-teal-800">
                 3 · Publicación
               </p>
               <h3 className="mt-2 font-display text-xl text-ink">
@@ -828,7 +828,7 @@ export function CronAdminClient({
 
               {flashResult.products && flashResult.products.length > 0 ? (
                 <div className="admin-card">
-                  <div className="border-b border-stone-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+                  <div className="border-b border-stone-200 px-4 py-3 text-xs font-semibold text-amber-900">
                     Productos Flash
                   </div>
                   <ul className="divide-y divide-stone-100">
@@ -878,7 +878,7 @@ export function CronAdminClient({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-[10px]"
+                          className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-xs"
                         >
                           Ir a Amazon
                         </a>
@@ -890,7 +890,7 @@ export function CronAdminClient({
 
               {flashResult.errors && flashResult.errors.length > 0 ? (
                 <div className="border border-amber-200 bg-amber-50">
-                  <div className="border-b border-amber-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+                  <div className="border-b border-amber-200 px-4 py-3 text-xs font-semibold text-amber-900">
                     Errores ({flashResult.errors.length})
                   </div>
                   <ul className="divide-y divide-amber-100">
@@ -935,7 +935,7 @@ export function CronAdminClient({
 
               {result.stats.deals.length > 0 ? (
                 <div className="admin-card">
-                  <div className="border-b border-stone-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+                  <div className="border-b border-stone-200 px-4 py-3 text-xs font-semibold text-teal-800">
                     Chollos en esta pasada
                   </div>
                   <ul className="divide-y divide-stone-100">
@@ -973,7 +973,7 @@ export function CronAdminClient({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-[10px]"
+                          className="admin-btn admin-btn-primary h-9 shrink-0 px-3 text-xs"
                         >
                           Ir a Amazon
                         </a>
@@ -985,7 +985,7 @@ export function CronAdminClient({
 
               {result.stats.errors.length > 0 ? (
                 <div className="border border-amber-200 bg-amber-50">
-                  <div className="border-b border-amber-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+                  <div className="border-b border-amber-200 px-4 py-3 text-xs font-semibold text-amber-900">
                     Errores ({result.stats.errors.length})
                   </div>
                   <ul className="divide-y divide-amber-100">
@@ -1013,7 +1013,7 @@ export function CronAdminClient({
 function ResultStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="admin-card p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+      <p className="text-xs font-semibold text-stone-500">
         {label}
       </p>
       <p className="mt-3 font-display text-2xl text-ink">{value}</p>

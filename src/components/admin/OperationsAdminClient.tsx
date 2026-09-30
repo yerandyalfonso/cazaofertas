@@ -47,7 +47,7 @@ export function OperationsAdminClient() {
   return (
     <div>
       <header className="max-w-3xl">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-800">
+        <p className="text-xs font-semibold text-teal-800">
           Operaciones
         </p>
         <h1 className="mt-2 font-display text-4xl tracking-tight text-ink">

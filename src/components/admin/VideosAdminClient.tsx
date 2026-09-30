@@ -655,7 +655,7 @@ export function VideosAdminClient({
         <div>
           <Link
             href="/admin/videos"
-            className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500 hover:text-ink"
+            className="text-xs font-semibold text-stone-500 hover:text-ink"
           >
             ← Videos
           </Link>
@@ -700,7 +700,7 @@ export function VideosAdminClient({
                 key={fmt}
                 type="button"
                 onClick={() => setExportFormat(fmt)}
-                className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                className="px-2.5 py-1.5 text-xs font-semibold"
                 style={chip(exportFormat === fmt)}
               >
                 {fmt}
@@ -737,7 +737,7 @@ export function VideosAdminClient({
                 setExporting(false);
                 setTimelineStatus(null);
               }}
-              className="inline-flex h-11 items-center gap-2 border border-stone-300 px-3 text-xs font-semibold uppercase tracking-[0.12em]"
+              className="inline-flex h-11 items-center gap-2 border border-stone-300 px-3 text-xs font-semibold"
             >
               <Square className="h-3.5 w-3.5" />
               Parar
@@ -752,7 +752,7 @@ export function VideosAdminClient({
       <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Fuente de slides
             </p>
             <div className="mt-2 flex gap-2">
@@ -766,7 +766,7 @@ export function VideosAdminClient({
                   key={id}
                   type="button"
                   onClick={() => setSourceMode(id)}
-                  className="rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em]"
+                  className="rounded-sm border px-3 py-2 text-xs font-semibold"
                   style={chip(sourceMode === id)}
                 >
                   {label}
@@ -859,7 +859,7 @@ export function VideosAdminClient({
               )}
 
               <div className="admin-card p-4 md:p-5">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                <p className="mb-4 text-xs font-semibold text-stone-500">
                   Estilo de tarjeta (productos)
                 </p>
                 <SocialCardStyleControls
@@ -904,7 +904,7 @@ export function VideosAdminClient({
 
         <aside className="space-y-4">
           <div className="admin-card p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Timeline
             </p>
             <label className="mt-3 block text-sm">

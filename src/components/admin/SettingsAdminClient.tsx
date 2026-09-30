@@ -279,7 +279,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
     <div className="space-y-8">
       {!embedded ? (
         <header>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+          <p className="text-xs font-semibold text-teal-800">
             Ajustes
           </p>
           <h1 className="mt-2 font-display text-3xl text-ink">Configuración</h1>

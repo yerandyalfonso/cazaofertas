@@ -115,7 +115,7 @@ export function ArticleQuickImport({
         }`}
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-800">
+          <span className="block text-xs font-semibold text-teal-800">
             {defaultCollapsed ? "Opcional · Importación rápida" : "Paso 1 · Importación rápida"}
           </span>
           <span className="mt-1 block font-display text-2xl tracking-tight text-ink">
@@ -137,7 +137,7 @@ export function ArticleQuickImport({
       {expanded ? (
         <div className="space-y-5 px-6 py-5">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Tipo de plantilla
             </p>
             <div
@@ -154,7 +154,7 @@ export function ArticleQuickImport({
                     role="tab"
                     aria-selected={active}
                     onClick={() => selectTemplate(option.id)}
-                    className={`h-11 px-4 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                    className={`h-11 px-4 text-xs font-semibold transition ${
                       active
                         ? "bg-ink text-paper"
                         : "border border-stone-300 bg-stone-50 text-stone-600 hover:border-ink"
@@ -170,14 +170,14 @@ export function ArticleQuickImport({
 
           <div className="border border-dashed border-teal-800/35 bg-teal-50/30 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-900">
+              <p className="text-xs font-semibold text-teal-900">
                 Formato de etiquetas · {preset.label}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void copySample()}
-                  className="inline-flex h-8 items-center gap-1.5 border border-teal-800/30 bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-900 hover:border-teal-800"
+                  className="inline-flex h-8 items-center gap-1.5 border border-teal-800/30 bg-white px-3 text-xs font-semibold text-teal-900 hover:border-teal-800"
                 >
                   {copied ? (
                     <Check className="h-3 w-3" />
@@ -189,7 +189,7 @@ export function ArticleQuickImport({
                 <button
                   type="button"
                   onClick={loadSample}
-                  className="inline-flex h-8 items-center gap-1.5 border border-teal-800/30 bg-white px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-teal-900 hover:border-teal-800"
+                  className="inline-flex h-8 items-center gap-1.5 border border-teal-800/30 bg-white px-3 text-xs font-semibold text-teal-900 hover:border-teal-800"
                 >
                   <ClipboardPaste className="h-3 w-3" />
                   Cargar ejemplo en el cuadro
@@ -216,7 +216,7 @@ export function ArticleQuickImport({
                   etc.
                 </p>
               </div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <p className="text-xs font-semibold text-stone-500">
                 {draft.trim() ? `${draft.trim().split(/\s+/).length} palabras` : "Vacío"}
               </p>
             </div>
@@ -239,7 +239,7 @@ export function ArticleQuickImport({
                 type="button"
                 onClick={autofill}
                 disabled={filling}
-                className="inline-flex h-12 items-center gap-2 bg-teal-800 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-teal-900 disabled:opacity-60"
+                className="inline-flex h-12 items-center gap-2 bg-teal-800 px-6 text-xs font-semibold text-white hover:bg-teal-900 disabled:opacity-60"
               >
                 <Wand2 className={`h-4 w-4 ${filling ? "animate-pulse" : ""}`} />
                 {filling ? "Autorellenando…" : "Autorellenar Campos"}
@@ -250,7 +250,7 @@ export function ArticleQuickImport({
                   setDraft("");
                   setStatus(null);
                 }}
-                className="h-12 border border-stone-300 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 hover:border-ink"
+                className="h-12 border border-stone-300 bg-white px-4 text-xs font-semibold text-stone-600 hover:border-ink"
               >
                 Limpiar cuadro
               </button>

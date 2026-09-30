@@ -9,7 +9,7 @@ export function SocialRedesTabs({
 }) {
   return (
     <div className="mb-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+      <p className="text-xs font-semibold text-[var(--text-muted)]">
         Redes
       </p>
       <h1 className="mt-2 font-display text-3xl text-[var(--text)]">

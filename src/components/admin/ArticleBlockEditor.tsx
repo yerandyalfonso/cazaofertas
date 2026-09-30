@@ -133,7 +133,7 @@ export function ArticleBlockEditor({
           }`}
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-500">
               <span
                 draggable
                 onDragStart={() => setDragId(block.id)}
@@ -327,7 +327,7 @@ export function ArticleBlockEditor({
                   placeholder="URL de la imagen"
                   className="h-10 min-w-[12rem] flex-1 border border-stone-300 bg-white px-3 text-sm outline-none focus:border-ink"
                 />
-                <label className="inline-flex h-10 cursor-pointer items-center gap-2 border border-stone-300 bg-white px-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-700 hover:border-ink">
+                <label className="inline-flex h-10 cursor-pointer items-center gap-2 border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 hover:border-ink">
                   {uploadingId === block.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
@@ -368,7 +368,7 @@ export function ArticleBlockEditor({
           {block.type === "prosCons" ? (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-teal-800">
+                <p className="mb-2 text-xs font-semibold text-teal-800">
                   Pros
                 </p>
                 {block.pros.map((item, idx) => (
@@ -395,7 +395,7 @@ export function ArticleBlockEditor({
                 </button>
               </div>
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-900">
+                <p className="mb-2 text-xs font-semibold text-amber-900">
                   Contras
                 </p>
                 {block.cons.map((item, idx) => (
@@ -491,7 +491,7 @@ export function ArticleBlockEditor({
       ))}
 
       <div className="flex flex-wrap gap-2 border border-dashed border-stone-300 bg-white p-3">
-        <span className="mr-1 self-center text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+        <span className="mr-1 self-center text-xs font-semibold text-stone-500">
           Añadir
         </span>
         {ADD_OPTIONS.map((option) => {
@@ -522,7 +522,7 @@ export function ArticleBlockEditor({
               { id: newBlockId(), type: "paragraph", text: "" },
             ])
           }
-          className="inline-flex h-9 items-center gap-1.5 bg-ink px-3 text-xs font-semibold uppercase tracking-[0.12em] text-paper"
+          className="inline-flex h-9 items-center gap-1.5 bg-ink px-3 text-xs font-semibold text-paper"
         >
           <Plus className="h-3.5 w-3.5" />
           Sección + párrafo

@@ -596,6 +596,14 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* En columna (móvil), flex-basis sería altura: el buscador no debe crecer. */
+@media (max-width: 767px) {
+  .admin-shell .admin-toolbar .admin-search-field {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+}
+
 @media (min-width: 768px) {
   .admin-shell .admin-toolbar {
     flex-direction: row;

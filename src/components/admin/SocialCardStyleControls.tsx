@@ -198,7 +198,7 @@ function PresetRow({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+      <p className="text-xs font-semibold text-stone-500">
         {label}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -256,7 +256,7 @@ export function SocialCardStyleControls({
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <p className="text-xs font-semibold text-stone-500">
           Layout de tarjeta
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
@@ -272,7 +272,7 @@ export function SocialCardStyleControls({
         </div>
         {value.layoutId === "pulse" ? (
           <div className="mt-4 space-y-3 border border-stone-200 bg-stone-50/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Color de fondo YIR
             </p>
             <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -305,7 +305,7 @@ export function SocialCardStyleControls({
         ) : null}
         {value.layoutId === "float" ? (
           <div className="mt-4 grid gap-3 border border-stone-200 bg-stone-50/80 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <p className="sm:col-span-2 lg:col-span-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="sm:col-span-2 lg:col-span-4 text-xs font-semibold text-stone-500">
               Flotante: inclinación, posición y zoom
             </p>
             <label className="text-xs text-stone-600">
@@ -369,7 +369,7 @@ export function SocialCardStyleControls({
       </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <p className="text-xs font-semibold text-stone-500">
           Paleta / fondo (light)
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -394,7 +394,7 @@ export function SocialCardStyleControls({
 
         <div className="mt-4 border border-stone-200 bg-stone-50/80 p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold text-stone-500">
               Tono del degradado
             </p>
             <p className="text-xs text-stone-600">
@@ -428,7 +428,7 @@ export function SocialCardStyleControls({
             className="mt-3 w-full accent-ink"
             aria-label="Tono del degradado de fondo"
           />
-          <div className="mt-1 flex justify-between text-[10px] uppercase tracking-[0.12em] text-stone-400">
+          <div className="mt-1 flex justify-between text-xs text-stone-400">
             <span>Normal</span>
             <span>Vibrante</span>
             <span>Pastel</span>
@@ -436,7 +436,7 @@ export function SocialCardStyleControls({
         </div>
 
         <div className="mt-4 border border-stone-200 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+          <p className="text-xs font-semibold text-stone-500">
             Fondo de la tarjeta
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -490,7 +490,7 @@ export function SocialCardStyleControls({
                   setPickingColor(false);
                 }
               }}
-              className="inline-flex items-center gap-2 rounded-sm border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink hover:border-ink disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-sm border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-semibold text-ink hover:border-ink disabled:opacity-50"
             >
               {pickingColor ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -502,7 +502,7 @@ export function SocialCardStyleControls({
             <button
               type="button"
               onClick={() => onChange({ cardSurfaceColor: "#ffffff" })}
-              className="inline-flex items-center gap-2 rounded-sm border border-stone-300 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-stone-600 hover:border-ink hover:text-ink"
+              className="inline-flex items-center gap-2 rounded-sm border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-600 hover:border-ink hover:text-ink"
             >
               <Droplet className="h-3.5 w-3.5" />
               Blanco
@@ -512,7 +512,7 @@ export function SocialCardStyleControls({
       </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <p className="text-xs font-semibold text-stone-500">
           Formato de exportación
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -534,7 +534,7 @@ export function SocialCardStyleControls({
       </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <p className="text-xs font-semibold text-stone-500">
           Ajuste de imagen
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">

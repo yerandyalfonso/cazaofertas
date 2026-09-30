@@ -1057,7 +1057,7 @@ export default function ProductsAdminClient() {
                 href={`/producto/${viewingProduct.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="admin-btn admin-btn-ghost h-9 px-3 text-[10px]"
+                className="admin-btn admin-btn-ghost h-9 px-3 text-xs"
               >
                 Ver en web
               </a>
@@ -1071,7 +1071,7 @@ export default function ProductsAdminClient() {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="admin-btn admin-btn-primary h-9 px-3 text-[10px]"
+                className="admin-btn admin-btn-primary h-9 px-3 text-xs"
               >
                 {retailerBuyCtaLabel(viewingProduct.retailer)}
               </a>
@@ -1080,7 +1080,7 @@ export default function ProductsAdminClient() {
                 onClick={() => {
                   openEdit(viewingProduct);
                 }}
-                className="admin-btn admin-btn-ghost h-9 px-3 text-[10px]"
+                className="admin-btn admin-btn-ghost h-9 px-3 text-xs"
               >
                 Editar
               </button>
@@ -1119,7 +1119,7 @@ export default function ProductsAdminClient() {
                   {productStatusBadges(viewingProduct).map((badge) => (
                     <span
                       key={badge.key}
-                      className={`inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${badge.className}`}
+                      className={`inline-flex rounded-sm border px-1.5 py-0.5 text-xs font-semibold ${badge.className}`}
                     >
                       {badge.label}
                     </span>
@@ -1295,7 +1295,7 @@ export default function ProductsAdminClient() {
               <h3>Enlaces</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-xs font-semibold text-[var(--text-muted)]">
                     URL producto
                   </p>
                   <p className="admin-detail-muted mt-1">
@@ -1303,7 +1303,7 @@ export default function ProductsAdminClient() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-xs font-semibold text-[var(--text-muted)]">
                     Affiliate
                   </p>
                   <p className="admin-detail-muted mt-1">
@@ -1311,7 +1311,7 @@ export default function ProductsAdminClient() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <p className="text-xs font-semibold text-[var(--text-muted)]">
                     Imagen
                   </p>
                   <p className="admin-detail-muted mt-1">
@@ -1379,7 +1379,7 @@ export default function ProductsAdminClient() {
             className="grid gap-4 md:grid-cols-2"
           >
             <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <label className="text-xs font-semibold text-stone-500">
                 Tienda
                 <select
                   value={form.retailer}
@@ -1393,7 +1393,7 @@ export default function ProductsAdminClient() {
                   ))}
                 </select>
               </label>
-              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <label className="text-xs font-semibold text-stone-500">
                 ID en tienda
                 <span className="ml-1 font-normal normal-case text-stone-400">
                   ({formRetailerDef.externalIdHint})
@@ -1414,7 +1414,7 @@ export default function ProductsAdminClient() {
               </label>
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <label className="text-xs font-semibold text-stone-500">
                 URL del producto
                 <input
                   required
@@ -1433,7 +1433,7 @@ export default function ProductsAdminClient() {
                     (!form.productUrl.trim() && !form.externalId.trim())
                   }
                   onClick={() => void scrapeFromUrl(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-teal-800 hover:underline disabled:opacity-50"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-800 hover:underline disabled:opacity-50"
                 >
                   {scraping ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -1449,7 +1449,7 @@ export default function ProductsAdminClient() {
                 </p>
               )}
             </div>
-            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
               Título
               <input
                 required
@@ -1462,7 +1462,7 @@ export default function ProductsAdminClient() {
             </label>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              <p className="text-xs font-semibold text-stone-500">
                 Categoría
               </p>
               <div className="mt-2 flex gap-2">
@@ -1521,7 +1521,7 @@ export default function ProductsAdminClient() {
               ) : null}
             </div>
 
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="text-xs font-semibold text-stone-500">
               Marca
               <input
                 value={form.brand}
@@ -1531,7 +1531,7 @@ export default function ProductsAdminClient() {
                 className="admin-input mt-2"
               />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="text-xs font-semibold text-stone-500">
               Precio de referencia (€)
               <input
                 required
@@ -1548,7 +1548,7 @@ export default function ProductsAdminClient() {
                 className="admin-input mt-2"
               />
             </label>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="text-xs font-semibold text-stone-500">
               Precio actual / oferta (€)
               <input
                 type="number"
@@ -1564,7 +1564,7 @@ export default function ProductsAdminClient() {
                 className="admin-input mt-2"
               />
             </label>
-            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
               URL de imagen
               <input
                 value={form.imageUrl}
@@ -1587,7 +1587,7 @@ export default function ProductsAdminClient() {
                 />
               </div>
             ) : null}
-            <label className="md:col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
               Descripción
               <textarea
                 value={form.description}
@@ -1628,7 +1628,7 @@ export default function ProductsAdminClient() {
             <col className="col-checked" />
             <col className="col-actions" />
           </colgroup>
-          <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-[11px] uppercase tracking-[0.12em] text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+          <thead className="sticky top-0 z-10 border-b border-stone-200 bg-stone-50 text-xs text-stone-500 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
             <tr>
               <th className="w-10 px-3 py-3">
                 <input
@@ -1777,7 +1777,7 @@ export default function ProductsAdminClient() {
                               {badges.map((badge) => (
                                 <span
                                   key={badge.key}
-                                  className={`inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${badge.className}`}
+                                  className={`inline-flex rounded-sm border px-1.5 py-0.5 text-xs font-semibold ${badge.className}`}
                                 >
                                   {badge.label}
                                 </span>
@@ -1817,11 +1817,11 @@ export default function ProductsAdminClient() {
                     ((product.dealLevel != null &&
                       product.dealLevel !== "NORMAL") ||
                       product.discountPercentage >= 5) ? (
-                      <span className="mt-1 inline-block rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+                      <span className="mt-1 inline-block rounded-sm bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
                         Oferta
                       </span>
                     ) : (
-                      <span className="mt-1 inline-block rounded-sm bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-600">
+                      <span className="mt-1 inline-block rounded-sm bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-600">
                         Normal
                       </span>
                     )}
