@@ -56,7 +56,7 @@ export function AdminSidePanel({
         <header className="admin-side-panel__header">
           <div className="min-w-0 flex-1">
             {eyebrow ? (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
+              <p className="text-sm font-medium text-[var(--primary)]">
                 {eyebrow}
               </p>
             ) : null}

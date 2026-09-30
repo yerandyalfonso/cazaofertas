@@ -88,9 +88,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <nav className="flex flex-1 flex-col gap-5 overflow-y-auto p-3" aria-label="Admin">
       {NAV_GROUPS.map((group) => (
         <div key={group.title}>
-          <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {group.title}
-          </p>
+          <p className="admin-nav-group-title">{group.title}</p>
           <div className="flex flex-col gap-0.5">
             {group.items.map((item) => {
               const active = isActive(item.href);
@@ -128,7 +126,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         type="button"
         onClick={() => void onLogout()}
         disabled={loggingOut}
-        className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50"
+        className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50"
       >
         {loggingOut ? "Saliendo…" : "Cerrar sesión"}
       </button>
@@ -138,13 +136,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <AdminToastProvider>
       <div className="admin-shell flex min-h-screen">
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] md:flex">
-          <div className="border-b border-[var(--border)] px-5 py-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
-              Admin
-            </p>
-            <p className="mt-1 text-xl font-bold tracking-tight text-[var(--text)]">
-              CazaOferta
+        <aside className="admin-sidebar sticky top-0 hidden h-screen w-60 shrink-0 flex-col md:flex">
+          <div className="flex items-center gap-2.5 border-b border-[var(--border)] px-5 py-5">
+            <Tag className="h-5 w-5 shrink-0 text-[var(--tag)]" aria-hidden />
+            <p className="text-lg font-bold tracking-tight text-[var(--text)]">
+              CazaOferta{" "}
+              <span className="font-medium text-[var(--text-muted)]">admin</span>
             </p>
           </div>
           {nav}
@@ -152,9 +149,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
-            <p className="text-lg font-bold tracking-tight text-[var(--text)]">
-              Admin
+          <div className="admin-sidebar flex items-center justify-between px-4 py-3 md:hidden">
+            <p className="flex items-center gap-2 text-lg font-bold tracking-tight text-[var(--text)]">
+              <Tag className="h-5 w-5 text-[var(--tag)]" aria-hidden />
+              CazaOferta{" "}
+              <span className="font-medium text-[var(--text-muted)]">admin</span>
             </p>
             <button
               type="button"
@@ -166,7 +165,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           {open ? (
-            <div className="border-b border-[var(--border)] bg-[var(--surface)] md:hidden">
+            <div className="admin-sidebar md:hidden">
               {nav}
               {footer}
             </div>

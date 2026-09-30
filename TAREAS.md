@@ -58,8 +58,8 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Admin
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
-- [ ] Mejora visual del admin con las skills de diseño (`frontend-design`, `ui-ux-pro-max`): revisar jerarquía, tablas, estados vacíos/carga, móvil y modo oscuro; partir de `AdminShell` y los componentes compartidos (`AdminListChrome`, `AdminField`, `AdminEmptyState`…) para que el cambio llegue a todas las páginas.
-- [ ] Productos: filtro por tienda (la lista muestra la tienda pero no filtra) y aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`).
+- [ ] Mejora visual del admin con las skills de diseño (`frontend-design`, `ui-ux-pro-max`): revisar jerarquía, tablas, estados vacíos/carga, móvil y modo oscuro; partir de `AdminShell` y los componentes compartidos (`AdminListChrome`, `AdminField`, `AdminEmptyState`…) para que el cambio llegue a todas las páginas. Primera pasada hecha 30-09 (marco, paleta, botones, pestañas, tablas, foco); falta quitar las ~150 etiquetas en mayúsculas de cada página (ojo: `SocialCardPreview` y plantillas generan imágenes publicadas, no tocarlas).
+- [ ] Productos: aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`). El filtro por tienda ya existe.
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
 - [ ] Estadísticas: desglose de clics y productos activos por tienda, para ver qué aporta cada integración nueva.
 - [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.

@@ -39,7 +39,7 @@ export default function AdminLoginForm() {
         onSubmit={(event) => void onSubmit(event)}
         className="admin-login-card"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+        <p className="text-sm font-medium text-[var(--primary)]">
           CazaOferta
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--text)]">
@@ -56,7 +56,7 @@ export default function AdminLoginForm() {
           </code>
           ).
         </p>
-        <label className="mt-6 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+        <label className="mt-6 block text-sm font-semibold text-[var(--text)]">
           Contraseña
           <input
             type="password"

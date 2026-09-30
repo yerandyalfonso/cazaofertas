@@ -1,26 +1,64 @@
 /* Estilos Admin alineados con el marketplace (no afectan al blog público). */
 
+/*
+ * Paleta: petróleo (marco y acción principal) + amarillo de etiqueta de precio,
+ * reservado a lo que está activo o seleccionado. Fondo gris frío, tarjetas
+ * blancas con borde fino y sin sombra: la jerarquía la marcan borde y radio.
+ */
 .admin-shell {
-  --bg: #f3f6f4;
+  --bg: #f2f4f6;
   --surface: #ffffff;
-  --surface-muted: #eef3f0;
-  --border: #d8e3dd;
-  --border-strong: #b8ccc2;
-  --text: #15201c;
-  --text-muted: #5c6f66;
-  --primary: #4f7f6a;
-  --primary-hover: #3f6a57;
-  --primary-soft: #e4efe9;
-  --danger: #d64545;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --shadow: 0 10px 30px rgba(21, 32, 28, 0.06);
-  --shadow-sm: 0 2px 10px rgba(21, 32, 28, 0.05);
-  --control-h: 2.75rem;
+  --surface-muted: #f0f3f5;
+  --border: #dde2e7;
+  --border-strong: #b9c2cb;
+  --text: #182028;
+  --text-muted: #56616d;
+  --primary: #0c6570;
+  --primary-hover: #094f58;
+  --primary-soft: #e3f1f2;
+  --tag: #f6c343;
+  --tag-ink: #3d2e00;
+  --frame: #0f2830;
+  --frame-2: #163640;
+  --danger: #c9372c;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 12px 32px rgba(15, 40, 48, 0.1);
+  --shadow-sm: none;
+  --control-h: 2.625rem;
 
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foco de teclado visible en todo el panel. */
+.admin-shell :where(a, button, [role="button"], summary, input[type="checkbox"], input[type="radio"]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Marco oscuro (barra lateral y menú móvil): redefine los tokens dentro. */
+.admin-shell .admin-sidebar {
+  --surface: var(--frame);
+  --surface-muted: var(--frame-2);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f2f6f7;
+  --text-muted: #9fb3b8;
+  background: var(--frame);
+  color: var(--text);
+}
+
+.admin-shell .admin-sidebar :where(a, button):focus-visible {
+  outline-color: var(--tag);
+}
+
+.admin-shell .admin-nav-group-title {
+  padding: 0 0.75rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .admin-shell a {
@@ -29,16 +67,34 @@
 }
 
 .admin-shell .admin-nav-link {
+  position: relative;
   border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+/* Activo: la «etiqueta» amarilla a la izquierda. */
 .admin-shell .admin-nav-link--active {
-  background: var(--primary);
-  color: #fff;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.admin-shell .admin-nav-link--active::before {
+  content: "";
+  position: absolute;
+  left: -0.75rem;
+  top: 0.375rem;
+  bottom: 0.375rem;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--tag);
+}
+
+.admin-shell .admin-nav-link--active svg {
+  color: var(--tag);
 }
 
 .admin-shell .admin-nav-link:not(.admin-nav-link--active):hover {
@@ -60,11 +116,12 @@
   gap: 0.5rem;
   height: var(--control-h);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 0 1.15rem;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  padding: 0 1rem;
   border: 1px solid transparent;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -273,7 +330,19 @@
 }
 
 .admin-shell .admin-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--surface-muted);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.admin-shell .admin-table-wrap tbody tr {
+  transition: background 0.1s ease;
+}
+
+.admin-shell .admin-table-wrap tbody tr:hover {
+  background: color-mix(in srgb, var(--primary-soft) 55%, transparent);
 }
 
 /* Productos: anchos fijos para que el skeleton / filas no muevan columnas */
@@ -428,12 +497,12 @@
 
 /* Menú en portal (document.body) — tokens propios (fuera de .admin-shell) */
 .admin-row-menu__panel {
-  --border: #d8e3dd;
+  --border: #dde2e7;
   --surface: #ffffff;
-  --surface-muted: #eef3f0;
-  --text: #15201c;
-  --text-muted: #5c6f66;
-  --radius-sm: 10px;
+  --surface-muted: #f0f3f5;
+  --text: #182028;
+  --text-muted: #56616d;
+  --radius-sm: 8px;
   z-index: 80;
   min-width: 11.5rem;
   overflow: hidden;
@@ -493,10 +562,8 @@
   display: inline-block;
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 600;
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -709,10 +776,8 @@
   border-bottom: 2px solid transparent;
   border-radius: 0 !important;
   margin-bottom: -1px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
+  font-weight: 500;
   color: var(--text-muted);
   background: transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
@@ -724,6 +789,7 @@
 
 .admin-shell .admin-tab--active {
   color: var(--text);
+  font-weight: 600;
   border-bottom-color: var(--primary);
   border-radius: 0 !important;
 }
@@ -741,7 +807,7 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(21, 32, 28, 0.35);
+  background: rgba(15, 40, 48, 0.45);
   cursor: pointer;
 }
 
@@ -754,7 +820,7 @@
   max-width: 100%;
   height: 100%;
   background: var(--surface);
-  box-shadow: -12px 0 40px rgba(21, 32, 28, 0.12);
+  box-shadow: -12px 0 40px rgba(15, 40, 48, 0.16);
   animation: admin-side-panel-in 0.22s ease-out;
 }
 
@@ -853,11 +919,9 @@
 
 .admin-shell .admin-detail-section h3 {
   margin: 0 0 0.85rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .admin-shell .admin-detail-grid {
@@ -867,10 +931,8 @@
 }
 
 .admin-shell .admin-detail-grid dt {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--text-muted);
 }
 
@@ -903,5 +965,13 @@
 @media (min-width: 640px) {
   .admin-shell .admin-side-panel__sheet {
     border-left: 1px solid var(--border);
+  }
+}
+
+/* Movimiento reducido: sin shimmer ni deslizamiento del panel. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell .admin-skeleton,
+  .admin-shell .admin-side-panel__sheet {
+    animation: none;
   }
 }
