@@ -173,7 +173,11 @@ export default function ProductsAdminClient() {
 
         const batch = data.products ?? [];
         setProducts((prev) => {
-          const next = reset ? batch : [...prev, ...batch];
+          // Con orden por «última revisión», un producto revisado mientras se
+          // pagina cambia de sitio y puede volver en la página siguiente.
+          const seen = reset ? new Set<string>() : new Set(prev.map((p) => p.id));
+          const fresh = batch.filter((p) => !seen.has(p.id) && seen.add(p.id));
+          const next = reset ? fresh : [...prev, ...fresh];
           if (reset) {
             const valid = new Set(next.map((p) => p.id));
             setSelectedIds((prevSelected) => {
