@@ -304,9 +304,52 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+const AMAZON_READER_REASON = "No se pudo extraer el precio del HTML de Amazon";
+/** Ejecuciones seguidas (de esta máquina) con fallos de lectura de Amazon. */
+const AMAZON_READER_STREAK = 3;
+
+/**
+ * Aviso aparte cuando el lector de Amazon falla en varias ejecuciones seguidas
+ * (Amazon cambió la página o sirve captcha). Solo avisa al empezar la racha,
+ * no en cada ejecución mientras dure. Requiere que la ejecución actual ya
+ * esté guardada en `user_alert_runs`.
+ */
+async function checkAmazonReaderStreak(): Promise<void> {
+  const { machineName } = await import("@/services/alertLoadTest");
+  const client = createSupabaseServiceClient();
+  const { data: runs } = await client
+    .from("user_alert_runs")
+    .select("started_at, reasons")
+    .eq("machine", machineName())
+    .order("started_at", { ascending: false })
+    .limit(AMAZON_READER_STREAK + 1);
+  const failures = (runs ?? []).map((run) =>
+    Object.entries((run.reasons ?? {}) as Record<string, number>)
+      .filter(([reason]) => reason.includes(AMAZON_READER_REASON))
+      .reduce((sum, [, count]) => sum + count, 0),
+  );
+  if (failures.length < AMAZON_READER_STREAK) return;
+  const streak = failures.slice(0, AMAZON_READER_STREAK);
+  if (streak.some((count) => count === 0)) return;
+  if ((failures[AMAZON_READER_STREAK] ?? 0) > 0) return;
+  await notifyCronAlert({
+    job: jobId("user-alerts"),
+    headline: "El lector de precios de Amazon falla seguido",
+    lines: [
+      `${AMAZON_READER_STREAK} ejecuciones seguidas en ${escapeHtml(machineName())} sin poder leer el precio de Amazon (${streak.reverse().join(" → ")} alertas).`,
+      "Puede que Amazon haya cambiado la página o esté mostrando captcha: revisa el lector.",
+    ],
+  });
+}
+
 export async function reviewUserAlertsResult(
   result: UserUrlAlertsResult,
 ): Promise<void> {
+  try {
+    await checkAmazonReaderStreak();
+  } catch (error) {
+    console.warn("[user-alerts] No se pudo comprobar la racha de fallos de Amazon:", error);
+  }
   // Avisa si hay fallos reales o si la tienda empieza a bloquear (≥3 omitidas
   // por anti-bot). Agotados / sin precio no avisan: son normales y harían ruido.
   const blocked = Object.entries(result.reasons ?? {})

@@ -29,6 +29,7 @@ import { DealLevel, ProductAvailability } from "@/types";
 import {
   isTelegramConfigured,
   sendTelegramMessage,
+  sendDealAlertMessage,
   buildOfferActionMarkup,
 } from "@/services/telegram/bot";
 import { notifyChannelDealIfEligible } from "@/services/telegram";
@@ -271,7 +272,10 @@ export async function runUserUrlAlerts(options?: {
     .eq("is_active", true)
     .not("url", "is", null)
     .order("last_checked_at", { ascending: true, nullsFirst: true })
-    .limit(limit);
+    // Margen para saltar alertas de tiendas que revisa la otra corrida
+    // (Carrefour/PcComponentes solo desde el Mac): no se mueven de la cola
+    // y, sin margen, ocupaban huecos del lote en cada ejecución.
+    .limit(limit + 200);
 
   if (error) {
     throw new Error(`No se pudieron leer alertas con URL: ${error.message}`);
@@ -369,7 +373,13 @@ export async function runUserUrlAlerts(options?: {
   };
 
   const telegramReady = isTelegramConfigured();
-  const rows = alerts ?? [];
+  const rows = (alerts ?? [])
+    .filter((row) => {
+      const rowUrl = row.url?.trim();
+      if (!rowUrl) return true;
+      return allowedRetailers.includes(detectRetailerFromUrl(rowUrl) ?? "amazon");
+    })
+    .slice(0, limit);
 
   for (let index = 0; index < rows.length; index += 1) {
     const alert = rows[index]!;
@@ -380,12 +390,6 @@ export async function runUserUrlAlerts(options?: {
     }
 
     const retailer = detectRetailerFromUrl(url) ?? "amazon";
-    if (!allowedRetailers.includes(retailer)) {
-      // No es esta corrida la que cubre esta tienda (p. ej. PcComponentes
-      // solo se revisa desde el cron del Mac). No cuenta como fallo ni motivo.
-      result.skipped += 1;
-      continue;
-    }
     if (!alertRetailerSupported(retailer)) {
       note("failed", `Tienda sin revisión automática (${retailer})`, url);
       await moveToBack(alert.id);
@@ -421,12 +425,18 @@ export async function runUserUrlAlerts(options?: {
             .update({ product_id: productId })
             .eq("id", alert.id);
         } catch (ensureError) {
-          const reason = "No se pudo crear/vincular el producto (se sigue revisando)";
-          result.reasons[reason] = (result.reasons[reason] ?? 0) + 1;
-          console.warn(
-            `[user-alerts] Alerta ${alert.id}: no se pudo enlazar producto`,
-            ensureError instanceof Error ? ensureError.message : ensureError,
-          );
+          const ensureMessage =
+            ensureError instanceof Error ? ensureError.message : String(ensureError);
+          // Agotado: no se crea la ficha; la revisión de abajo lo anota como
+          // «Producto agotado» y se vincula cuando vuelva a haber stock.
+          if (!/agotado/i.test(ensureMessage)) {
+            const reason = "No se pudo crear/vincular el producto (se sigue revisando)";
+            result.reasons[reason] = (result.reasons[reason] ?? 0) + 1;
+            console.warn(
+              `[user-alerts] Alerta ${alert.id}: no se pudo enlazar producto`,
+              ensureMessage,
+            );
+          }
         }
       }
 
@@ -633,29 +643,84 @@ export async function runUserUrlAlerts(options?: {
         productSlug = linkedProduct?.slug ?? null;
       }
 
-      await sendTelegramMessage({
-        chatId: recipient.chatId,
-        text: [
-          ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
-          "📉 <b>Bajada en tu alerta de URL</b>",
-          "",
-          escapeHtml(title),
-          `Antes: <s>${formatEuro(reference)}</s>`,
-          `Ahora: <b>${formatEuro(currentPrice)}</b> (−${discountPct}%)`,
-          ...(quote.primeOnly
-            ? [
-                `⭐ Precio de oferta Prime${
-                  quote.regularPrice ? ` · sin Prime: ${formatEuro(quote.regularPrice)}` : ""
-                }`,
-              ]
-            : []),
-        ].join("\n"),
-        disableWebPagePreview: false,
-        replyMarkup: buildOfferActionMarkup({
+      // Mismo formato que el resto de alertas (foto + ficha + botones) cuando
+      // hay producto vinculado; si no, texto con la vista previa del enlace.
+      let deal: DealCandidate | null = null;
+      if (productId) {
+        const category = linkedProduct?.categories ?? null;
+        const scoring = dealScoringService.scoreProduct({
+          currentPrice,
+          previousPrice: reference,
+          lowestPrice: Math.min(
+            currentPrice,
+            toNumber(linkedProduct?.lowest_price) ?? currentPrice,
+          ),
+          categorySlug: category?.parent?.slug ?? category?.slug ?? "otros",
+        });
+
+        deal = {
+          productId,
+          asin,
+          title,
+          brand: linkedProduct?.brand ?? null,
+          categoryId: category?.id ?? linkedProduct?.category_id ?? null,
+          categoryName: category?.name ?? null,
+          categorySlug: category?.slug ?? null,
+          parentCategorySlug: category?.parent?.slug ?? null,
+          parentCategoryName: category?.parent?.name ?? null,
+          retailer,
+          currentPrice,
+          previousPrice: reference,
+          discountPercentage: discountPct,
+          dealLevel: scoring.level,
+          score: scoring.score,
+          dealLabel: scoring.label,
           affiliateUrl,
+          nearHistoricalLow: scoring.level === DealLevel.HISTORICAL_LOW,
           productSlug,
-        }),
-      });
+          imageUrl: linkedProduct?.image_url ?? null,
+          summary: linkedProduct?.description?.trim() || null,
+          expiresAt: linkedProduct?.deal_expires_at ?? null,
+        };
+      }
+
+      if (deal) {
+        await sendDealAlertMessage({
+          chatId: recipient.chatId,
+          deal: {
+            ...deal,
+            primeOnly: quote.primeOnly,
+            regularPrice: quote.regularPrice ?? null,
+            ...(recipient.testLabel
+              ? { title: `${recipient.testLabel} · ${deal.title}` }
+              : {}),
+          },
+        });
+      } else {
+        await sendTelegramMessage({
+          chatId: recipient.chatId,
+          text: [
+            ...(recipient.testLabel ? [escapeHtml(recipient.testLabel)] : []),
+            "📉 <b>Bajada en tu alerta de URL</b>",
+            "",
+            escapeHtml(title),
+            `Antes: <s>${formatEuro(reference)}</s>`,
+            `Ahora: <b>${formatEuro(currentPrice)}</b> (−${discountPct}%)`,
+            ...(quote.primeOnly
+              ? [
+                  `⭐ Precio de oferta Prime${
+                    quote.regularPrice ? ` · sin Prime: ${formatEuro(quote.regularPrice)}` : ""
+                  }`,
+                ]
+              : []),
+          ].join("\n"),
+          disableWebPagePreview: false,
+          replyMarkup: buildOfferActionMarkup({
+            affiliateUrl,
+            productSlug,
+          }),
+        });
+      }
 
       result.notified += 1;
       await client
@@ -670,44 +735,8 @@ export async function runUserUrlAlerts(options?: {
       // precio) evita reenvíos duplicados si el descubrimiento normal ya
       // publicó este mismo producto.
       // Los usuarios de prueba no propagan ofertas al canal ni a redes.
-      if (productId && !recipient.testLabel) {
+      if (deal && !recipient.testLabel) {
         try {
-          const category = linkedProduct?.categories ?? null;
-          const scoring = dealScoringService.scoreProduct({
-            currentPrice,
-            previousPrice: reference,
-            lowestPrice: Math.min(
-              currentPrice,
-              toNumber(linkedProduct?.lowest_price) ?? currentPrice,
-            ),
-            categorySlug: category?.parent?.slug ?? category?.slug ?? "otros",
-          });
-
-          const deal: DealCandidate = {
-            productId,
-            asin,
-            title,
-            brand: linkedProduct?.brand ?? null,
-            categoryId: category?.id ?? linkedProduct?.category_id ?? null,
-            categoryName: category?.name ?? null,
-            categorySlug: category?.slug ?? null,
-            parentCategorySlug: category?.parent?.slug ?? null,
-            parentCategoryName: category?.parent?.name ?? null,
-            retailer,
-            currentPrice,
-            previousPrice: reference,
-            discountPercentage: discountPct,
-            dealLevel: scoring.level,
-            score: scoring.score,
-            dealLabel: scoring.label,
-            affiliateUrl,
-            nearHistoricalLow: scoring.level === DealLevel.HISTORICAL_LOW,
-            productSlug,
-            imageUrl: linkedProduct?.image_url ?? null,
-            summary: linkedProduct?.description?.trim() || null,
-            expiresAt: linkedProduct?.deal_expires_at ?? null,
-          };
-
           await notifyMatchingUsers(client, deal, { excludeAlertId: alert.id });
           await notifyChannelDealIfEligible(client, deal);
         } catch (broadcastError) {
