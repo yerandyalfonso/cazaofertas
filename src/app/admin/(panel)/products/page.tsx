@@ -22,14 +22,9 @@ import {
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import {
   adminPriceCheckNote,
-  detectRetailerFromUrl,
-  getRetailerDefinition,
-  isProductRetailer,
   normalizeRetailer,
   PRODUCT_RETAILERS,
   retailerLabel,
-  retailerScrapeSupported,
-  type ProductRetailer,
 } from "@/lib/retailers";
 import { formatFullDateTime } from "@/lib/relative-time";
 import { useAdminToast } from "@/components/admin/AdminToast";
@@ -39,8 +34,9 @@ import {
   AdminSearchField,
   AdminSortButton,
 } from "@/components/admin/AdminListChrome";
-import { AdminSidePanel } from "@/components/admin/AdminSidePanel";
 import { ProductDetailPanel } from "@/components/admin/products/ProductDetailPanel";
+import { ProductFormPanel } from "@/components/admin/products/ProductFormPanel";
+import { useProductForm } from "@/components/admin/products/useProductForm";
 import {
   type AdminProduct,
   type CategoryOption,
@@ -50,7 +46,6 @@ import {
   type DealFilter,
   productStatusBadges,
   freshnessMeta,
-  emptyForm,
   iconBtnClass,
   toolbarFieldClass,
 } from "@/components/admin/products/productsAdmin";
@@ -64,24 +59,15 @@ export default function ProductsAdminClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [scraping, setScraping] = useState(false);
-  const [creatingCategory, setCreatingCategory] = useState(false);
   const [updatingAsin, setUpdatingAsin] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<AdminProduct | null>(
     null,
   );
-  const [editingAsin, setEditingAsin] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [showNewCategory, setShowNewCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [scrapedDiscount, setScrapedDiscount] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [retailerFilter, setRetailerFilter] = useState("");
@@ -91,7 +77,6 @@ export default function ProductsAdminClient() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const tableScrollRef = useRef<HTMLDivElement>(null);
-  const lastScrapedUrl = useRef<string>("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const nextOffsetRef = useRef(0);
   const hasMoreRef = useRef(true);
@@ -101,11 +86,6 @@ export default function ProductsAdminClient() {
   const deferredQuery = useDeferredValue(query);
   const toast = useAdminToast();
 
-  const formRetailerDef = useMemo(
-    () => getRetailerDefinition(form.retailer),
-    [form.retailer],
-  );
-  const formScrapeSupported = retailerScrapeSupported(form.retailer);
 
   const PAGE_SIZE = 100;
 
@@ -229,6 +209,22 @@ export default function ProductsAdminClient() {
     void loadPage(true);
   }, [loadPage]);
 
+  const productForm = useProductForm({
+    categories,
+    setCategories,
+    setError,
+    setMessage,
+    onOpen: () => setViewingProduct(null),
+    onSaved: load,
+  });
+  const {
+    setOpen,
+    editingAsin,
+    setEditingAsin,
+    openCreate,
+    openEdit,
+  } = productForm;
+
   // `loadPage` cambia con cada filtro/orden/búsqueda (`listQueryKey`).
   const reloadList = useCallback(() => loadPage(true), [loadPage]);
   useAdminLoad(reloadList);
@@ -312,275 +308,6 @@ export default function ProductsAdminClient() {
     retailerFilter.length > 0 ||
     staleFilter !== "all" ||
     dealFilter !== "all";
-
-  function openCreate() {
-    setViewingProduct(null);
-    setEditingAsin(null);
-    setForm(emptyForm);
-    setShowNewCategory(false);
-    setNewCategoryName("");
-    setScrapedDiscount(null);
-    lastScrapedUrl.current = "";
-    setMessage(null);
-    setError(null);
-    setOpen(true);
-  }
-
-  function openEdit(product: AdminProduct) {
-    setViewingProduct(null);
-    setEditingAsin(product.asin);
-    const retailer = isProductRetailer(product.retailer)
-      ? product.retailer
-      : "amazon";
-    setForm({
-      retailer,
-      productUrl: product.productUrl || product.amazonUrl,
-      externalId: product.externalId ?? "",
-      title: product.title,
-      categoryId: product.category?.id ?? "",
-      referencePrice: String(product.referencePrice),
-      currentPrice: String(product.currentPrice),
-      brand: product.brand ?? "",
-      imageUrl: product.imageUrl ?? "",
-      description: product.description ?? "",
-    });
-    setShowNewCategory(false);
-    setNewCategoryName("");
-    setScrapedDiscount(
-      product.discountPercentage > 0 ? product.discountPercentage : null,
-    );
-    lastScrapedUrl.current = product.productUrl || product.amazonUrl;
-    setMessage(null);
-    setError(null);
-    setOpen(true);
-  }
-
-  function onUrlChange(value: string) {
-    const detected = detectRetailerFromUrl(value);
-    setForm((prev) => ({
-      ...prev,
-      productUrl: value,
-      retailer: detected ?? prev.retailer,
-    }));
-  }
-
-  function onRetailerChange(value: string) {
-    if (!isProductRetailer(value)) return;
-    setForm((prev) => ({ ...prev, retailer: value }));
-  }
-
-  async function createCategory() {
-    const name = newCategoryName.trim();
-    if (!name) {
-      setError("Escribe un nombre para la nueva categoría.");
-      return;
-    }
-
-    setCreatingCategory(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        category?: CategoryOption;
-      };
-      if (!response.ok || !data.ok || !data.category) {
-        setError(data.error ?? "No se pudo crear la categoría.");
-        return;
-      }
-
-      setCategories((prev) => {
-        const without = prev.filter((item) => item.id !== data.category!.id);
-        return [...without, data.category!].sort((a, b) =>
-          a.name.localeCompare(b.name, "es"),
-        );
-      });
-      setForm((prev) => ({ ...prev, categoryId: data.category!.id }));
-      setNewCategoryName("");
-      setShowNewCategory(false);
-      setMessage(`Categoría «${data.category.name}» lista.`);
-    } catch {
-      setError("Error de red al crear la categoría.");
-    } finally {
-      setCreatingCategory(false);
-    }
-  }
-
-  async function scrapeFromUrl(force = false) {
-    const url = form.productUrl.trim();
-    const scrapeInput = url || form.externalId.trim();
-
-    if (!scrapeInput) {
-      if (force) {
-        setError("Pega la URL del producto o su identificador.");
-      }
-      return;
-    }
-
-    if (!formScrapeSupported) {
-      if (force) {
-        setError(
-          `${formRetailerDef.label} no tiene extracción automática. Rellena los campos manualmente.`,
-        );
-      }
-      return;
-    }
-
-    if (!force && lastScrapedUrl.current === scrapeInput) return;
-
-    setScraping(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/products/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productUrl: scrapeInput,
-          retailer: form.retailer,
-        }),
-      });
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        partial?: boolean;
-        warning?: string | null;
-        title?: string | null;
-        brand?: string | null;
-        price?: number | null;
-        listPrice?: number | null;
-        referencePrice?: number | null;
-        discountPercentage?: number | null;
-        productUrl?: string;
-        amazonUrl?: string;
-        asin?: string;
-        externalId?: string;
-        retailer?: ProductRetailer;
-        categorySlug?: string | null;
-        imageUrl?: string | null;
-        description?: string | null;
-      };
-
-      if (!response.ok || !data.ok) {
-        setError(data.error ?? "No se pudo extraer datos de la ficha.");
-        return;
-      }
-
-      if (data.warning) {
-        toast.info(data.warning);
-      }
-
-      lastScrapedUrl.current = data.productUrl ?? data.amazonUrl ?? scrapeInput;
-      const current = data.price;
-      const reference =
-        data.listPrice ??
-        data.referencePrice ??
-        (current != null ? current : null);
-
-      const matchedCategory =
-        data.categorySlug != null
-          ? categories.find((c) => c.slug === data.categorySlug)
-          : undefined;
-
-      setForm((prev) => ({
-        ...prev,
-        retailer: data.retailer ?? prev.retailer,
-        productUrl: data.productUrl ?? data.amazonUrl ?? prev.productUrl,
-        externalId: data.externalId ?? prev.externalId,
-        title: data.title?.trim() || prev.title,
-        brand: data.brand?.trim() || prev.brand,
-        currentPrice: current != null ? String(current) : prev.currentPrice,
-        referencePrice:
-          reference != null ? String(reference) : prev.referencePrice,
-        categoryId: matchedCategory?.id ?? prev.categoryId,
-        imageUrl: data.imageUrl?.trim() || prev.imageUrl,
-        description: data.description?.trim() || prev.description,
-      }));
-      setScrapedDiscount(
-        data.discountPercentage != null && data.discountPercentage > 0
-          ? data.discountPercentage
-          : current != null &&
-              reference != null &&
-              reference > current
-            ? Math.round(((reference - current) / reference) * 10000) / 100
-            : null,
-      );
-
-      const discountLabel =
-        data.discountPercentage != null && data.discountPercentage > 0
-          ? ` · −${Math.round(data.discountPercentage)}%`
-          : "";
-      const partialNote = data.partial ? " (extracción parcial)" : "";
-      setMessage(
-        data.warning
-          ? data.warning
-          : current != null
-            ? `Extraído${partialNote}: ${data.title ?? "sin título"} · oferta ${current.toFixed(2)} €${
-                data.listPrice != null
-                  ? ` (antes ${data.listPrice.toFixed(2)} €)`
-                  : ""
-              }${discountLabel}`
-            : `Título extraído${partialNote}${data.title ? `: ${data.title}` : ""}. Precio no disponible — complétalo manualmente.`,
-      );
-    } catch {
-      setError("Error de red al consultar la tienda.");
-    } finally {
-      setScraping(false);
-    }
-  }
-
-  async function onSave(event: React.FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          retailer: form.retailer,
-          productUrl: form.productUrl,
-          externalId: form.externalId || undefined,
-          title: form.title,
-          categoryId: form.categoryId || undefined,
-          referencePrice: Number(form.referencePrice),
-          currentPrice: form.currentPrice
-            ? Number(form.currentPrice)
-            : undefined,
-          brand: form.brand || undefined,
-          imageUrl: form.imageUrl || undefined,
-          description: form.description || undefined,
-        }),
-      });
-      const data = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || !data.ok) {
-        const message = data.error ?? "No se pudo guardar.";
-        setError(message);
-        toast.error(message);
-        return;
-      }
-      const success = editingAsin
-        ? "Producto actualizado."
-        : "Producto creado / upsert.";
-      setMessage(success);
-      toast.success(success);
-      setForm(emptyForm);
-      setEditingAsin(null);
-      setScrapedDiscount(null);
-      setOpen(false);
-      await load();
-    } catch {
-      setError("Error de red al guardar.");
-      toast.error("Error de red al guardar.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function onDelete(product: AdminProduct) {
     const ok = window.confirm(
@@ -758,20 +485,6 @@ export default function ProductsAdminClient() {
     }
   }
 
-  const liveDiscount = (() => {
-    const current = Number(form.currentPrice);
-    const reference = Number(form.referencePrice);
-    if (
-      Number.isFinite(current) &&
-      Number.isFinite(reference) &&
-      reference > current &&
-      current > 0
-    ) {
-      return Math.round(((reference - current) / reference) * 10000) / 100;
-    }
-    return scrapedDiscount;
-  })();
-
   return (
     <div className="flex min-h-[calc(100dvh-6.5rem)] flex-col md:min-h-[calc(100dvh-5rem)]">
       <AdminPageHeader
@@ -934,274 +647,7 @@ export default function ProductsAdminClient() {
         onEdit={openEdit}
       />
 
-      <AdminSidePanel
-        open={open}
-        onClose={() => setOpen(false)}
-        eyebrow={editingAsin ? "Editar" : "Alta"}
-        title={editingAsin ? "Editar producto" : "Nuevo producto"}
-        size="xl"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="admin-btn admin-btn-ghost"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              form="admin-product-form"
-              disabled={saving}
-              className="admin-btn admin-btn-primary"
-            >
-              {saving
-                ? "Guardando…"
-                : editingAsin
-                  ? "Guardar cambios"
-                  : "Guardar en Supabase"}
-            </button>
-          </>
-        }
-      >
-<form
-            id="admin-product-form"
-            onSubmit={(event) => void onSave(event)}
-            className="grid gap-4 md:grid-cols-2"
-          >
-            <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
-              <label className="text-xs font-semibold text-stone-500">
-                Tienda
-                <select
-                  value={form.retailer}
-                  onChange={(event) => onRetailerChange(event.target.value)}
-                  className="admin-input mt-2"
-                >
-                  {PRODUCT_RETAILERS.map((retailer) => (
-                    <option key={retailer} value={retailer}>
-                      {retailerLabel(retailer)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs font-semibold text-stone-500">
-                ID en tienda
-                <span className="ml-1 font-normal normal-case text-stone-400">
-                  ({formRetailerDef.externalIdHint})
-                </span>
-                <input
-                  value={form.externalId}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      externalId: event.target.value,
-                    }))
-                  }
-                  placeholder={
-                    form.retailer === "amazon" ? "B0XXXXXXXXXX" : "Opcional si está en la URL"
-                  }
-                  className="admin-input mt-2"
-                />
-              </label>
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-stone-500">
-                URL del producto
-                <input
-                  required
-                  value={form.productUrl}
-                  onChange={(event) => onUrlChange(event.target.value)}
-                  onBlur={() => void scrapeFromUrl(false)}
-                  placeholder={formRetailerDef.urlPlaceholder}
-                  className="admin-input mt-2"
-                />
-              </label>
-              {formScrapeSupported ? (
-                <button
-                  type="button"
-                  disabled={
-                    scraping ||
-                    (!form.productUrl.trim() && !form.externalId.trim())
-                  }
-                  onClick={() => void scrapeFromUrl(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-800 hover:underline disabled:opacity-50"
-                >
-                  {scraping ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                  ) : null}
-                  {scraping
-                    ? `Extrayendo de ${formRetailerDef.label}…`
-                    : `Extraer título y precios de ${formRetailerDef.label}`}
-                </button>
-              ) : (
-                <p className="mt-2 text-xs text-stone-500">
-                  {formRetailerDef.label} no tiene extracción automática todavía.
-                  Rellena título y precios manualmente.
-                </p>
-              )}
-            </div>
-            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
-              Título
-              <input
-                required
-                value={form.title}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, title: event.target.value }))
-                }
-                className="admin-input mt-2"
-              />
-            </label>
-
-            <div>
-              <p className="text-xs font-semibold text-stone-500">
-                Categoría
-              </p>
-              <div className="mt-2 flex gap-2">
-                <select
-                  value={form.categoryId}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === "__new__") {
-                      setShowNewCategory(true);
-                      return;
-                    }
-                    setShowNewCategory(false);
-                    setForm((prev) => ({ ...prev, categoryId: value }));
-                  }}
-                  className="admin-input"
-                >
-                  <option value="">Sin categoría</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                  <option value="__new__">+ Nueva categoría…</option>
-                </select>
-              </div>
-              {showNewCategory ? (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    autoFocus
-                    value={newCategoryName}
-                    onChange={(event) => setNewCategoryName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void createCategory();
-                      }
-                    }}
-                    placeholder="Nombre de la categoría"
-                    className="h-11 w-full border border-stone-300 px-3 text-sm text-ink outline-none focus:border-ink"
-                  />
-                  <button
-                    type="button"
-                    disabled={creatingCategory}
-                    onClick={() => void createCategory()}
-                    title="Crear categoría"
-                    className="admin-btn admin-btn-primary shrink-0"
-                  >
-                    {creatingCategory ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="h-3.5 w-3.5" />
-                    )}
-                    Crear
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <label className="text-xs font-semibold text-stone-500">
-              Marca
-              <input
-                value={form.brand}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, brand: event.target.value }))
-                }
-                className="admin-input mt-2"
-              />
-            </label>
-            <label className="text-xs font-semibold text-stone-500">
-              Precio de referencia (€)
-              <input
-                required
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.referencePrice}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    referencePrice: event.target.value,
-                  }))
-                }
-                className="admin-input mt-2"
-              />
-            </label>
-            <label className="text-xs font-semibold text-stone-500">
-              Precio actual / oferta (€)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={form.currentPrice}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    currentPrice: event.target.value,
-                  }))
-                }
-                className="admin-input mt-2"
-              />
-            </label>
-            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
-              URL de imagen
-              <input
-                value={form.imageUrl}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    imageUrl: event.target.value,
-                  }))
-                }
-                placeholder="https://static.carrefour.es/..."
-                className="admin-input mt-2"
-              />
-            </label>
-            {form.imageUrl.trim() ? (
-              <div className="md:col-span-2">
-                <img
-                  src={form.imageUrl.trim()}
-                  alt="Vista previa"
-                  className="h-32 w-32 rounded-sm border border-stone-200 bg-white object-contain p-2"
-                />
-              </div>
-            ) : null}
-            <label className="md:col-span-2 text-xs font-semibold text-stone-500">
-              Descripción
-              <textarea
-                value={form.description}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    description: event.target.value,
-                  }))
-                }
-                rows={4}
-                className="mt-2 w-full border border-stone-300 px-3 py-2 text-sm font-normal normal-case tracking-normal text-ink outline-none focus:border-ink"
-              />
-            </label>
-            {liveDiscount != null && liveDiscount > 0 ? (
-              <p className="md:col-span-2 text-sm text-amber-800">
-                Descuento detectado:{" "}
-                <span className="font-semibold">
-                  −{Math.round(liveDiscount)}%
-                </span>
-              </p>
-            ) : null}
-          </form>
-      </AdminSidePanel>
+      <ProductFormPanel productForm={productForm} categories={categories} />
 
       <div
         ref={tableScrollRef}
