@@ -11,6 +11,7 @@ export const PRODUCT_RETAILERS = [
   "miravia",
   "aliexpress",
   "pccomponentes",
+  "mediamarkt",
 ] as const;
 export type ProductRetailer = (typeof PRODUCT_RETAILERS)[number];
 
@@ -82,6 +83,16 @@ export const RETAILER_DEFINITIONS: RetailerDefinition[] = [
     scrapeSupported: false,
     externalIdHint: "slug de la URL",
   },
+  {
+    id: "mediamarkt",
+    label: "MediaMarkt",
+    hostPatterns: [/mediamarkt\.es/i],
+    urlPlaceholder: "https://www.mediamarkt.es/es/product/_…-1234567.html",
+    // Ficha renderizada en servidor: fetch simple, pero solo desde IP
+    // residencial (a la del VPS le da 403). Ver `requiresResidentialIp`.
+    scrapeSupported: true,
+    externalIdHint: "número final de la URL (…-1234567.html)",
+  },
 ];
 
 /**
@@ -113,7 +124,12 @@ export function alertRetailerSupported(retailer: ProductRetailer): boolean {
  */
 export function requiresResidentialIp(retailer: ProductRetailer): boolean {
   // Carrefour: además de IP residencial exige Chrome con ventana (Cloudflare).
-  return retailer === "pccomponentes" || retailer === "carrefour";
+  // MediaMarkt: fetch simple desde el Mac; a la IP del VPS le da 403.
+  return (
+    retailer === "pccomponentes" ||
+    retailer === "carrefour" ||
+    retailer === "mediamarkt"
+  );
 }
 
 export function getRetailerDefinition(
@@ -165,6 +181,7 @@ export function syntheticAsinForRetailer(
   if (retailer === "miravia") return `MV-${clean}`;
   if (retailer === "aliexpress") return `AE-${clean}`;
   if (retailer === "pccomponentes") return `PCC-${clean}`;
+  if (retailer === "mediamarkt") return `MM-${clean}`;
   return `RT-${clean}`;
 }
 
@@ -211,6 +228,23 @@ export function extractPcComponentesProductId(urlOrId: string): string | null {
   }
 }
 
+export function extractMediaMarktProductId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim();
+  const fromUrl = trimmed.match(/\/product\/[^?#]*?-(\d{5,})\.html/i);
+  if (fromUrl?.[1]) return fromUrl[1];
+
+  if (/^\d{5,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+/** Sin query ni hash: `?promotional_offer`, utm… no cambian el producto. */
+export function normalizeMediaMarktProductUrl(url: string): string {
+  const parsed = new URL(url.trim());
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
 function extractCarrefourProductId(urlOrId: string): string | null {
   const trimmed = urlOrId.trim();
   const skuFromQuery = trimmed.match(/[?&]skuId=(\d+)/i);
@@ -244,6 +278,8 @@ export function extractExternalId(
       return extractAliexpressProductId(trimmed);
     case "pccomponentes":
       return extractPcComponentesProductId(trimmed);
+    case "mediamarkt":
+      return extractMediaMarktProductId(trimmed);
     default:
       return trimmed.length >= 3 ? trimmed : null;
   }
@@ -334,6 +370,7 @@ export const RETAILER_COLORS: Record<string, string> = {
   miravia: "#6C2BD9",
   aliexpress: "#FF4747",
   pccomponentes: "#F26122",
+  mediamarkt: "#DF0000",
 };
 
 export function retailerColor(retailer: string | null | undefined): string {

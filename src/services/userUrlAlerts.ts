@@ -15,6 +15,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase";
 import { scrapeAmazonProductPage } from "@/providers/price";
 import { scrapeKiabiProductPage } from "@/providers/retail/kiabi";
 import { scrapeMiraviaProductPage } from "@/providers/retail/miravia";
+import { scrapeMediaMarktProductPage } from "@/providers/retail/mediamarkt";
 import {
   closeSharedBrowser,
   scrapeAliexpressProductPage,
@@ -173,6 +174,22 @@ async function fetchRetailQuote(
     };
   }
 
+  if (retailer === "mediamarkt") {
+    const quote = await scrapeMediaMarktProductPage(pageUrl, { timeoutMs });
+    return {
+      price: quote.price,
+      previousPrice: quote.listPrice,
+      title: quote.title,
+      productUrl: quote.productUrl,
+      availability:
+        quote.availability === "IN_STOCK"
+          ? ProductAvailability.IN_STOCK
+          : quote.availability === "OUT_OF_STOCK"
+            ? ProductAvailability.OUT_OF_STOCK
+            : ProductAvailability.UNKNOWN,
+    };
+  }
+
   // Tiendas solo alcanzables vía navegador headless (Cloudflare Turnstile /
   // ficha renderizada por JS). Nunca usadas por el recheck masivo de ofertas.
   if (retailer === "aliexpress") {
@@ -249,7 +266,7 @@ export async function runUserUrlAlerts(options?: {
   delayMs?: number;
   /**
    * Tiendas a comprobar en esta corrida. Por defecto, todas menos
-   * PcComponentes y Carrefour (exigen IP residencial y solo corren desde el
+   * PcComponentes, Carrefour y MediaMarkt (exigen IP residencial y solo corren desde el
    * cron local del Mac vía `runUserUrlAlerts({ retailers: [...] })`).
    */
   retailers?: ProductRetailer[];

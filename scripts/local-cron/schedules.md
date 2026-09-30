@@ -13,12 +13,13 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 |-----|-----|-----|-------|
 | `flash-deals` | cada 3 min | cada 10 min | VPS sin Miravia (`CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=0`) |
 | `check-prices` | cada 10 min | cada 10 min | VPS: Miravia por WARP y `CAZAOFERTAS_META_FLUSH=1` (solo el VPS publica en Facebook/Instagram) |
-| `user-alerts` | cada 20 min (35 alertas, 30 s entre cada una) | cada 30 min (40 alertas, 40 s) | Todas las tiendas menos PcComponentes. VPS: drop-ins `/etc/systemd/system/cazaofertas-cron@user-alerts.service.d/pace.conf` (ritmo y `TimeoutStartSec=30min`; el servicio base mata a los 10 min) y `cazaofertas-cron-user-alerts.timer.d/pace.conf` |
+| `user-alerts` | cada 20 min (35 alertas, 30 s entre cada una) | cada 30 min (40 alertas, 40 s) | Todas las tiendas menos PcComponentes, Carrefour y MediaMarkt. VPS: drop-ins `/etc/systemd/system/cazaofertas-cron@user-alerts.service.d/pace.conf` (ritmo y `TimeoutStartSec=30min`; el servicio base mata a los 10 min) y `cazaofertas-cron-user-alerts.timer.d/pace.conf` |
 | `kiabi-deals` | 09:30, 18:30 | 09:30, 18:30 | |
 | `coupons-discover` | 10:00, 18:00 | 10:00, 18:00 | |
 | `miravia-deals` | timer desactivado | cada 30 min | Miravia da captcha a la IP del VPS |
 | `amazon-price-check` | — | cada 5 min | Solo Amazon; respeta la pausa anti-bot |
-| `user-alerts-residential` | — | cada 30 min | Solo PcComponentes |
+| `user-alerts-residential` | — | cada 30 min | PcComponentes, Carrefour y MediaMarkt (10 alertas por corrida) |
+| `mediamarkt-deals` | — | 08:15, 12:15, 16:15, 20:15 | MediaMarkt da 403 a la IP del VPS. Sin avisos salvo `MEDIAMARKT_DEALS_NOTIFY=1` |
 | `admin-digest` | 09:00, 15:00, 21:00 | — | |
 | backup | 03:00 | 04:00 (`pullbackup`, copia al Mac) | |
 

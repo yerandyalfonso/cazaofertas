@@ -1275,7 +1275,7 @@ async function handleWizardTextInput(
     if (!retailer || !alertRetailerSupported(retailer) || !externalId) {
       await sendTelegramMessage({
         chatId,
-        text: "Esa no parece una URL de producto válida (Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes). Pégala de nuevo o cancela con /start.",
+        text: "Esa no parece una URL de producto válida (Amazon, Kiabi, Miravia, AliExpress, Carrefour, PcComponentes o MediaMarkt). Pégala de nuevo o cancela con /start.",
       });
       return true;
     }
@@ -1686,7 +1686,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (!rawText) {
     await sendTelegramMessage({
       chatId,
-      text: "Envía una palabra clave o pega una URL de producto (Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes), o usa «Crear alerta» en el menú.",
+      text: "Envía una palabra clave o pega una URL de producto (Amazon, Kiabi, Miravia, AliExpress, Carrefour, PcComponentes o MediaMarkt), o usa «Crear alerta» en el menú.",
     });
     return;
   }
@@ -1705,7 +1705,7 @@ export async function handleNewAlert(message: TelegramMessage): Promise<void> {
   if (isUrlAlert && !asin) {
     await sendTelegramMessage({
       chatId,
-      text: "No pude extraer el identificador de esa URL. Pega un enlace de producto de Amazon, Kiabi, Miravia, AliExpress, Carrefour o PcComponentes.",
+      text: "No pude extraer el identificador de esa URL. Pega un enlace de producto de Amazon, Kiabi, Miravia, AliExpress, Carrefour, PcComponentes o MediaMarkt.",
     });
     return;
   }

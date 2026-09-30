@@ -16,6 +16,7 @@ type LocalCronJob =
   | "user-alerts"
   | "user-alerts-residential"
   | "kiabi-deals"
+  | "mediamarkt-deals"
   | "telegram-flush"
   | "coupons-discover"
   | "admin-digest"
@@ -29,6 +30,7 @@ const JOBS: LocalCronJob[] = [
   "user-alerts",
   "user-alerts-residential",
   "kiabi-deals",
+  "mediamarkt-deals",
   "telegram-flush",
   "coupons-discover",
   "admin-digest",
@@ -224,7 +226,8 @@ async function runUserAlerts(): Promise<void> {
 /**
  * Alertas de tiendas que solo pasan el bloqueo anti-bot desde IP residencial
  * (PcComponentes: Cloudflare Turnstile bloquea la IP del VPS aunque se use
- * navegador headless real). Corre solo desde el Mac.
+ * navegador headless real; MediaMarkt da 403 a la IP del VPS). Corre solo
+ * desde el Mac.
  */
 async function runUserAlertsResidential(): Promise<void> {
   const { runUserUrlAlerts } = await import("@/services/userUrlAlerts");
@@ -232,7 +235,7 @@ async function runUserAlertsResidential(): Promise<void> {
   const result = await runUserUrlAlerts({
     limit: 10,
     delayMs: 3_000,
-    retailers: ["pccomponentes", "carrefour"],
+    retailers: ["pccomponentes", "carrefour", "mediamarkt"],
   });
   console.log(JSON.stringify(result, null, 2));
   await reviewUserAlertsResult(result);
@@ -244,6 +247,28 @@ async function runUserAlertsResidential(): Promise<void> {
     console.log("carrefour images", await backfillCarrefourProductImages());
   } catch (error) {
     console.warn("[user-alerts-residential] fotos Carrefour:", error);
+  }
+}
+
+/**
+ * Rebajas MediaMarkt desde los listados de categoría. Solo Mac: a la IP del
+ * VPS MediaMarkt le da 403. `MEDIAMARKT_DEALS_DRY_RUN=1` no escribe nada;
+ * `MEDIAMARKT_DEALS_NOTIFY=1` avisa al canal y a las alertas de usuario.
+ */
+async function runMediaMarktDeals(): Promise<void> {
+  const { runMediaMarktDealsCheck } = await import("@/services/mediamarktDeals");
+  const result = await runMediaMarktDealsCheck({
+    limit: Number(process.env.MEDIAMARKT_DEALS_LIMIT) || 20,
+    dryRun: process.env.MEDIAMARKT_DEALS_DRY_RUN === "1",
+    // Sin historial, cada producto nuevo sale como «mínimo histórico»: los
+    // avisos al canal se activan a mano cuando el catálogo ya tenga base.
+    notify: process.env.MEDIAMARKT_DEALS_NOTIFY === "1",
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.discovery.pagesFetched === 0 && result.discovery.feedErrors.length > 0) {
+    throw new Error(
+      `MediaMarkt: ningún listado cargó (${result.discovery.feedErrors[0]!.message})`,
+    );
   }
 }
 
@@ -323,6 +348,9 @@ async function main(): Promise<void> {
       break;
     case "kiabi-deals":
       await runKiabiDeals();
+      break;
+    case "mediamarkt-deals":
+      await runMediaMarktDeals();
       break;
     case "telegram-flush":
       await runTelegramFlush();

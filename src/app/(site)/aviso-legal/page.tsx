@@ -72,7 +72,7 @@ export default function AvisoLegalPage() {
         </p>
         <p>
           También podemos enlazar a otras tiendas (como AliExpress, Miravia,
-          PcComponentes, Carrefour o Kiabi) a través de sus propios programas
+          PcComponentes, MediaMarkt, Carrefour o Kiabi) a través de sus propios programas
           de afiliación. En todos los casos:
         </p>
         <ul className="list-disc space-y-2 pl-5">

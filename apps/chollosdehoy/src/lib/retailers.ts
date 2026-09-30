@@ -5,6 +5,7 @@ export const RETAILER_LABELS: Record<string, string> = {
   miravia: "Miravia",
   aliexpress: "AliExpress",
   pccomponentes: "PcComponentes",
+  mediamarkt: "MediaMarkt",
 };
 
 /** Color de marca de cada tienda: variables CSS definidas en globals.css. */
@@ -15,6 +16,7 @@ export const RETAILER_COLORS: Record<string, string> = {
   miravia: "var(--retailer-miravia)",
   aliexpress: "var(--retailer-aliexpress)",
   pccomponentes: "var(--retailer-pccomponentes)",
+  mediamarkt: "var(--retailer-mediamarkt)",
 };
 
 /** Color de una tienda, o el primario si no tiene uno propio. */

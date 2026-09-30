@@ -90,7 +90,7 @@ export async function runRetailPriceCheck(options?: {
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  const retailers = ["miravia", "kiabi", "carrefour"].filter(
+  const retailers = ["miravia", "kiabi", "carrefour", "mediamarkt"].filter(
     (retailer) => !skipRetailers.includes(retailer),
   );
 

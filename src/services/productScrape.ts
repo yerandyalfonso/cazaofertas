@@ -17,6 +17,7 @@ import { roundMoney } from "@/lib/money";
 import { previewAmazonProductPage } from "@/providers/price";
 import { scrapeKiabiProductPage } from "@/providers/retail/kiabi";
 import { scrapeMiraviaProductPage } from "@/providers/retail/miravia";
+import { scrapeMediaMarktProductPage } from "@/providers/retail/mediamarkt";
 
 export interface ProductPagePreview {
   retailer: ProductRetailer;
@@ -188,6 +189,38 @@ export async function previewProductPage(
       warning:
         quote.price == null
           ? "Miravia: no se pudo leer el precio de la ficha; completa manualmente."
+          : null,
+    };
+  }
+
+  if (retailer === "mediamarkt") {
+    const quote = await scrapeMediaMarktProductPage(trimmed, {
+      timeoutMs: options.timeoutMs ?? 18_000,
+    });
+    // El recheck masivo marca agotado al ver «agotado» en el error.
+    if (quote.availability === "OUT_OF_STOCK") {
+      throw new Error("MediaMarkt: producto agotado.");
+    }
+
+    return {
+      retailer: "mediamarkt",
+      externalId: quote.externalId,
+      asin: syntheticAsinForRetailer("mediamarkt", quote.externalId),
+      title: quote.title,
+      brand: quote.brand ?? null,
+      price: quote.price,
+      listPrice: quote.listPrice,
+      referencePrice: quote.listPrice ?? quote.price,
+      discountPercentage: quote.discountPercentage,
+      productUrl: quote.productUrl,
+      imageUrl: quote.imageUrl ?? null,
+      categorySlug: null,
+      breadcrumbs: [],
+      description: quote.description ?? null,
+      partial: quote.price == null,
+      warning:
+        quote.price == null
+          ? "MediaMarkt: no se pudo leer el precio de la ficha; completa manualmente."
           : null,
     };
   }
