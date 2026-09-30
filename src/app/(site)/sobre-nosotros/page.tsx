@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BLOG_AUTHOR } from "@/lib/legal";
 import { buildPageMetadata } from "@/lib/seo";
 import { telegramBotUrl } from "@/lib/telegram-links";
 
@@ -51,6 +52,22 @@ export default function AboutPage() {
           vigilamos por ti.
         </p>
       </div>
+
+      {BLOG_AUTHOR.pseudonym ? (
+        <section className="mt-16 border-t border-ink pt-10">
+          <h2 className="font-display text-3xl tracking-tight text-ink md:text-4xl">
+            Quién escribe
+          </h2>
+          <p className="mt-6 font-display text-2xl italic text-ink">
+            {BLOG_AUTHOR.pseudonym}
+          </p>
+          <div className="mt-4 space-y-4 text-lg leading-relaxed text-stone-700">
+            {BLOG_AUTHOR.bio.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-16 border-t border-ink pt-10">
         <h2 className="font-display text-3xl tracking-tight text-ink md:text-4xl">

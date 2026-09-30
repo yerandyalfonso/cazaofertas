@@ -515,13 +515,44 @@ export async function searchProducts(
   return data.map((row) => mapProduct(row));
 }
 
+/** Ofertas que la página de categoría pinta en el HTML; el resto llega por tandas. */
+export const CATEGORY_FIRST_PAGE = 48;
+
+/** Tamaño de cada tanda que pide la rejilla al hacer scroll. */
+export const CATEGORY_PAGE_SIZE = 24;
+
+const CATEGORY_CACHE_TTL_MS = 60_000;
+const categoryProductsCache = new Map<
+  string,
+  { expires: number; products: Promise<CatalogProduct[]> }
+>();
+
 /**
- * Ofertas de una categoría raíz (incluye sus subcategorías), mejor puntuadas
- * primero. Consulta directa por categoría: no depende del top global.
+ * Todas las ofertas activas de una categoría raíz (incluye sus subcategorías),
+ * mejor puntuadas primero. Consulta directa por categoría: no depende del top
+ * global. Se guarda un minuto en memoria para que las tandas del scroll no
+ * repitan la consulta (no cabe en `unstable_cache`: las grandes pasan de 2 MB).
  */
-export async function getCategoryProducts(
+export function getCategoryProducts(
   rootSlug: string,
-  limit = 480,
+): Promise<CatalogProduct[]> {
+  const now = Date.now();
+  const cached = categoryProductsCache.get(rootSlug);
+  if (cached && cached.expires > now) return cached.products;
+
+  const products = loadCategoryProducts(rootSlug).catch((error) => {
+    categoryProductsCache.delete(rootSlug);
+    throw error;
+  });
+  categoryProductsCache.set(rootSlug, {
+    expires: now + CATEGORY_CACHE_TTL_MS,
+    products,
+  });
+  return products;
+}
+
+async function loadCategoryProducts(
+  rootSlug: string,
 ): Promise<CatalogProduct[]> {
   const client = getClient();
   if (!client) return [];
@@ -542,19 +573,26 @@ export async function getCategoryProducts(
     .map((cat) => cat.id);
   if (ids.length === 0) return [];
 
-  const { data, error } = await client
-    .from("products")
-    .select(CATEGORY_SELECT)
-    .eq("is_active", true)
-    .in("category_id", ids)
-    .order("discount_percentage", { ascending: false, nullsFirst: false })
-    .limit(limit);
-  if (error || !data) {
-    console.error("[catalog] getCategoryProducts", error?.message);
-    return [];
+  // Supabase devuelve como mucho 1.000 filas por consulta: se lee por páginas.
+  const PAGE = 1000;
+  const rows: ProductWithCategory[] = [];
+  for (let from = 0; from < 20_000; from += PAGE) {
+    const { data, error } = await client
+      .from("products")
+      .select(CATEGORY_SELECT)
+      .eq("is_active", true)
+      .in("category_id", ids)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error || !data) {
+      console.error("[catalog] getCategoryProducts", error?.message);
+      break;
+    }
+    rows.push(...(data as ProductWithCategory[]));
+    if (data.length < PAGE) break;
   }
 
-  return data
+  return rows
     .map((row) => mapProduct(row))
     .sort(
       (a, b) =>

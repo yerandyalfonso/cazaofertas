@@ -4,12 +4,12 @@ import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/JsonLd";
 import { CategoryHero } from "@/components/CategoryHero";
 import { ProductGridProgressive } from "@/components/ProductGridProgressive";
-import { getCategories, getCategoryProducts } from "@/lib/catalog";
+import { CATEGORY_FIRST_PAGE, getCategories } from "@/lib/catalog";
+import { getCategoryListing } from "@/lib/category-listing";
 import {
   categoryPublicPath,
   getBlogCategory,
   getSubcategoryByPath,
-  productMatchesSubcategory,
   PRODUCT_SUBCATEGORIES,
 } from "@/lib/site-categories";
 import {
@@ -60,18 +60,15 @@ export default async function SubcategoryDetailPage({
   const parent = getBlogCategory(slug);
   if (!sub || !parent) notFound();
 
-  const [categories, products] = await Promise.all([
+  const [categories, listing] = await Promise.all([
     getCategories(),
-    getCategoryProducts(slug),
+    getCategoryListing(slug, child),
   ]);
   const parentCategory = categories.find((item) => item.slug === slug);
   if (!parentCategory) notFound();
 
-  const filtered = products
-    .filter((product) =>
-      productMatchesSubcategory(product.category, parent.slug, sub),
-    )
-    .sort((a, b) => b.dealScore - a.dealScore);
+  const filtered = listing ?? [];
+  const firstPage = filtered.slice(0, CATEGORY_FIRST_PAGE);
 
   const path = categoryPublicPath(parent.slug, sub.slug);
 
@@ -88,7 +85,7 @@ export default async function SubcategoryDetailPage({
           itemListJsonLd({
             name: `Ofertas de ${sub.name}`,
             path,
-            items: filtered.map((product) => ({
+            items: firstPage.map((product) => ({
               name: product.title,
               path: `/producto/${product.slug}`,
             })),
@@ -120,7 +117,12 @@ export default async function SubcategoryDetailPage({
 
       <section className="mt-12">
         {filtered.length > 0 ? (
-          <ProductGridProgressive products={filtered} />
+          <ProductGridProgressive
+            products={firstPage}
+            total={filtered.length}
+            categorySlug={parent.slug}
+            childSlug={child}
+          />
         ) : (
           <p className="text-sm text-stone-600">
             Todavía no hay productos en esta subcategoría.{" "}

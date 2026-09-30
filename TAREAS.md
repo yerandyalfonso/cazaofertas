@@ -8,14 +8,22 @@ Lista viva de trabajo pendiente. Marca con `[x]` al terminar y añade la fecha.
 - [x] 2026-09-26 Corregir el artículo «5 productos básicos para la limpieza del hogar»: FAQ con texto de prueba («wewewe», «qeqe») y enlace a `127.0.0.1` en el primer H2.
 - [x] 2026-09-26 Seed: ya no siembra artículos en `seed`//api/seed; `seed:blog` solo inserta los que falten como borrador, sin sobrescribir.
 - [ ] Ampliar a 1.500+ palabras las guías que se quieran posicionar mejor.
-- [x] 2026-09-29 Rediseño de la web pública y nueva marca «Una mica de tot» (rama `rediseno-blog-una-mica-de-tot`, falta integrar en `main` y desplegar). Detalle en `docs/diseno-una-mica-de-tot.md`. Arreglado de paso: el filtro por categoría de Ofertas no mostraba nada (comparaba subcategoría con categoría raíz), las categorías mostraban solo las ofertas del top global (Bebé: 18 de 774) y los recuentos se cortaban en 1.000 filas.
-- [ ] Temas del blog: «Guías» y «Comparativas» son formatos, no temas. Recategorizar esos artículos (Hogar, Bebé, Cocina…) o añadir un campo «formato» aparte.
-- [ ] Personalizar `/sobre-nosotros` con quién escribe el blog (hoy es un texto genérico).
-- [ ] Categorías con más de 480 ofertas: solo se cargan las 480 mejores; paginar en el servidor si se quieren todas.
+- [x] 2026-09-29 Rediseño de la web pública y nueva marca «Una mica de tot» (integrado en `main` y desplegado; comprobado el 30-09). Detalle en `docs/diseno-una-mica-de-tot.md`. Arreglado de paso: el filtro por categoría de Ofertas no mostraba nada (comparaba subcategoría con categoría raíz), las categorías mostraban solo las ofertas del top global (Bebé: 18 de 774) y los recuentos se cortaban en 1.000 filas.
+- [x] 2026-09-30 Temas del blog: los 24 artículos publicados pasan a Hogar, Cocina, Bebé, Tecnología, Belleza, Mascotas, Ocio y Compras (cambiado en la BD). El formato ya lo da la plantilla (Guía de compra, Comparativa rápida…); elegir plantilla en el editor ya no cambia el tema.
+- [x] 2026-09-30 `/sobre-nosotros`: sección «Quién escribe», visible en cuanto se rellene `BLOG_AUTHOR` en `src/lib/legal.ts`.
+- [ ] Elegir el seudónimo del autor y escribir su bio (`BLOG_AUTHOR` en `src/lib/legal.ts`).
+- [ ] Datos del titular para el aviso legal (LSSI, art. 10): nombre, NIF y domicilio (`LEGAL_OWNER` en `src/lib/legal.ts`). Obligatorio al tener ingresos por afiliación.
+- [ ] Email de contacto del blog (derechos de privacidad y contacto): `LEGAL_OWNER.email` en `src/lib/legal.ts`.
+- [x] 2026-09-30 Aviso legal y privacidad reescritos tras revisar blogs de afiliados parecidos: resumen al inicio, afiliación de Amazon y otras tiendas, precios, cookies (no hay de publicidad ni analítica: Umami sin cookies), tabla de datos por uso, proveedores (Contabo, Francia), derechos y AEPD.
+- [x] 2026-09-30 Categorías sin tope de 480: el HTML trae las 48 mejores y el resto llega por tandas de 24 desde `/api/categorias/productos` (lista de la categoría en memoria 1 min).
+- [ ] SEO del blog en Google: dar de alta `blog.chollosdhoy.com` en Google Search Console (si se crea la propiedad de dominio `chollosdhoy.com` del marketplace, ya cubre el subdominio) y enviar `https://blog.chollosdhoy.com/sitemap.xml`.
+- [ ] SEO del blog en Bing: dar de alta en Bing Webmaster (importar desde Google) y enviar el sitemap del blog.
+- [ ] IndexNow en el blog: avisar a Bing al publicar o actualizar un artículo.
+- [ ] Cambiar el dominio del blog (hoy `blog.chollosdhoy.com`) cuando haya uno nuevo. Sitios donde aparece: `NEXT_PUBLIC_SITE_URL` en el `.env.local` del VPS, el Caddyfile del VPS (`/etc/caddy/Caddyfile`), el DNS, `src/lib/site.ts` (dominio de reserva), `src/services/carrefourDeals.ts` y `apps/chollosdehoy/src/lib/guides.ts` y `NEXT_PUBLIC_BLOG_URL` del marketplace (enlaces del marketplace al blog). Después: redirección 301 del dominio viejo al nuevo, cambio de dirección en Search Console y Bing, y revisar los enlaces ya publicados en Telegram y Facebook. Antes de hacerlo, buscar `blog.chollosdhoy` en el código y en el VPS por si aparece en algún sitio más.
 - [ ] Gráfico de historial de precios en la ficha (datos ya disponibles en `getPriceHistory`).
 - [x] 2026-09-26 SEO del blog: JSON-LD `FAQPage` para los bloques de preguntas frecuentes (desplegado 26-09).
-- [x] 2026-09-26 Avisos de SEO en el editor: longitud del título y la descripción, imagen destacada y `alt` de las imágenes (falta desplegar).
-- [x] 2026-09-26 Enlazado interno blog ↔ marketplace (desplegado 26-09): el artículo enlaza a la categoría del marketplace de sus productos, y las categorías del marketplace muestran «Guías relacionadas». Los artículos sin productos (guías de Amazon) no llevan enlace.
+- [x] 2026-09-26 Avisos de SEO en el editor: longitud del título y la descripción, imagen destacada y `alt` de las imágenes (desplegado; comprobado el 30-09).
+- [x] 2026-09-26 Enlazado interno blog ↔ marketplace (desplegado 26-09): el artículo enlaza a la categoría de sus productos (desde el 30-09, a las ofertas del propio blog, `/categorias/<slug>`, no al marketplace), y las categorías del marketplace muestran «Guías relacionadas». Los artículos sin productos (guías de Amazon) no llevan enlace.
 
 ## Marketplace (chollosdhoy.com)
 

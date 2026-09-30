@@ -192,12 +192,7 @@ function formatDate(value: string | null | undefined): string {
   return value.slice(0, 10);
 }
 
-const FEATURED_CATEGORIES = new Set([
-  "Comparativas",
-  "Guías",
-  "Tecnología",
-  "Hogar",
-]);
+const FEATURED_CATEGORIES = new Set(["Tecnología", "Hogar", "Cocina", "Bebé"]);
 
 function enrichFromFallback(post: BlogPost): BlogPost {
   const fallback = BLOG_POSTS.find((item) => item.slug === post.slug);

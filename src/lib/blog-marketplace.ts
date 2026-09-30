@@ -1,16 +1,15 @@
 import type { CatalogProduct } from "@/lib/catalog";
-import { marketplaceAbsoluteUrl } from "@/lib/site";
 
 export interface ArticleMarketplaceCategory {
   slug: string;
   name: string;
-  /** Listado de la categoría en el marketplace (chollosdhoy.com). */
+  /** Listado de ofertas de la categoría en el propio blog. */
   href: string;
 }
 
 /**
  * Categoría padre más repetida entre los productos del artículo. La etiqueta
- * del artículo («Guías», «Comparativas») no sirve: es editorial, no de
+ * del artículo (su tema: «Hogar», «Compras»…) no sirve: es editorial, no de
  * producto. Empate → la del primer producto que aparece.
  */
 export function resolveArticleMarketplaceCategory(
@@ -36,6 +35,6 @@ export function resolveArticleMarketplaceCategory(
   return {
     slug: best.slug,
     name: best.name,
-    href: marketplaceAbsoluteUrl(`/categoria/${best.slug}`),
+    href: `/categorias/${best.slug}`,
   };
 }

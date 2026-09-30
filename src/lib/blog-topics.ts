@@ -1,4 +1,4 @@
-/** Slug de un tema del blog a partir de la categoría del artículo («Guías» → «guias»). */
+/** Slug de un tema del blog a partir de la categoría del artículo («Bebé» → «bebe»). */
 export function topicSlug(name: string): string {
   return name
     .normalize("NFD")

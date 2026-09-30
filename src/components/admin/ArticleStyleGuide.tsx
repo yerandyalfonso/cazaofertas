@@ -116,9 +116,6 @@ export function ArticleStyleGuide({
               <p className="font-display text-lg tracking-tight text-ink">
                 {outline.label}
               </p>
-              <p className="mt-1 text-xs text-stone-500">
-                Categoría sugerida: {outline.category}
-              </p>
               {outline.pullQuoteExample ? (
                 <p className="mt-3 border-l-2 border-teal-700/50 pl-3 font-display text-base text-stone-700">
                   “{outline.pullQuoteExample}”

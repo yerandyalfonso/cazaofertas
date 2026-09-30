@@ -75,7 +75,7 @@ const CORE_BLOG_POSTS: BlogPost[] = [
     title: "Comparativa rápida: auriculares ANC por menos de 100 €",
     excerpt:
       "Cancelación de ruido sin pagar el precio de lanzamiento. Tres opciones con bajada real y ficha de compra integrada.",
-    category: "Comparativas",
+    category: "Tecnología",
     readingTime: "8 min",
     publishedAt: "2026-08-12",
     featured: true,
@@ -150,7 +150,7 @@ const CORE_BLOG_POSTS: BlogPost[] = [
     title: "Cómo detectar un chollo real (y no caer en descuentos fantasma)",
     excerpt:
       "No toda bajada es una oferta. Te explicamos qué miramos: mínimo histórico, estabilidad y porcentaje útil.",
-    category: "Guías",
+    category: "Compras",
     readingTime: "6 min",
     publishedAt: "2026-08-20",
     featured: true,
@@ -224,7 +224,7 @@ const CORE_BLOG_POSTS: BlogPost[] = [
     title: "Las mejores categorías para configurar alertas en Telegram",
     excerpt:
       "Tecnología, informática y hogar concentran las caídas más claras. Así priorizamos filtros.",
-    category: "Telegram",
+    category: "Compras",
     readingTime: "4 min",
     publishedAt: "2026-08-18",
     featured: false,

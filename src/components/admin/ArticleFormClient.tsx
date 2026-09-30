@@ -38,15 +38,17 @@ function productThumb(url: string | null | undefined): string | null {
   return `/api/admin/image-proxy?url=${encodeURIComponent(url.trim())}`;
 }
 
+/** Temas del blog. El formato (guía, comparativa…) lo da la plantilla. */
 const CATEGORIES = [
-  "Comparativas",
-  "Guías",
-  "Tecnología",
   "Hogar",
+  "Cocina",
+  "Bebé",
+  "Tecnología",
   "Belleza",
+  "Mascotas",
+  "Ocio",
   "Deportes",
-  "Ofertas",
-  "Análisis",
+  "Compras",
 ] as const;
 
 function slugify(value: string): string {
@@ -76,7 +78,7 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
   const [excerpt, setExcerpt] = useState("");
   const [featuredImage, setFeaturedImage] = useState("");
   const [author, setAuthor] = useState(BLOG_NAME);
-  const [category, setCategory] = useState("Ofertas");
+  const [category, setCategory] = useState("Hogar");
   const [status, setStatus] = useState("draft");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
@@ -184,9 +186,6 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     const option = ARTICLE_TEMPLATE_OPTIONS.find((t) => t.id === next);
     if (!option) return;
     setTemplate(next);
-    if (!isEdit || !slugTouched) {
-      setCategory(option.defaultCategory);
-    }
   }
 
   function applyQuickImport(result: QuickImportResult) {
@@ -197,7 +196,6 @@ export function ArticleFormClient({ articleId }: { articleId?: string }) {
     }
     if (result.excerpt) setExcerpt(result.excerpt);
     if (result.pullQuote) setPullQuote(result.pullQuote);
-    if (result.category) setCategory(result.category);
     setBlocks(result.blocks);
     setEditorResetKey((key) => key + 1);
     if (result.featuredImage) {

@@ -5,6 +5,7 @@ import { CategoryHero } from "@/components/CategoryHero";
 import { ProductGridProgressive } from "@/components/ProductGridProgressive";
 import { RelatedArticles } from "@/components/blog/RelatedArticles";
 import {
+  CATEGORY_FIRST_PAGE,
   getCategories,
   getCategoryProducts,
   getCategoryShowcases,
@@ -68,6 +69,7 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
   if (!category) notFound();
 
   const filtered = products;
+  const firstPage = filtered.slice(0, CATEGORY_FIRST_PAGE);
   const copy = categorySeoCopy(category.slug, category.name);
   const intro = category.description?.trim() || copy.intro;
   const subcategories = PRODUCT_SUBCATEGORIES.filter(
@@ -89,7 +91,7 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
           itemListJsonLd({
             name: `Ofertas de ${category.name}`,
             path: `/categorias/${category.slug}`,
-            items: filtered.map((product) => ({
+            items: firstPage.map((product) => ({
               name: product.title,
               path: `/producto/${product.slug}`,
             })),
@@ -127,7 +129,11 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
 
       <section className={articles.length > 0 ? "mt-16 border-t border-stone-300 pt-12" : "mt-12"}>
         {filtered.length > 0 ? (
-          <ProductGridProgressive products={filtered} />
+          <ProductGridProgressive
+            products={firstPage}
+            total={filtered.length}
+            categorySlug={category.slug}
+          />
         ) : (
           <p className="text-sm text-stone-600">
             Todavía no hay productos activos en esta categoría. Vuelve pronto o

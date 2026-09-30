@@ -25,7 +25,7 @@ export function getSiteUrl(): string {
     return normalizeSiteBase(explicit);
   }
 
-  return vercelProductionSiteUrl() ?? "https://cazaofertas-olive.vercel.app";
+  return vercelProductionSiteUrl() ?? "https://blog.chollosdhoy.com";
 }
 
 export function absoluteUrl(path: string): string {

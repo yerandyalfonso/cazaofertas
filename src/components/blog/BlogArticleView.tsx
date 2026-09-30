@@ -82,7 +82,7 @@ export function BlogArticleView({
 
       <div className="mt-20 space-y-6 md:mt-24">
         {marketplaceCategory ? (
-          <a
+          <Link
             href={marketplaceCategory.href}
             className="flex items-center justify-between gap-4 border border-stone-300 bg-paper px-6 py-5 transition hover:border-ink"
           >
@@ -97,7 +97,7 @@ export function BlogArticleView({
             <span aria-hidden className="text-2xl text-ink">
               →
             </span>
-          </a>
+          </Link>
         ) : null}
         <TelegramCategoryCta
           category={marketplaceCategory?.name ?? post.category}

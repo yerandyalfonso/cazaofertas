@@ -13,7 +13,6 @@ export interface QuickImportTemplate {
   blogTemplate: BlogTemplate;
   label: string;
   description: string;
-  defaultCategory: string;
   /** Texto de ejemplo listo para copiar/pegar. */
   sample: string;
   /** Líneas de ayuda visual (formato de etiquetas). */
@@ -26,7 +25,6 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     blogTemplate: "product-analysis",
     label: "Review / Análisis",
     description: "Título, extracto, H2s, pros/contras y veredicto.",
-    defaultCategory: "Análisis",
     guideLines: [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
@@ -69,7 +67,6 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     blogTemplate: "deep-guide",
     label: "Guía / Listado",
     description: "Título, extracto, introducción y puntos clave numerados.",
-    defaultCategory: "Guías",
     guideLines: [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
@@ -122,7 +119,6 @@ export const QUICK_IMPORT_TEMPLATES: QuickImportTemplate[] = [
     blogTemplate: "flash-deal",
     label: "Noticia / Chollo Flash",
     description: "Título, extracto, precios y llamada a la acción.",
-    defaultCategory: "Ofertas",
     guideLines: [
       "[TÍTULO]: …",
       "[EXTRACTO]: …",
@@ -169,7 +165,6 @@ export function quickImportIdForBlogTemplate(
 
 export interface QuickImportResult {
   template: BlogTemplate;
-  category: string;
   title: string;
   excerpt: string;
   pullQuote: string;
@@ -591,7 +586,6 @@ export function parseQuickImport(
 
   return {
     template: preset.blogTemplate,
-    category: preset.defaultCategory,
     title,
     excerpt,
     pullQuote,

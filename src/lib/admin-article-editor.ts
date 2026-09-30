@@ -15,7 +15,6 @@ export interface ArticleTemplateOption {
   id: BlogTemplate;
   label: string;
   description: string;
-  defaultCategory: string;
   seedBlocks: () => BlogBlock[];
   seedPullQuote?: string;
   seedPros?: string[];
@@ -28,7 +27,6 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
     label: "Chollo Flash",
     description:
       "Oferta urgente: gancho, por qué es chollo, ficha de compra y aviso de stock.",
-    defaultCategory: "Ofertas",
     seedPullQuote: "Si el score es alto y el precio toca mínimo, actúa rápido.",
     seedBlocks: () => [
       {
@@ -69,7 +67,6 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
     label: "Review / Análisis",
     description:
       "Análisis de producto con pros, contras y veredicto de compra.",
-    defaultCategory: "Análisis",
     seedPros: [
       "Punto fuerte 1",
       "Punto fuerte 2",
@@ -130,7 +127,6 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
     label: "Guía de Compra",
     description:
       "Guía estructurada con criterios, errores habituales y recomendación final.",
-    defaultCategory: "Guías",
     seedPullQuote: "Define el uso real antes de mirar el cartel de descuento.",
     seedBlocks: () => [
       {
@@ -225,7 +221,6 @@ export const ARTICLE_TEMPLATE_OPTIONS: ArticleTemplateOption[] = [
     label: "Comparativa rápida",
     description:
       "Tabla mental de opciones: tres candidatos y cuándo elegir cada uno.",
-    defaultCategory: "Comparativas",
     seedBlocks: () => [
       {
         type: "heading",
@@ -572,7 +567,6 @@ export function createBlankEditorBlocks(): EditorBlock[] {
 /** Resumen estático de la estructura recomendada (solo consulta). */
 export function getTemplateStyleOutline(template: BlogTemplate): {
   label: string;
-  category: string;
   pullQuoteExample?: string;
   sections: Array<{ kind: string; text: string }>;
 } {
@@ -615,7 +609,6 @@ export function getTemplateStyleOutline(template: BlogTemplate): {
   });
   return {
     label: option.label,
-    category: option.defaultCategory,
     pullQuoteExample: option.seedPullQuote,
     sections,
   };
