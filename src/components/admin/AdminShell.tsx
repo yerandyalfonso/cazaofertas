@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  Bell,
   FileText,
   FolderTree,
   GalleryHorizontal,
@@ -39,6 +40,7 @@ const NAV_GROUPS: Array<{
       { href: "/admin/coupons", label: "Cupones", icon: Ticket },
       { href: "/admin/categories", label: "Categorías", icon: FolderTree },
       { href: "/admin/keywords", label: "Keywords", icon: Tag },
+      { href: "/admin/alerts", label: "Alertas", icon: Bell },
     ],
   },
   {
