@@ -30,6 +30,8 @@ export function mapAwinAdvertiserToRetailer(name: string): string {
   if (/\bamazon\b/.test(n)) return "amazon";
   if (/\bkiabi\b/.test(n)) return "kiabi";
   if (/\bcarrefour\b/.test(n)) return "carrefour";
+  if (/\bmedia\s?markt\b/.test(n)) return "mediamarkt";
+  if (/\bpc\s?componentes\b/.test(n)) return "pccomponentes";
   if (/\bmiravia\b|\baliexpress\b/.test(n)) return "miravia";
   return slugifyRetailer(name);
 }

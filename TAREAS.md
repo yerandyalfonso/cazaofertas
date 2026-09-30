@@ -107,7 +107,7 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### AliExpress
 
-- [ ] Las alertas de AliExpress usan el Chromium headless de Playwright (`withBrowserPage`), que no está instalado en el Mac (`~/Library/Caches/ms-playwright` no existe); en el VPS sí. Hoy no hay alertas de AliExpress, así que no falla nada, pero en el Mac fallarían al arrancar. Arreglo: `npx playwright install chromium` en el Mac o sacar AliExpress del `user-alerts` del Mac.
+- [x] 2026-09-30 Chromium de Playwright instalado en el Mac (`npx playwright install chromium`): las alertas de AliExpress (`withBrowserPage`) fallaban al arrancar en el Mac. Probado con 2 fichas reales.
 
 ### Kiabi
 
@@ -124,7 +124,7 @@ Alertas de usuario por URL (`user-alerts-residential`) y job de ofertas `pccompo
 
 - [ ] Decidir si se activan los avisos del job (`PCCOMPONENTES_DEALS_NOTIFY=1` en el `.env.local` del Mac). Hoy apagados: el tachado es el PVPR del fabricante, que suele estar inflado (en la prueba, 145 de 236 productos con ≥15 % y muchos por encima del 50 %). Si se activan, subir el descuento mínimo en admin → Ajustes (p. ej. 30 %).
 - [ ] Revisar tras las primeras corridas reales (log `~/Library/Logs/cazaofertas/pccomponentes-deals.log`) cuántos productos entran y si las categorías se asignan bien fuera de Tecnología/Informática.
-- [ ] Afiliación: los enlaces van directos a pccomponentes.com. Si se entra en su programa, rellenar `affiliate_url`.
+- [ ] Afiliación: darse de alta en el programa de PcComponentes (si está en Awin) y poner `AWIN_MID_PCCOMPONENTES` en el `.env.local` del VPS (ver MediaMarkt: el código ya está listo).
 - [x] 2026-09-30 Ficha con Google Chrome con ventana (antes Chromium headless, que Cloudflare bloquea en la ficha y que además no estaba instalado en el Mac: toda alerta fallaba al arrancar). Espera a que Cloudflare resuelva el reto («Un momento…», hasta 15 s); ~2–4 s por ficha. Probado con 3 fichas reales, incluida una con variantes (`ProductGroup`) y una inexistente («no encontrado»).
 - [x] 2026-09-30 Precio tachado: el PVPR que muestra la ficha (`#pdp-price-original`, «PVPR 749,99€»); el JSON-LD solo trae el precio actual.
 - [x] 2026-09-30 URL guardada sin query, hash ni `/` final (`normalizePcComponentesProductUrl`). El id ya salía limpio (el slug de la ruta), así que no había productos duplicados, pero la URL se guardaba con `?utm…`.
@@ -135,14 +135,14 @@ Alertas de usuario por URL (`user-alerts-residential`) y job de ofertas `pccompo
 
 Ficha y listados renderizados en servidor: `fetch` simple, sin navegador. Precio, tachado, disponibilidad y vendedor salen del estado Apollo de la página (`CofrPriceFeature`, `CofrOnlineStatusFeature`); título, marca, imagen y EAN del JSON-LD. Código en `src/providers/retail/mediamarkt/` y `src/services/mediamarktDeals.ts`. **Solo desde el Mac:** a la IP del VPS le da 403.
 
-- [ ] Desplegar en el VPS (`./deploy.sh all`) y, después, instalar el job en el Mac (`npm run cron:local:install`). En ese orden: sin el despliegue, la web del VPS no conoce MediaMarkt y trataría sus productos como de Amazon (enlaces de compra mal).
 - [ ] Decidir si interesan las ofertas de vendedores externos (marketplace): hoy se descartan (9 de 99 en la primera prueba); se activan con `MEDIAMARKT_DEALS_INCLUDE_MARKETPLACE=1`.
-- [ ] Afiliación: los enlaces van directos a mediamarkt.es. Si se entra en su programa (Awin), rellenar `affiliate_url`.
+- [ ] Afiliación: darse de alta como publisher en Awin y solicitar el programa de MediaMarkt España. Con la aprobación, poner en el `.env.local` del VPS `AWIN_PUBLISHER_ID` (id de afiliado) y `AWIN_MID_MEDIAMARKT` (id del anunciante) y reiniciar las dos webs: todos los enlaces de compra de MediaMarkt pasan a `awin1.com/cread.php?…` sin tocar productos (`src/lib/awin.ts` y su copia en el marketplace). Vale para cualquier tienda con `AWIN_MID_<TIENDA>`.
 - [ ] Usar el EAN (`gtin`, ya se lee) para cruzar el mismo producto entre tiendas (p. ej. con Amazon) y comparar precios.
 - [x] 2026-09-30 Provider de ficha (`scrapeMediaMarktProductPage`): id = número final de la URL (sin query ni hash), prefijo `MM-`. Si la ficha redirige a otro producto (ofertas de marketplace retiradas) da «producto no encontrado»: su página traía el precio del id pedido en las recomendaciones y se habría guardado el de otro producto.
 - [x] 2026-09-30 Alertas de usuario por URL: el bot deja la alerta en espera (`requiresResidentialIp`) y la completa `user-alerts-residential` del Mac (ahora PcComponentes, Carrefour y MediaMarkt, 10 por corrida). También en la revisión de precios del catálogo (`retailPriceCheck`), que marca agotado si la tienda lo da como no disponible; el VPS se la salta (`RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia,mediamarkt`).
 - [x] 2026-09-30 Job `mediamarkt-deals` (Mac, 08:15, 12:15, 16:15 y 20:15): rebajas ≥15 % de 8 listados de categoría (3 páginas de 12), sin abrir fichas; primero bajadas de productos ya guardados y luego nuevos, hasta 20 por corrida. Prueba en seco: 99 productos, 60 con descuento, categorías bien asignadas. Configurable con `MEDIAMARKT_DEALS_*` y `MEDIAMARKT_FEED_URLS`.
 - [x] 2026-09-30 MediaMarkt en el bot, el aviso legal y la lista de tiendas del marketplace.
+- [x] 2026-09-30 Desplegado en el VPS e instalado el job en el Mac. Corrida real de prueba (3 productos, sin avisos): se crean bien y la ficha del marketplace muestra «30,99 € en MediaMarkt» con el botón a mediamarkt.es.
 - [x] 2026-09-30 Avisos del job activados (`MEDIAMARKT_DEALS_NOTIFY=1` en el `.env.local` del Mac); pasan el mismo filtro de puntuación del canal que Amazon.
 
 ## Infraestructura / mantenimiento

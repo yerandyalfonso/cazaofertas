@@ -1,3 +1,4 @@
+import { awinDeeplink } from "@/lib/awin";
 import {
   extractAsin,
   generateAmazonUrl,
@@ -352,16 +353,18 @@ export function resolveProductBuyUrl(product: ProductLinkFields): string {
     });
   }
 
+  const direct = resolveProductPageUrl(product);
   const affiliate = product.affiliate_url?.trim();
-  if (affiliate) {
+  // Los jobs de ofertas guardan la URL normal también como affiliate_url: solo
+  // es un enlace de afiliado propio si es distinta de la de la ficha.
+  if (affiliate && affiliate !== direct) {
     return affiliate;
   }
 
-  const direct = resolveProductPageUrl(product);
   if (!direct) {
     throw new Error("No se pudo resolver URL de compra para el producto.");
   }
-  return direct;
+  return awinDeeplink(retailer, direct);
 }
 
 export function retailerLabel(retailer: string | null | undefined): string {

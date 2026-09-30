@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { awinDeeplink } from "@/lib/awin";
 import { MARKETPLACE_RETAILERS } from "@/lib/retailers";
 import { resolveParentSlug } from "@/lib/taxonomy";
 import {
@@ -172,7 +173,12 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
 
   const productUrl =
     row.product_url?.trim() || row.amazon_url?.trim() || "#";
-  const affiliateUrl = row.affiliate_url?.trim() || productUrl;
+  const storedAffiliate = row.affiliate_url?.trim();
+  // Los jobs de ofertas guardan la URL normal también como affiliate_url.
+  const affiliateUrl =
+    storedAffiliate && storedAffiliate !== productUrl
+      ? storedAffiliate
+      : awinDeeplink(row.retailer, productUrl);
 
   return {
     id: row.id,
