@@ -665,11 +665,14 @@ export function CarouselEditorClient({
                 {publishedOptions.length === 0 ? (
                   <option value="">Sin artículos</option>
                 ) : (
-                  publishedOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))
+                  <>
+                    <option value="">Elige un artículo…</option>
+                    {publishedOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </>
                 )}
               </select>
             </label>
