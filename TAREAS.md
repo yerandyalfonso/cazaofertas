@@ -59,8 +59,8 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
-- [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.
 - [ ] Panel de las alertas de usuario: ver/pausar alertas por usuario y tienda, y las que esperan al Mac (`requiresResidentialIp`), útil también para el test de carga.
+- [x] 2026-09-30 Operaciones → Resumen: tabla «Estado por tienda» (Al día / Atrasada / Parado, activos, última revisión, revisados en 24 h, sin revisar +48 h, agotados, último producto nuevo), sacada de los productos activos. No hay registro de ejecuciones de los jobs: si hace falta saber qué máquina corrió cada uno, sería una tabla nueva.
 - [x] 2026-09-30 Estadísticas: tabla «Por tienda» con productos activos, clics del periodo, % de clics y clics por 100 productos (los clics de productos borrados, aparte). Arreglado también el desborde horizontal de la página con títulos largos.
 - [x] 2026-09-30 Productos: aviso bajo la tienda y en «Revisar precio» (desactivado, con el motivo) cuando la tienda no se puede revisar desde el admin: «Sin revisión de precio» (Carrefour, PcComponentes, AliExpress) o «Precio: lo revisa el Mac» (MediaMarkt). Arreglado también el filtro por tienda/categoría: si cambiabas el filtro mientras cargaba la siguiente página, la recarga se descartaba y salía «Requested range not satisfiable».
 - [x] 2026-09-30 Redes / Tarjetas: `api/admin/image-proxy` solo admitía Amazon, Unsplash y Supabase; las fotos de Miravia, Kiabi, Carrefour y MediaMarkt daban 400 y salían sin foto. Ahora admite sus CDNs (Carrefour solo su bucket de Google Storage y nuestro Storage).

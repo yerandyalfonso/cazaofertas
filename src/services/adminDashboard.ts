@@ -12,7 +12,21 @@ export interface AdminCatalogStats {
   lastCheckedAt: string | null;
   oldestCheckedAt: string | null;
   neverChecked: number;
-  byRetailer: Array<{ retailer: string; count: number }>;
+  byRetailer: RetailerHealth[];
+}
+
+/** Estado de la vigilancia de una tienda, sacado de sus productos activos. */
+export interface RetailerHealth {
+  retailer: string;
+  count: number;
+  /** Revisión de precio más reciente. */
+  lastCheckedAt: string | null;
+  checked24h: number;
+  /** Sin revisar en más de 48 h (o nunca). */
+  stale48h: number;
+  outOfStock: number;
+  /** Último producto dado de alta (lo mete el job de ofertas o una alerta). */
+  lastCreatedAt: string | null;
 }
 
 export interface AdminClickStats {
@@ -30,6 +44,8 @@ type ProductStatRow = {
   retailer: string | null;
   product_url: string | null;
   last_checked_at: string | null;
+  availability: string | null;
+  created_at: string | null;
 };
 
 function startOfDaysAgo(days: number): string {
@@ -49,7 +65,7 @@ async function forEachActiveProductPage(
     const { data, error } = await client
       .from("products")
       .select(
-        "amazon_url, asin, retailer, product_url, last_checked_at",
+        "amazon_url, asin, retailer, product_url, last_checked_at, availability, created_at",
       )
       .eq("is_active", true)
       .range(offset, offset + PRODUCT_PAGE_SIZE - 1);
@@ -73,7 +89,10 @@ export async function getAdminCatalogStats(): Promise<AdminCatalogStats> {
   let neverChecked = 0;
   let lastCheckedAt: string | null = null;
   let oldestCheckedAt: string | null = null;
-  const retailerMap = new Map<string, number>();
+  const retailerMap = new Map<string, RetailerHealth>();
+  const now = Date.now();
+  const since24h = new Date(now - 24 * 3_600_000).toISOString();
+  const since48h = new Date(now - 48 * 3_600_000).toISOString();
 
   await forEachActiveProductPage((rows) => {
     for (const row of rows) {
@@ -98,7 +117,26 @@ export async function getAdminCatalogStats(): Promise<AdminCatalogStats> {
         }
       }
       const key = (row.retailer ?? "amazon").trim() || "amazon";
-      retailerMap.set(key, (retailerMap.get(key) ?? 0) + 1);
+      const health = retailerMap.get(key) ?? {
+        retailer: key,
+        count: 0,
+        lastCheckedAt: null,
+        checked24h: 0,
+        stale48h: 0,
+        outOfStock: 0,
+        lastCreatedAt: null,
+      };
+      health.count += 1;
+      if (row.last_checked_at && row.last_checked_at >= since24h) health.checked24h += 1;
+      if (!row.last_checked_at || row.last_checked_at < since48h) health.stale48h += 1;
+      if (row.availability === "OUT_OF_STOCK") health.outOfStock += 1;
+      if (row.last_checked_at && (!health.lastCheckedAt || row.last_checked_at > health.lastCheckedAt)) {
+        health.lastCheckedAt = row.last_checked_at;
+      }
+      if (row.created_at && (!health.lastCreatedAt || row.created_at > health.lastCreatedAt)) {
+        health.lastCreatedAt = row.created_at;
+      }
+      retailerMap.set(key, health);
     }
   });
 
@@ -109,9 +147,7 @@ export async function getAdminCatalogStats(): Promise<AdminCatalogStats> {
     lastCheckedAt,
     oldestCheckedAt,
     neverChecked,
-    byRetailer: [...retailerMap.entries()]
-      .map(([retailer, count]) => ({ retailer, count }))
-      .sort((a, b) => b.count - a.count),
+    byRetailer: [...retailerMap.values()].sort((a, b) => b.count - a.count),
   };
 }
 

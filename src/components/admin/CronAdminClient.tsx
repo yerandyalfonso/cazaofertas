@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminField } from "@/components/admin/AdminField";
 import { useAdminToast } from "@/components/admin/AdminToast";
+import { formatRelativeTime } from "@/lib/relative-time";
 import { retailerLabel } from "@/lib/retailers";
+import type { RetailerHealth } from "@/services/adminDashboard";
 
 interface CronStatus {
   activeProducts: number;
@@ -13,7 +15,7 @@ interface CronStatus {
   lastCheckedAt: string | null;
   oldestCheckedAt?: string | null;
   neverChecked?: number;
-  byRetailer?: Array<{ retailer: string; count: number }>;
+  byRetailer?: RetailerHealth[];
   cronControl?: {
     isPaused: boolean;
     pausedUntil: string | null;
@@ -116,6 +118,21 @@ interface FlashRunResult {
     imageUrl?: string | null;
   }>;
   errors?: Array<{ asin: string; message: string }>;
+}
+
+/**
+ * «Al día»: algo revisado en las últimas 24 h y menos de la mitad sin revisar
+ * en 48 h. «Parado»: nada revisado en 48 h. Entre medias, «Atrasada».
+ */
+function retailerHealthLabel(row: RetailerHealth): { label: string; className: string } {
+  const lastMs = row.lastCheckedAt ? new Date(row.lastCheckedAt).getTime() : 0;
+  if (!lastMs || Date.now() - lastMs > 48 * 3_600_000) {
+    return { label: "Parado", className: "bg-rose-50 text-rose-800" };
+  }
+  if (row.checked24h > 0 && row.stale48h * 2 < row.count) {
+    return { label: "Al día", className: "bg-emerald-50 text-emerald-800" };
+  }
+  return { label: "Atrasada", className: "bg-amber-50 text-amber-900" };
 }
 
 export function CronAdminClient({
@@ -600,35 +617,57 @@ export function CronAdminClient({
           </section>
 
           {!loadingStatus && (status?.byRetailer?.length ?? 0) > 0 ? (
-            <section className="admin-card mt-6 max-w-xl p-5">
-              <p className="text-xs font-semibold text-stone-500">
-                Por tienda
+            <section className="mt-6">
+              <h3 className="text-sm font-semibold text-ink">Estado por tienda</h3>
+              <p className="mt-1 text-sm text-stone-600">
+                Sacado de los productos activos: cuándo se revisaron sus precios
+                y cuándo entró el último producto nuevo.
               </p>
-              <ul className="mt-3 divide-y divide-stone-100">
-                {status!.byRetailer!.map((row) => {
-                  const total = status?.activeProducts || 1;
-                  const pct = Math.round((row.count / total) * 100);
-                  return (
-                    <li
-                      key={row.retailer}
-                      className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
-                    >
-                      <span className="w-24 shrink-0 text-sm font-medium text-ink">
-                        {retailerLabel(row.retailer)}
-                      </span>
-                      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-stone-100">
-                        <div
-                          className="h-full rounded-full bg-teal-700"
-                          style={{ width: `${Math.max(pct, 2)}%` }}
-                        />
-                      </div>
-                      <span className="w-16 shrink-0 text-right text-sm tabular-nums text-stone-600">
-                        {row.count}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="admin-table-wrap mt-3">
+                <table className="text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-[var(--text-muted)]">
+                      <th className="px-4 py-2.5 font-semibold">Tienda</th>
+                      <th className="px-4 py-2.5 font-semibold">Estado</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">Activos</th>
+                      <th className="px-4 py-2.5 font-semibold">Última revisión</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">Revisados 24 h</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">Sin revisar +48 h</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">Agotados</th>
+                      <th className="px-4 py-2.5 font-semibold">Último nuevo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status!.byRetailer!.map((row) => {
+                      const health = retailerHealthLabel(row);
+                      return (
+                        <tr key={row.retailer} className="border-t border-[var(--border)]">
+                          <td className="px-4 py-2.5 font-medium text-ink">
+                            {retailerLabel(row.retailer)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span
+                              className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${health.className}`}
+                            >
+                              {health.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">{row.count}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            {row.lastCheckedAt ? formatRelativeTime(row.lastCheckedAt) : "Nunca"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right">{row.checked24h}</td>
+                          <td className="px-4 py-2.5 text-right">{row.stale48h}</td>
+                          <td className="px-4 py-2.5 text-right">{row.outOfStock}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            {row.lastCreatedAt ? formatRelativeTime(row.lastCreatedAt) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </section>
           ) : null}
 
