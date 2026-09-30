@@ -12,6 +12,12 @@ const ALLOWED_HOSTS = new Set([
   "media-amazon.com",
 ]);
 
+/** CDNs de imagen de las demás tiendas (ver `products.image_url`). */
+const RETAILER_IMAGE_HOSTS = new Set([
+  "static.kiabi.es",
+  "assets.mmsrg.com",
+]);
+
 function isAllowedImageUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
@@ -23,7 +29,15 @@ function isAllowedImageUrl(raw: string): boolean {
       host.endsWith(".ssl-images-amazon.com") ||
       host.endsWith(".images-amazon.com") ||
       host === "images.unsplash.com" ||
-      host.endsWith(".supabase.co")
+      host.endsWith(".supabase.co") ||
+      RETAILER_IMAGE_HOSTS.has(host) ||
+      host.endsWith(".miravia.es") ||
+      host.endsWith(".mrvcdn.com") ||
+      // Fotos de Carrefour: su bucket público y las que subimos a nuestro Storage.
+      (host === "storage.googleapis.com" &&
+        url.pathname.startsWith("/catalog-pictures-carrefour-es/")) ||
+      (host === "blog.chollosdhoy.com" &&
+        url.pathname.startsWith("/storage/v1/object/public/"))
     );
   } catch {
     return false;
@@ -31,7 +45,7 @@ function isAllowedImageUrl(raw: string): boolean {
 }
 
 /**
- * Proxy same-origin de imágenes Amazon para poder exportar PNG
+ * Proxy same-origin de imágenes de producto para poder exportar PNG
  * (canvas / html-to-image necesita CORS o origen propio).
  */
 export async function GET(request: NextRequest) {
