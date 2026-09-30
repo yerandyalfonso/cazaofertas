@@ -15,6 +15,7 @@ import {
   type MediaMarktListingItem,
 } from "@/providers/retail/mediamarkt";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
+import { getRetailerDealSettings } from "@/services/retailerDealSettings";
 import type { DealCandidate } from "@/services/alertMatching";
 import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -28,20 +29,14 @@ import { DealLevel, ProductAvailability } from "@/types";
  * de la página), así que no se abre la ficha de cada producto. Fetch simple,
  * pero solo desde IP residencial (a la del VPS le da 403): job solo del Mac.
  *
- * Configuración por env:
+ * Configuración: admin → Ajustes (`retailerDealSettings`); si no se ha
+ * guardado nada allí, estas variables de entorno:
  *   MEDIAMARKT_DEALS_ENABLED=false        desactiva el job
  *   MEDIAMARKT_DEALS_MIN_DISCOUNT=15      % mínimo para guardar
  *   MEDIAMARKT_DEALS_PAGES_PER_FEED=3     páginas de 12 por listado
  *   MEDIAMARKT_DEALS_INCLUDE_MARKETPLACE=1  incluir vendedores externos
  *   MEDIAMARKT_FEED_URLS=…                listados (coma)
  */
-
-function envNumber(name: string, fallback: number): number {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value >= 0 && process.env[name]?.trim()
-    ? value
-    : fallback;
-}
 
 function slugifyTitleWithId(title: string, externalId: string): string {
   const base = title
@@ -215,23 +210,23 @@ export async function runMediaMarktDealsCheck(options?: {
     errors: [],
   };
 
-  if (process.env.MEDIAMARKT_DEALS_ENABLED?.trim().toLowerCase() === "false") {
+  const settings = await getRetailerDealSettings("mediamarkt");
+  if (!settings.enabled) {
     return empty;
   }
 
   const client = createSupabaseServiceClient();
   const limit = options?.limit && options.limit > 0 ? options.limit : 20;
   const shouldNotify = !dryRun && (options?.notify ?? true);
-  const minDiscount = envNumber("MEDIAMARKT_DEALS_MIN_DISCOUNT", 15);
+  const minDiscount = settings.minDiscountPercent;
   // Vendedores externos: precios y tachados menos fiables; fuera por defecto.
-  const includeMarketplace = process.env.MEDIAMARKT_DEALS_INCLUDE_MARKETPLACE === "1";
+  const includeMarketplace = settings.includeMarketplace;
   const channelMinDiscount = await resolveTelegramMinDiscountPercent();
   await ensureCategoryKeywordRulesLoaded();
 
   const discovery = await discoverMediaMarktDeals({
-    feedUrls: options?.feedUrls,
-    pagesPerFeed:
-      options?.pagesPerFeed ?? envNumber("MEDIAMARKT_DEALS_PAGES_PER_FEED", 3),
+    feedUrls: options?.feedUrls ?? (settings.feedUrls.length ? settings.feedUrls : undefined),
+    pagesPerFeed: options?.pagesPerFeed ?? settings.pagesPerFeed,
   });
 
   const ownItems = includeMarketplace

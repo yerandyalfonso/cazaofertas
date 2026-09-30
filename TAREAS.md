@@ -59,12 +59,12 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 - [ ] Unificar la carga de datos del admin (26 avisos `react-hooks/set-state-in-effect` a 26-09).
 - [ ] Mejora visual del admin con las skills de diseño (`frontend-design`, `ui-ux-pro-max`): revisar jerarquía, tablas, estados vacíos/carga, móvil y modo oscuro; partir de `AdminShell` y los componentes compartidos (`AdminListChrome`, `AdminField`, `AdminEmptyState`…) para que el cambio llegue a todas las páginas.
-- [ ] Ajustes → configuración de las tiendas nuevas: hoy solo Amazon, Miravia y Kiabi tienen feeds editables; Carrefour y MediaMarkt dependen del `.env.local` del Mac (`CARREFOUR_DEALS_ENABLED`, `_MIN_DISCOUNT`, `_PAGES_PER_FEED`, `CARREFOUR_DEAL_FEED_URLS`; `MEDIAMARKT_DEALS_ENABLED`, `_MIN_DISCOUNT`, `_PAGES_PER_FEED`, `_INCLUDE_MARKETPLACE`, `MEDIAMARKT_FEED_URLS`). Pasarlos a `appSettings` con el env como valor por defecto, y dejar hueco para AliExpress y PcComponentes (hoy solo alertas).
 - [ ] Productos: filtro por tienda (la lista muestra la tienda pero no filtra) y aviso visible cuando la tienda no admite scrape (`retailerScrapeSupported`).
 - [ ] Partir `products/page.tsx` (≈1 950 líneas) y `coupons/page.tsx` (≈680) en componentes, como el resto de páginas del panel (`*AdminClient`).
 - [ ] Estadísticas: desglose de clics y productos activos por tienda, para ver qué aporta cada integración nueva.
 - [ ] Operaciones: estado por tienda (último job correcto, máquina Mac/VPS, agotados, fallos de scrape) en lugar de tener que mirar `schedules.md` y los logs.
 - [ ] Panel de las alertas de usuario: ver/pausar alertas por usuario y tienda, y las que esperan al Mac (`requiresResidentialIp`), útil también para el test de carga.
+- [x] 2026-09-30 Ajustes → Carrefour y MediaMarkt: secciones en admin → Ajustes (activo, descuento mínimo, páginas por listado, listados y, en MediaMarkt, vendedores externos), guardadas en `app_settings.retailer_deal_settings` (migración 0055, `src/services/retailerDealSettings.ts`); lo no guardado sigue saliendo del `.env.local` del Mac. Otra tienda con job (AliExpress, PcComponentes): sumarla a `src/lib/retailerDealJobs.ts`.
 - [x] 2026-09-26 Redes / Tarjetas: guardar los diseños en la base de datos (tarjetas, carruseles y vídeos → `design_projects`).
 - [x] 2026-09-26 Productos: usar `AdminSortButton` compartido y quitar el import `X` sin usar.
 - [x] 2026-09-26 Guardar título/ASIN en `affiliate_clicks` para no perder la atribución cuando se borra un producto (~9 % de clics sin producto).

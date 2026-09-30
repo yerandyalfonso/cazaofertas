@@ -11,6 +11,12 @@ import {
   getMetaSocialSettings,
   updateMetaSocialSettings,
 } from "@/services/metaSocialSettings";
+import {
+  getRetailerDealSettingsMap,
+  RETAILER_DEAL_JOBS,
+  type RetailerDealSettingsPatch,
+  updateRetailerDealSettings,
+} from "@/services/retailerDealSettings";
 
 export const runtime = "nodejs";
 
@@ -49,11 +55,12 @@ export async function GET(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
 
-    const [settings, metaSocial] = await Promise.all([
+    const [settings, metaSocial, retailerDeals] = await Promise.all([
       getAppSettings(),
       getMetaSocialSettings(),
+      getRetailerDealSettingsMap(),
     ]);
-    return NextResponse.json({ ok: true, settings, metaSocial });
+    return NextResponse.json({ ok: true, settings, metaSocial, retailerDeals });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: formatEnvError(error) },
@@ -179,20 +186,59 @@ export async function PATCH(request: NextRequest) {
       metaPatch.batchSize = metaBatchSize.value;
     }
 
-    if (Object.keys(patch).length === 0 && Object.keys(metaPatch).length === 0) {
+    // { carrefour: { enabled, minDiscountPercent, pagesPerFeed, feedUrls, includeMarketplace }, … }
+    const retailerPatch: RetailerDealSettingsPatch = {};
+    const retailerBody =
+      body.retailerDeals && typeof body.retailerDeals === "object"
+        ? (body.retailerDeals as Record<string, Record<string, unknown>>)
+        : {};
+    for (const job of RETAILER_DEAL_JOBS) {
+      const raw = retailerBody[job];
+      if (!raw || typeof raw !== "object") continue;
+      const jobPatch: NonNullable<RetailerDealSettingsPatch[typeof job]> = {};
+      for (const field of ["minDiscountPercent", "pagesPerFeed"] as const) {
+        const parsed = parseOptionalNumber(raw[field], `${job}.${field}`);
+        if (!parsed.ok) {
+          return NextResponse.json(
+            { ok: false, error: parsed.error },
+            { status: 400 },
+          );
+        }
+        if (parsed.value !== undefined) jobPatch[field] = parsed.value;
+      }
+      for (const field of ["enabled", "includeMarketplace"] as const) {
+        const parsed = parseOptionalBoolean(raw[field]);
+        if (parsed !== undefined) jobPatch[field] = parsed;
+      }
+      if (raw.feedUrls !== undefined) {
+        jobPatch.feedUrls = parseFeedUrlsText(String(raw.feedUrls ?? ""));
+      }
+      retailerPatch[job] = jobPatch;
+    }
+
+    if (
+      Object.keys(patch).length === 0 &&
+      Object.keys(metaPatch).length === 0 &&
+      Object.keys(retailerPatch).length === 0
+    ) {
       return NextResponse.json(
         { ok: false, error: "No hay campos válidos para actualizar." },
         { status: 400 },
       );
     }
 
-    const [settings, metaSocial] = await Promise.all([
-      Object.keys(patch).length > 0 ? updateAppSettings(patch) : getAppSettings(),
+    // Secuencial: las tres escrituras tocan la misma fila de app_settings.
+    const settings =
+      Object.keys(patch).length > 0 ? await updateAppSettings(patch) : await getAppSettings();
+    const metaSocial =
       Object.keys(metaPatch).length > 0
-        ? updateMetaSocialSettings(metaPatch)
-        : getMetaSocialSettings(),
-    ]);
-    return NextResponse.json({ ok: true, settings, metaSocial });
+        ? await updateMetaSocialSettings(metaPatch)
+        : await getMetaSocialSettings();
+    const retailerDeals =
+      Object.keys(retailerPatch).length > 0
+        ? await updateRetailerDealSettings(retailerPatch)
+        : await getRetailerDealSettingsMap();
+    return NextResponse.json({ ok: true, settings, metaSocial, retailerDeals });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: formatEnvError(error) },

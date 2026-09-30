@@ -17,6 +17,7 @@ import {
   type CarrefourListingItem,
 } from "@/providers/retail/carrefour/carrefourBrowserDiscovery";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
+import { getRetailerDealSettings } from "@/services/retailerDealSettings";
 import type { DealCandidate } from "@/services/alertMatching";
 import { ensureCategoryKeywordRulesLoaded } from "@/services/categoryKeywords";
 import { dealScoringService } from "@/services/deal-scoring";
@@ -35,11 +36,6 @@ import { DealLevel, ProductAvailability } from "@/types";
  *   CARREFOUR_DEALS_PAGES_PER_FEED=5     páginas de 24 por listado
  *   CARREFOUR_BROWSER_FEED_URLS=…        listados (coma)
  */
-
-function envNumber(name: string, fallback: number): number {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value >= 0 ? value : fallback;
-}
 
 function slugifyTitleWithId(title: string, externalId: string): string {
   const base = title
@@ -304,23 +300,23 @@ export async function runCarrefourDealsCheck(options?: {
     errors: [],
   };
 
-  if (process.env.CARREFOUR_DEALS_ENABLED?.trim().toLowerCase() === "false") {
+  const settings = await getRetailerDealSettings("carrefour");
+  if (!settings.enabled) {
     return empty;
   }
 
   const client = createSupabaseServiceClient();
   const limit = options?.limit && options.limit > 0 ? options.limit : 20;
   const shouldNotify = !dryRun && (options?.notify ?? true);
-  const minDiscount = envNumber("CARREFOUR_DEALS_MIN_DISCOUNT", 15);
+  const minDiscount = settings.minDiscountPercent;
   const channelMinDiscount = await resolveTelegramMinDiscountPercent();
   await ensureCategoryKeywordRulesLoaded();
 
   const discovery = options?.onlyItems?.length
     ? { items: options.onlyItems, pagesFetched: 0, feedErrors: [] }
     : await discoverCarrefourDealsWithBrowser({
-        feedUrls: options?.feedUrls,
-        pagesPerFeed:
-          options?.pagesPerFeed ?? envNumber("CARREFOUR_DEALS_PAGES_PER_FEED", 5),
+        feedUrls: options?.feedUrls ?? (settings.feedUrls.length ? settings.feedUrls : undefined),
+        pagesPerFeed: options?.pagesPerFeed ?? settings.pagesPerFeed,
       });
 
   const catalogByAsin = await loadCarrefourCatalogForItems(client, discovery.items);

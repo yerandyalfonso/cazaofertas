@@ -6,6 +6,54 @@ import { useAdminToast } from "@/components/admin/AdminToast";
 import { formatFeedUrlsText } from "@/lib/feed-urls";
 import type { AppSettings } from "@/services/appSettings";
 import type { MetaSocialSettings } from "@/services/metaSocialSettings";
+import { RETAILER_DEAL_JOBS, type RetailerDealJob } from "@/lib/retailerDealJobs";
+import type { RetailerDealSettingsMap } from "@/services/retailerDealSettings";
+
+type RetailerDealForm = {
+  enabled: boolean;
+  minDiscountPercent: string;
+  pagesPerFeed: string;
+  feedUrls: string;
+  includeMarketplace: boolean;
+};
+
+const RETAILER_DEAL_COPY: Record<
+  RetailerDealJob,
+  { title: string; schedule: string; feedPlaceholder: string; feedHint: string }
+> = {
+  carrefour: {
+    title: "Carrefour",
+    schedule:
+      "Job del Mac con Google Chrome con ventana (Cloudflare bloquea el modo headless).",
+    feedPlaceholder: "https://www.carrefour.es/exclusivo-online/cat28650681/c",
+    feedHint: "Listados no alimentación. Vacío = listado por defecto.",
+  },
+  mediamarkt: {
+    title: "MediaMarkt",
+    schedule: "Job del Mac (08:15, 12:15, 16:15 y 20:15); a la IP del VPS le da 403.",
+    feedPlaceholder: "https://www.mediamarkt.es/es/category/port%C3%A1tiles-153.html",
+    feedHint: "Listados de categoría. Vacío = los 8 listados por defecto.",
+  },
+};
+
+function retailerDealsToForm(
+  retailerDeals: RetailerDealSettingsMap,
+): Record<RetailerDealJob, RetailerDealForm> {
+  const entries = RETAILER_DEAL_JOBS.map((job) => {
+    const value = retailerDeals[job];
+    return [
+      job,
+      {
+        enabled: value.enabled,
+        minDiscountPercent: String(value.minDiscountPercent),
+        pagesPerFeed: String(value.pagesPerFeed),
+        feedUrls: formatFeedUrlsText(value.feedUrls),
+        includeMarketplace: value.includeMarketplace,
+      },
+    ] as const;
+  });
+  return Object.fromEntries(entries) as Record<RetailerDealJob, RetailerDealForm>;
+}
 
 type SettingsForm = {
   metaPostingEnabled: boolean;
@@ -78,6 +126,10 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
   const [saving, setSaving] = useState(false);
   const [source, setSource] = useState<"database" | "env">("env");
   const [form, setForm] = useState<SettingsForm | null>(null);
+  const [retailerForm, setRetailerForm] = useState<Record<
+    RetailerDealJob,
+    RetailerDealForm
+  > | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,12 +139,20 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
         ok?: boolean;
         settings?: AppSettings;
         metaSocial?: MetaSocialSettings;
+        retailerDeals?: RetailerDealSettingsMap;
         error?: string;
       };
-      if (!response.ok || !data.ok || !data.settings || !data.metaSocial) {
+      if (
+        !response.ok ||
+        !data.ok ||
+        !data.settings ||
+        !data.metaSocial ||
+        !data.retailerDeals
+      ) {
         throw new Error(data.error ?? "No se pudieron cargar los ajustes.");
       }
       setForm(settingsToForm(data.settings, data.metaSocial));
+      setRetailerForm(retailerDealsToForm(data.retailerDeals));
       setSource(data.settings.source);
     } catch (error) {
       toast.error(
@@ -111,8 +171,18 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  function patchRetailer<K extends keyof RetailerDealForm>(
+    job: RetailerDealJob,
+    key: K,
+    value: RetailerDealForm[K],
+  ) {
+    setRetailerForm((current) =>
+      current ? { ...current, [job]: { ...current[job], [key]: value } } : current,
+    );
+  }
+
   async function save() {
-    if (!form) return;
+    if (!form || !retailerForm) return;
     setSaving(true);
     try {
       const response = await fetch("/api/admin/settings", {
@@ -147,18 +217,38 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
           kiabiNewProductsOnly: form.kiabiNewProductsOnly,
           kiabiFeedUrls: form.kiabiFeedUrls,
           kiabiFeedsPerRun: Number(form.kiabiFeedsPerRun),
+          retailerDeals: Object.fromEntries(
+            RETAILER_DEAL_JOBS.map((job) => [
+              job,
+              {
+                enabled: retailerForm[job].enabled,
+                minDiscountPercent: Number(retailerForm[job].minDiscountPercent),
+                pagesPerFeed: Number(retailerForm[job].pagesPerFeed),
+                feedUrls: retailerForm[job].feedUrls,
+                includeMarketplace: retailerForm[job].includeMarketplace,
+              },
+            ]),
+          ),
         }),
       });
       const data = (await response.json()) as {
         ok?: boolean;
         settings?: AppSettings;
         metaSocial?: MetaSocialSettings;
+        retailerDeals?: RetailerDealSettingsMap;
         error?: string;
       };
-      if (!response.ok || !data.ok || !data.settings || !data.metaSocial) {
+      if (
+        !response.ok ||
+        !data.ok ||
+        !data.settings ||
+        !data.metaSocial ||
+        !data.retailerDeals
+      ) {
         throw new Error(data.error ?? "No se pudieron guardar los ajustes.");
       }
       setForm(settingsToForm(data.settings, data.metaSocial));
+      setRetailerForm(retailerDealsToForm(data.retailerDeals));
       setSource(data.settings.source);
       toast.success("Configuración guardada.");
     } catch (error) {
@@ -170,7 +260,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
     }
   }
 
-  if (loading || !form) {
+  if (loading || !form || !retailerForm) {
     return (
       <div className="admin-card p-8 text-sm text-stone-500">
         Cargando configuración…
@@ -597,6 +687,79 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
           </AdminField>
         </div>
       </section>
+
+      {RETAILER_DEAL_JOBS.map((job) => {
+        const copy = RETAILER_DEAL_COPY[job];
+        const value = retailerForm[job];
+        return (
+          <section key={job} className="admin-card p-6">
+            <h2 className="font-display text-2xl text-ink">{copy.title}</h2>
+            <p className="mt-1 text-sm text-stone-600">
+              {copy.schedule} Lo que no guardes aquí sale del{" "}
+              <code className="text-xs">.env.local</code> del Mac.
+            </p>
+            <label className="mt-4 flex items-center gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={value.enabled}
+                onChange={(e) => patchRetailer(job, "enabled", e.target.checked)}
+                className="h-4 w-4 accent-teal-800"
+              />
+              Job de ofertas {copy.title} activo
+            </label>
+            {job === "mediamarkt" ? (
+              <label className="mt-3 flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={value.includeMarketplace}
+                  onChange={(e) =>
+                    patchRetailer(job, "includeMarketplace", e.target.checked)
+                  }
+                  className="h-4 w-4 accent-teal-800"
+                />
+                Incluir vendedores externos (marketplace)
+              </label>
+            ) : null}
+            <div className="mt-5 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              <AdminField label="Descuento mín. (%)">
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={value.minDiscountPercent}
+                  onChange={(e) =>
+                    patchRetailer(job, "minDiscountPercent", e.target.value)
+                  }
+                  className="admin-input w-full"
+                />
+              </AdminField>
+              <AdminField label="Páginas por listado" hint="Máximo 10">
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={value.pagesPerFeed}
+                  onChange={(e) => patchRetailer(job, "pagesPerFeed", e.target.value)}
+                  className="admin-input w-full"
+                />
+              </AdminField>
+              <AdminField
+                label={`Listados ${copy.title}`}
+                hint={copy.feedHint}
+                className="sm:col-span-2"
+              >
+                <textarea
+                  rows={3}
+                  value={value.feedUrls}
+                  onChange={(e) => patchRetailer(job, "feedUrls", e.target.value)}
+                  placeholder={copy.feedPlaceholder}
+                  className="admin-input w-full font-mono text-xs"
+                />
+              </AdminField>
+            </div>
+          </section>
+        );
+      })}
 
       <div className="flex flex-wrap items-center gap-3 pb-4">
         <button
