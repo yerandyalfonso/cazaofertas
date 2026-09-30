@@ -260,8 +260,7 @@ async function runMediaMarktDeals(): Promise<void> {
   const result = await runMediaMarktDealsCheck({
     limit: Number(process.env.MEDIAMARKT_DEALS_LIMIT) || 20,
     dryRun: process.env.MEDIAMARKT_DEALS_DRY_RUN === "1",
-    // Sin historial, cada producto nuevo sale como «mínimo histórico»: los
-    // avisos al canal se activan a mano cuando el catálogo ya tenga base.
+    // Avisos al canal y a las alertas: se activan con MEDIAMARKT_DEALS_NOTIFY=1.
     notify: process.env.MEDIAMARKT_DEALS_NOTIFY === "1",
   });
   console.log(JSON.stringify(result, null, 2));

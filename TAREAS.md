@@ -42,6 +42,7 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 - [ ] Dar de alta en Bing Webmaster (importar desde Google).
 - [ ] Implementar IndexNow para avisar a Bing de productos nuevos/cambiados.
 - [ ] Opcional: ensanchar el contenido de ficha y listados para que quede alineado con la barra superior (hoy la barra usa el ancho de la portada, 1600 px).
+- [x] 2026-09-30 Etiqueta de nivel máximo «Mínimo histórico» → «Chollazo» en la web (blog y marketplace), igual que en Telegram y Facebook.
 - [x] 2026-09-30 MediaMarkt en la lista de tiendas del marketplace (nombre, color `--retailer-mediamarkt` y filtro por tienda).
 - [x] 2026-09-27 Rediseño UI/UX del marketplace (desplegado 27-09, ver «Diseño» en `apps/chollosdehoy/README.md`): tarjetas con precio grande, anterior tachado y botón «Ver» de borde naranja (a todo el ancho si queda solo en su fila); portada con las dos mejores ofertas en horizontal; listados con cabecera compacta y una tarjeta por fila en móvil; ficha con el descuento sobre la foto, precio grande y sin avisos redundantes; barra de navegación fija en todas las páginas; filtro de precio con slider; acento naranja vivo `#f97316`; altura única de 44 px en botones y buscador.
 - [x] 2026-09-27 Accesibilidad móvil: 0 zonas táctiles <44 px en todas las rutas (migas, pie, avisos, chips, paginación y títulos), 0 scroll horizontal, un h1 por página.
@@ -101,6 +102,7 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### Carrefour
 
+- [x] 2026-09-30 Productos nuevos del job de ofertas (Carrefour y MediaMarkt) sin «Chollazo» automático: se puntuaban con su precio actual como mínimo, así que todo lo nuevo salía como máximo nivel. Ahora, sin historial, el nivel depende solo del descuento. Los avisos del job ya estaban activos (el LaunchAgent no lleva `--no-notify`).
 - [x] Alertas por URL con Google Chrome con ventana desde el Mac (Cloudflare bloquea headless), mismo id que las alertas (`skuId`) y fotos subidas a Supabase (commits hasta `539288e`).
 
 ### PcComponentes
@@ -115,7 +117,7 @@ Solo alertas de usuario por URL, desde el Mac (`user-alerts-residential`). Anál
 
 Ficha y listados renderizados en servidor: `fetch` simple, sin navegador. Precio, tachado, disponibilidad y vendedor salen del estado Apollo de la página (`CofrPriceFeature`, `CofrOnlineStatusFeature`); título, marca, imagen y EAN del JSON-LD. Código en `src/providers/retail/mediamarkt/` y `src/services/mediamarktDeals.ts`. **Solo desde el Mac:** a la IP del VPS le da 403.
 
-- [ ] Activar los avisos al canal y a las alertas del job de ofertas (`MEDIAMARKT_DEALS_NOTIFY=1` en el `.env.local` del Mac) cuando el catálogo tenga unos días de historial. Sin historial, cada producto nuevo sale como «mínimo histórico» y la primera tanda mandaría 20 avisos de golpe.
+- [ ] Desplegar en el VPS (`./deploy.sh all`) y, después, instalar el job en el Mac (`npm run cron:local:install`). En ese orden: sin el despliegue, la web del VPS no conoce MediaMarkt y trataría sus productos como de Amazon (enlaces de compra mal).
 - [ ] Decidir si interesan las ofertas de vendedores externos (marketplace): hoy se descartan (9 de 99 en la primera prueba); se activan con `MEDIAMARKT_DEALS_INCLUDE_MARKETPLACE=1`.
 - [ ] Afiliación: los enlaces van directos a mediamarkt.es. Si se entra en su programa (Awin), rellenar `affiliate_url`.
 - [ ] Usar el EAN (`gtin`, ya se lee) para cruzar el mismo producto entre tiendas (p. ej. con Amazon) y comparar precios.
@@ -123,6 +125,7 @@ Ficha y listados renderizados en servidor: `fetch` simple, sin navegador. Precio
 - [x] 2026-09-30 Alertas de usuario por URL: el bot deja la alerta en espera (`requiresResidentialIp`) y la completa `user-alerts-residential` del Mac (ahora PcComponentes, Carrefour y MediaMarkt, 10 por corrida). También en la revisión de precios del catálogo (`retailPriceCheck`), que marca agotado si la tienda lo da como no disponible; el VPS se la salta (`RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia,mediamarkt`).
 - [x] 2026-09-30 Job `mediamarkt-deals` (Mac, 08:15, 12:15, 16:15 y 20:15): rebajas ≥15 % de 8 listados de categoría (3 páginas de 12), sin abrir fichas; primero bajadas de productos ya guardados y luego nuevos, hasta 20 por corrida. Prueba en seco: 99 productos, 60 con descuento, categorías bien asignadas. Configurable con `MEDIAMARKT_DEALS_*` y `MEDIAMARKT_FEED_URLS`.
 - [x] 2026-09-30 MediaMarkt en el bot, el aviso legal y la lista de tiendas del marketplace.
+- [x] 2026-09-30 Avisos del job activados (`MEDIAMARKT_DEALS_NOTIFY=1` en el `.env.local` del Mac); pasan el mismo filtro de puntuación del canal que Amazon.
 
 ## Infraestructura / mantenimiento
 

@@ -389,7 +389,9 @@ export async function runCarrefourDealsCheck(options?: {
       const scoring = dealScoringService.scoreProduct({
         currentPrice: price,
         previousPrice: reference > price ? reference : null,
-        lowestPrice: existing ? toNumber(existing.lowest_price) : price,
+        // Producto nuevo: sin historial no hay mínimo con el que comparar (con
+        // el precio actual como mínimo, todo lo nuevo salía «Chollazo»).
+        lowestPrice: existing ? toNumber(existing.lowest_price) : null,
         categorySlug: categoryMeta.parentSlug,
       });
       const now = new Date().toISOString();

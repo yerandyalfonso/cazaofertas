@@ -19,7 +19,7 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 | `miravia-deals` | timer desactivado | cada 30 min | Miravia da captcha a la IP del VPS |
 | `amazon-price-check` | — | cada 5 min | Solo Amazon; respeta la pausa anti-bot |
 | `user-alerts-residential` | — | cada 30 min | PcComponentes, Carrefour y MediaMarkt (10 alertas por corrida) |
-| `mediamarkt-deals` | — | 08:15, 12:15, 16:15, 20:15 | MediaMarkt da 403 a la IP del VPS. Sin avisos salvo `MEDIAMARKT_DEALS_NOTIFY=1` |
+| `mediamarkt-deals` | — | 08:15, 12:15, 16:15, 20:15 | MediaMarkt da 403 a la IP del VPS. Avisa al canal si `MEDIAMARKT_DEALS_NOTIFY=1` (activado en el Mac) |
 | `admin-digest` | 09:00, 15:00, 21:00 | — | |
 | backup | 03:00 | 04:00 (`pullbackup`, copia al Mac) | |
 

@@ -105,7 +105,7 @@ function scoreProduct(input: {
     return {
       level: DealLevel.HISTORICAL_LOW,
       score: Math.min(100, Math.round(score + 35)),
-      label: "Mínimo histórico",
+      label: "Chollazo",
     };
   }
 
