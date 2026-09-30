@@ -259,8 +259,14 @@ export default function ProductsAdminClient() {
       setShowScrollTop(tableScroll > 280 || pageScroll > 420);
 
       if (!el || loadInFlightRef.current || !hasMoreRef.current) return;
-      const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 280;
+      // La tabla solo tiene scroll propio si su alto está limitado; si crece
+      // con las filas, lo que cuenta es el scroll de la página. Sin esto,
+      // «cerca del final» era siempre cierto y se cargaba el catálogo entero.
+      const tableScrolls = el.scrollHeight > el.clientHeight + 1;
+      const nearBottom = tableScrolls
+        ? el.scrollTop + el.clientHeight >= el.scrollHeight - 280
+        : window.innerHeight + window.scrollY >=
+          document.documentElement.scrollHeight - 600;
       if (nearBottom) {
         void loadPage(false);
       }
