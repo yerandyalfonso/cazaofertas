@@ -5,7 +5,7 @@ import { Price } from "@/components/Price";
 import { buildTrackedAffiliatePath } from "@/lib/affiliate-tracking";
 import type { CatalogProduct } from "@/lib/catalog";
 import { formatEuro } from "@/lib/money";
-import { retailerViewCtaLabel } from "@/lib/retailers";
+import { retailerLabel, retailerViewCtaLabel } from "@/lib/retailers";
 
 interface InlineDealCardProps {
   product: CatalogProduct;
@@ -27,7 +27,10 @@ export function InlineDealCard({
 }: InlineDealCardProps) {
   const detailHref = href ?? `/producto/${product.slug}`;
   const resolvedBuyLabel =
-    buyLabel ?? retailerViewCtaLabel(product.retailer);
+    buyLabel ??
+    (variant === "sidebar"
+      ? retailerViewCtaLabel(product.retailer)
+      : "Ver oferta");
   const buyHref = buildTrackedAffiliatePath({
     productId: product.id,
     source: clickSource,
@@ -104,70 +107,106 @@ export function InlineDealCard({
     product.previousPrice && product.previousPrice > product.currentPrice
       ? product.previousPrice - product.currentPrice
       : 0;
+  const discount = Math.round(product.discountPercentage);
+  const previousPrice =
+    product.previousPrice && product.previousPrice > product.currentPrice
+      ? formatEuro(product.previousPrice)
+      : null;
+  const currentPrice = formatEuro(product.currentPrice);
 
   return (
-    <article className="group relative grid grid-cols-[104px_minmax(0,1fr)] gap-4 border border-stone-300 bg-white p-3 transition-colors hover:border-ink sm:grid-cols-[168px_minmax(0,1fr)] sm:gap-6 sm:p-4">
+    <article className="group flex flex-col border border-stone-300 bg-white transition-colors hover:border-ink sm:grid sm:grid-cols-[200px_minmax(0,1fr)_196px]">
       <Link
         href={detailHref}
-        className="relative aspect-square w-full self-start bg-paper"
+        className="relative aspect-[4/3] w-full border-b border-stone-200 bg-white sm:m-3 sm:aspect-square sm:w-auto sm:border-b-0"
       >
         {product.imageUrl ? (
           <RemoteImage
             src={product.imageUrl}
             alt={product.title}
             fill
-            sizes="(max-width: 640px) 104px, 168px"
-            className="object-contain p-2 mix-blend-multiply transition-transform duration-500 ease-out group-hover:scale-[1.04] sm:p-3"
+            sizes="(max-width: 640px) 100vw, 200px"
+            className="object-contain p-4 transition-transform duration-500 ease-out group-hover:scale-[1.04] sm:p-1.5"
           />
         ) : (
           <span className="flex h-full items-center justify-center text-xs text-stone-400">
             Sin imagen
           </span>
         )}
-        {product.discountPercentage > 0 ? (
-          <span className="absolute left-0 top-0 bg-ink px-2 py-1 text-xs font-semibold tabular-nums text-paper">
-            −{Math.round(product.discountPercentage)}%
-          </span>
-        ) : null}
       </Link>
 
-      <div className="flex min-w-0 flex-col py-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-          {[product.brand, product.category?.name].filter(Boolean).join(" · ") ||
-            "Producto"}
+      <div className="flex min-w-0 flex-col gap-2 px-3.5 pt-3.5 sm:py-5 sm:pl-1.5 sm:pr-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-500">
+          {[product.brand, product.category?.name]
+            .filter(Boolean)
+            .join(" · ") || "Producto"}
         </p>
-        <Link href={detailHref} className="mt-2">
-          <h3 className="line-clamp-2 font-display text-lg leading-snug tracking-tight text-ink transition-colors group-hover:text-teal-900">
+        <Link href={detailHref}>
+          <h3 className="line-clamp-3 font-display text-base leading-snug tracking-tight text-ink transition-colors group-hover:text-teal-900 sm:text-lg">
             {product.title}
           </h3>
         </Link>
+        <p className="text-[13px] text-stone-500 sm:mt-auto">
+          Vendido por{" "}
+          <span className="font-semibold text-ink">
+            {retailerLabel(product.retailer)}
+          </span>
+        </p>
+      </div>
 
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-4 gap-y-3 pt-4">
-          <div className="min-w-0">
-            <Price
-              current={product.currentPrice}
-              previous={product.previousPrice}
-              discountPercentage={product.discountPercentage}
-              showDiscountLabel={false}
-              size="md"
-              className="[&>span:nth-child(2)]:text-sm"
-            />
-            {savings > 0 ? (
-              <p className="mt-1 text-xs text-teal-800">
-                Ahorras {formatEuro(savings)}
-              </p>
+      <div className="mx-3.5 mt-3 flex flex-col gap-3.5 border-t border-stone-200 pb-3.5 pt-3 sm:m-0 sm:gap-1.5 sm:border-l sm:border-t-0 sm:px-[18px] sm:py-5">
+        {/* Móvil: de → a, con % y ahorro a la derecha */}
+        <div className="flex items-end justify-between gap-3 sm:hidden">
+          <div className="grid gap-1">
+            {previousPrice ? (
+              <s className="text-sm tabular-nums text-stone-500">
+                {previousPrice}
+              </s>
             ) : null}
+            <span className="font-display text-[30px] font-semibold leading-none tabular-nums">
+              {currentPrice}
+            </span>
           </div>
-          <a
-            href={buyHref}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="inline-flex h-11 shrink-0 items-center gap-2 bg-ink px-5 text-xs font-semibold uppercase tracking-[0.14em] text-paper transition hover:bg-teal-900 max-sm:w-full max-sm:justify-center"
-          >
-            {resolvedBuyLabel}
-            <span aria-hidden>→</span>
-          </a>
+          {discount > 0 ? (
+            <div className="grid justify-items-end gap-1.5">
+              <span className="bg-teal-50 px-[7px] py-[5px] text-xs font-bold tabular-nums text-teal-800">
+                −{discount}%
+              </span>
+              {savings > 0 ? (
+                <span className="text-[12.5px] font-bold tabular-nums text-teal-800">
+                  −{formatEuro(savings)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
+
+        {/* Escritorio: bloque de precio arriba */}
+        <div className="hidden flex-col gap-1.5 sm:flex">
+          {discount > 0 ? (
+            <span className="self-start bg-teal-50 px-[7px] py-[5px] text-xs font-bold tabular-nums text-teal-800">
+              −{discount}%
+            </span>
+          ) : null}
+          <span className="font-display text-[30px] font-semibold leading-none tabular-nums">
+            {currentPrice}
+          </span>
+          {previousPrice ? (
+            <s className="text-sm tabular-nums text-stone-500">
+              {previousPrice}
+            </s>
+          ) : null}
+        </div>
+
+        <a
+          href={buyHref}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 bg-ink text-xs font-bold uppercase tracking-[0.12em] text-paper transition hover:bg-teal-900 sm:mt-auto"
+        >
+          {resolvedBuyLabel}
+          <span aria-hidden>→</span>
+        </a>
       </div>
     </article>
   );
