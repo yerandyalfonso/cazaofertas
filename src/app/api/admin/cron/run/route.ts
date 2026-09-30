@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
-import { formatEnvError, isFacebookPageConfigured } from "@/lib/env";
+import {
+  formatEnvError,
+  isFacebookPageConfigured,
+  isInstagramPublishingConfigured,
+} from "@/lib/env";
 import { runAmazonPriceCheck } from "@/services/amazonPriceCheck";
 import { getAdminCatalogStats } from "@/services/adminDashboard";
 import { getAppSettings } from "@/services/appSettings";
+import { getMetaQueueStatus } from "@/services/metaPostQueue";
 import {
   getCronControlState,
   pauseCronJobs,
@@ -22,14 +27,21 @@ export async function GET(request: NextRequest) {
     const denied = requireAdminApi(request);
     if (denied) return denied;
 
-    const [catalog, cronControl, appSettings, telegramQueue, telegramBatch] =
-      await Promise.all([
-        getAdminCatalogStats(),
-        getCronControlState().catch(() => null),
-        getAppSettings().catch(() => null),
-        getChannelNotificationQueueStats(),
-        getTelegramBatchSchedule(),
-      ]);
+    const [
+      catalog,
+      cronControl,
+      appSettings,
+      telegramQueue,
+      telegramBatch,
+      metaQueue,
+    ] = await Promise.all([
+      getAdminCatalogStats(),
+      getCronControlState().catch(() => null),
+      getAppSettings().catch(() => null),
+      getChannelNotificationQueueStats(),
+      getTelegramBatchSchedule(),
+      getMetaQueueStatus().catch(() => null),
+    ]);
 
     return NextResponse.json({
       ok: true,
@@ -48,6 +60,8 @@ export async function GET(request: NextRequest) {
       telegramBatchDue: telegramBatch.batchDue,
       telegramNextFlushAt: telegramBatch.nextFlushAt,
       facebookConfigured: isFacebookPageConfigured(),
+      instagramConfigured: isInstagramPublishingConfigured(),
+      metaQueue,
     });
   } catch (error) {
     const message = formatEnvError(error);
@@ -97,9 +111,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = formatEnvError(error);
     console.error("[admin/cron/run]", message);
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

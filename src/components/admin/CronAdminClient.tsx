@@ -40,6 +40,16 @@ interface CronStatus {
   telegramBatchDue?: boolean;
   telegramNextFlushAt?: string | null;
   facebookConfigured?: boolean;
+  instagramConfigured?: boolean;
+  metaQueue?: {
+    postingEnabled: boolean;
+    pending: number;
+    batchSize: number;
+    minDiscountPercent: number;
+    postIntervalMinutes: number;
+    lastPostAt: string | null;
+    nextPostAt: string | null;
+  } | null;
 }
 
 interface CronRunResult {
@@ -129,6 +139,7 @@ export function CronAdminClient({
   const [error, setError] = useState<string | null>(null);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [flushingTelegram, setFlushingTelegram] = useState(false);
+  const [flushingMeta, setFlushingMeta] = useState(false);
 
   async function readJsonSafe<T>(response: Response): Promise<T | null> {
     const text = await response.text();
@@ -174,6 +185,8 @@ export function CronAdminClient({
         telegramBatchDue: data.telegramBatchDue,
         telegramNextFlushAt: data.telegramNextFlushAt ?? null,
         facebookConfigured: data.facebookConfigured ?? false,
+        instagramConfigured: data.instagramConfigured ?? false,
+        metaQueue: data.metaQueue ?? null,
       });
     } catch (err) {
       const message =
@@ -351,6 +364,48 @@ export function CronAdminClient({
       toast.error(message);
     } finally {
       setPauseBusy(false);
+    }
+  }
+
+  async function flushMetaNow() {
+    setFlushingMeta(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/cron/meta-flush", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await readJsonSafe<{
+        ok?: boolean;
+        error?: string;
+        skipped?: boolean;
+        reason?: string;
+        posted?: number;
+        facebookOk?: boolean;
+        instagramOk?: boolean;
+      }>(response);
+      if (!response.ok || !data?.ok) {
+        const message = data?.error ?? "No se pudo publicar el lote de Meta.";
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      if (data.skipped) {
+        toast.success(data.reason ?? "Nada que publicar.");
+      } else {
+        toast.success(
+          `Lote Meta · ${data.posted ?? 0} chollos · Facebook ${data.facebookOk ? "ok" : "falló"} · Instagram ${data.instagramOk ? "ok" : "falló"}`,
+        );
+      }
+      await loadStatus();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error al publicar el lote.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setFlushingMeta(false);
     }
   }
 
@@ -582,7 +637,7 @@ export function CronAdminClient({
               Canales
             </p>
             <h2 className="mt-2 font-display text-2xl text-ink">
-              Telegram y Facebook
+              Telegram
             </h2>
             <p className="mt-1 max-w-xl text-sm text-stone-600">
               Los crons encolan; el envío al grupo respeta el intervalo. Desde
@@ -655,14 +710,95 @@ export function CronAdminClient({
                 Editar umbrales
               </Link>
             </div>
-            <p className="mt-3 text-sm text-stone-600">
-              Facebook:{" "}
-              {loadingStatus
-                ? "…"
-                : status?.facebookConfigured
-                  ? "configurado (mismo lote Telegram)"
-                  : "sin configurar (FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN)"}
+          </section>
+
+          <section className="mt-6 admin-card p-6">
+            <p className="text-xs font-semibold text-teal-800">Canales</p>
+            <h2 className="mt-2 font-display text-2xl text-ink">
+              Facebook e Instagram
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-stone-600">
+              Comparten cola: se publica un carrusel en cada red cuando se
+              junta el lote y pasó el espaciado mínimo.
             </p>
+            {status?.metaQueue ? (
+              <p className="mt-3 text-sm text-stone-600">
+                Umbral: dto. ≥ {status.metaQueue.minDiscountPercent}%
+                {" · "}lote de {status.metaQueue.batchSize}
+                {" · "}cada {status.metaQueue.postIntervalMinutes} min mín.
+                {status.metaQueue.nextPostAt
+                  ? ` · próximo ${new Date(status.metaQueue.nextPostAt).toLocaleString("es-ES")}`
+                  : ""}
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
+              <p className="text-sm text-stone-600">
+                Pendientes:{" "}
+                <span className="font-medium text-ink">
+                  {loadingStatus
+                    ? "…"
+                    : `${status?.metaQueue?.pending ?? 0}/${status?.metaQueue?.batchSize ?? 0}`}
+                </span>
+                {status?.metaQueue?.lastPostAt ? (
+                  <>
+                    {" "}
+                    · último lote{" "}
+                    {new Date(status.metaQueue.lastPostAt).toLocaleString(
+                      "es-ES",
+                    )}
+                  </>
+                ) : null}
+              </p>
+              <button
+                type="button"
+                disabled={
+                  flushingMeta ||
+                  loadingStatus ||
+                  !status?.metaQueue?.postingEnabled ||
+                  !status?.metaQueue?.pending
+                }
+                onClick={() => void flushMetaNow()}
+                className="admin-btn admin-btn-ghost h-9"
+              >
+                {flushingMeta ? "Publicando…" : "Publicar lote ahora"}
+              </button>
+              <Link
+                href="/admin/settings"
+                className="text-sm font-medium text-teal-800 underline"
+              >
+                Editar umbrales
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  name: "Facebook",
+                  configured: status?.facebookConfigured,
+                  missing: "FACEBOOK_PAGE_ID + FACEBOOK_PAGE_ACCESS_TOKEN",
+                },
+                {
+                  name: "Instagram",
+                  configured: status?.instagramConfigured,
+                  missing: "INSTAGRAM_BUSINESS_ACCOUNT_ID",
+                },
+              ].map((channel) => (
+                <div
+                  key={channel.name}
+                  className="rounded-lg border border-stone-200 px-4 py-3"
+                >
+                  <p className="text-sm font-medium text-ink">{channel.name}</p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    {loadingStatus
+                      ? "…"
+                      : !channel.configured
+                        ? `Sin configurar (${channel.missing})`
+                        : status?.metaQueue?.postingEnabled
+                          ? "Activo"
+                          : "Pausado (admin → Ajustes)"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </section>
         </>
       ) : null}
@@ -757,7 +893,7 @@ export function CronAdminClient({
                 Lote Telegram
               </h3>
               <p className="mt-2 flex-1 text-sm text-stone-600">
-                Envía pendientes ahora (y Facebook si está configurado), sin
+                Envía pendientes de Telegram ahora, sin
                 esperar al intervalo.
               </p>
               <div className="mt-5">

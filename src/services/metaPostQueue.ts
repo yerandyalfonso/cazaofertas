@@ -348,3 +348,36 @@ export async function maybeFlushMetaBatch(options?: {
     instagramOk: instagram.ok,
   };
 }
+
+export interface MetaQueueStatus {
+  postingEnabled: boolean;
+  pending: number;
+  batchSize: number;
+  minDiscountPercent: number;
+  postIntervalMinutes: number;
+  lastPostAt: string | null;
+  /** Cuándo se cumple el espaciado mínimo; null si ya pasó o nunca se publicó. */
+  nextPostAt: string | null;
+}
+
+/** Estado de la cola compartida de Facebook/Instagram para el admin. */
+export async function getMetaQueueStatus(): Promise<MetaQueueStatus> {
+  const client = createSupabaseServiceClient();
+  const [settings, pending] = await Promise.all([
+    getMetaSocialSettings(),
+    countPendingMetaPosts(client),
+  ]);
+  const nextMs = settings.lastPostAt
+    ? new Date(settings.lastPostAt).getTime() +
+      settings.postIntervalMinutes * 60_000
+    : null;
+  return {
+    postingEnabled: settings.postingEnabled,
+    pending,
+    batchSize: settings.batchSize,
+    minDiscountPercent: settings.minDiscountPercent,
+    postIntervalMinutes: settings.postIntervalMinutes,
+    lastPostAt: settings.lastPostAt,
+    nextPostAt: nextMs && nextMs > Date.now() ? new Date(nextMs).toISOString() : null,
+  };
+}
