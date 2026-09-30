@@ -108,6 +108,8 @@ write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 write_plist "com.cazaofertas.cron.coupons-discover" "coupons-discover" "" "10:00 18:00"
 # MediaMarkt: solo desde el Mac (a la IP del VPS le da 403).
 write_plist "com.cazaofertas.cron.mediamarkt-deals" "mediamarkt-deals" "" "8:15 12:15 16:15 20:15"
+# PcComponentes: Google Chrome con ventana (Cloudflare), solo Mac.
+write_plist "com.cazaofertas.cron.pccomponentes-deals" "pccomponentes-deals" "" "9:45 17:45"
 
 echo
 echo "Cargando LaunchAgents..."
@@ -118,6 +120,7 @@ load_agent "com.cazaofertas.cron.user-alerts"
 load_agent "com.cazaofertas.cron.kiabi-deals"
 load_agent "com.cazaofertas.cron.coupons-discover"
 load_agent "com.cazaofertas.cron.mediamarkt-deals"
+load_agent "com.cazaofertas.cron.pccomponentes-deals"
 
 echo
 echo "Listo. Horarios (hora local del Mac):"
@@ -128,6 +131,7 @@ echo "  • user-alerts:   cada 30 min (40 alertas, 40 s entre cada una)"
 echo "  • kiabi-deals:   09:30 y 18:30 (requiere KIABI_DEALS_ENABLED=1)"
 echo "  • coupons:       10:00 y 18:00"
 echo "  • mediamarkt:    08:15, 12:15, 16:15 y 20:15"
+echo "  • pccomponentes: 09:45 y 17:45 (abre Chrome minimizado)"
 echo "  • telegram:      lote al grupo según intervalo admin (default 4 h)"
 echo
 echo "Prueba manual:"

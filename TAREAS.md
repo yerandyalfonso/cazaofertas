@@ -119,14 +119,16 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### PcComponentes
 
-Solo alertas de usuario por URL, desde el Mac (`user-alerts-residential`, que abre Google Chrome con ventana minimizada, como Carrefour). Código en `src/providers/browser/pccomponentesProductPage.ts`; el Chrome con ventana compartido está en `src/providers/browser/headedChrome.ts`.
+Alertas de usuario por URL (`user-alerts-residential`) y job de ofertas `pccomponentes-deals`, los dos desde el Mac con Google Chrome con ventana minimizada, como Carrefour. Código en `src/providers/browser/pccomponentes*.ts` y `src/services/pccomponentesDeals.ts`; el Chrome con ventana compartido está en `src/providers/browser/headedChrome.ts`.
 
-- [ ] Descubrimiento de ofertas (job `pccomponentes-deals`, como Carrefour/MediaMarkt): los listados (`/portatiles`…) cargan incluso con Chrome headless y traen JSON-LD `ItemList` con nombre, precio y URL; falta ver de dónde sacar el PVPR en el listado para no abrir cada ficha.
+- [ ] Decidir si se activan los avisos del job (`PCCOMPONENTES_DEALS_NOTIFY=1` en el `.env.local` del Mac). Hoy apagados: el tachado es el PVPR del fabricante, que suele estar inflado (en la prueba, 145 de 236 productos con ≥15 % y muchos por encima del 50 %). Si se activan, subir el descuento mínimo en admin → Ajustes (p. ej. 30 %).
+- [ ] Revisar tras las primeras corridas reales (log `~/Library/Logs/cazaofertas/pccomponentes-deals.log`) cuántos productos entran y si las categorías se asignan bien fuera de Tecnología/Informática.
 - [ ] Afiliación: los enlaces van directos a pccomponentes.com. Si se entra en su programa, rellenar `affiliate_url`.
 - [x] 2026-09-30 Ficha con Google Chrome con ventana (antes Chromium headless, que Cloudflare bloquea en la ficha y que además no estaba instalado en el Mac: toda alerta fallaba al arrancar). Espera a que Cloudflare resuelva el reto («Un momento…», hasta 15 s); ~2–4 s por ficha. Probado con 3 fichas reales, incluida una con variantes (`ProductGroup`) y una inexistente («no encontrado»).
 - [x] 2026-09-30 Precio tachado: el PVPR que muestra la ficha (`#pdp-price-original`, «PVPR 749,99€»); el JSON-LD solo trae el precio actual.
 - [x] 2026-09-30 URL guardada sin query, hash ni `/` final (`normalizePcComponentesProductUrl`). El id ya salía limpio (el slug de la ruta), así que no había productos duplicados, pero la URL se guardaba con `?utm…`.
 - [x] 2026-09-30 Fotos de `img.pccomponentes.com`: cargan desde el Mac y desde el VPS (Telegram puede mostrarlas sin subirlas a Supabase, al contrario que Carrefour).
+- [x] 2026-09-30 Job `pccomponentes-deals` (Mac, 09:45 y 17:45; LaunchAgent instalado el 30-09). Lee las tarjetas de 6 listados de categoría (~40 por página, 2 páginas): precio, PVPR tachado (`crossedPrice`), marca, categoría, vendedor y foto, sin abrir fichas. Descarta vendedores externos y reacondicionados («Replay…»: PcComponentes los marca `condition=new`, se detectan por título). Configurable en admin → Ajustes (`retailer_deal_settings.pccomponentes`) o con `PCCOMPONENTES_DEALS_*`. Prueba en seco: 236 productos, 145 con descuento, 32 de terceros descartados. No necesita despliegue: el VPS ya conocía la tienda.
 
 ### MediaMarkt
 

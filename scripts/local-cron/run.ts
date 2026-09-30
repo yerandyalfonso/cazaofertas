@@ -17,6 +17,7 @@ type LocalCronJob =
   | "user-alerts-residential"
   | "kiabi-deals"
   | "mediamarkt-deals"
+  | "pccomponentes-deals"
   | "telegram-flush"
   | "coupons-discover"
   | "admin-digest"
@@ -31,6 +32,7 @@ const JOBS: LocalCronJob[] = [
   "user-alerts-residential",
   "kiabi-deals",
   "mediamarkt-deals",
+  "pccomponentes-deals",
   "telegram-flush",
   "coupons-discover",
   "admin-digest",
@@ -271,6 +273,27 @@ async function runMediaMarktDeals(): Promise<void> {
   }
 }
 
+/**
+ * Rebajas PcComponentes (PVPR tachado) desde los listados de categoría. Solo
+ * Mac: Cloudflare exige Google Chrome con ventana e IP residencial.
+ * `PCCOMPONENTES_DEALS_DRY_RUN=1` no escribe nada; `PCCOMPONENTES_DEALS_NOTIFY=1`
+ * avisa al canal y a las alertas de usuario.
+ */
+async function runPcComponentesDeals(): Promise<void> {
+  const { runPcComponentesDealsCheck } = await import("@/services/pccomponentesDeals");
+  const result = await runPcComponentesDealsCheck({
+    limit: Number(process.env.PCCOMPONENTES_DEALS_LIMIT) || 20,
+    dryRun: process.env.PCCOMPONENTES_DEALS_DRY_RUN === "1",
+    notify: process.env.PCCOMPONENTES_DEALS_NOTIFY === "1",
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.discovery.pagesFetched === 0 && result.discovery.feedErrors.length > 0) {
+    throw new Error(
+      `PcComponentes: ningún listado cargó (${result.discovery.feedErrors[0]!.message})`,
+    );
+  }
+}
+
 async function runKiabiDeals(): Promise<void> {
   const { runKiabiDealsCheck } = await import("@/services/kiabiDeals");
   const { reviewKiabiDealsResult } = await import("./notify");
@@ -350,6 +373,9 @@ async function main(): Promise<void> {
       break;
     case "mediamarkt-deals":
       await runMediaMarktDeals();
+      break;
+    case "pccomponentes-deals":
+      await runPcComponentesDeals();
       break;
     case "telegram-flush":
       await runTelegramFlush();

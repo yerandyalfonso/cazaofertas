@@ -12,6 +12,7 @@ for label in \
   com.cazaofertas.cron.kiabi-deals \
   com.cazaofertas.cron.coupons-discover \
   com.cazaofertas.cron.mediamarkt-deals \
+  com.cazaofertas.cron.pccomponentes-deals \
   com.cazaofertas.cron.carrefour-deals \
   com.cazaofertas.cron.carrefour-deals-test
 do

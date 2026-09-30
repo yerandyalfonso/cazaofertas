@@ -34,6 +34,13 @@ const RETAILER_DEAL_COPY: Record<
     feedPlaceholder: "https://www.mediamarkt.es/es/category/port%C3%A1tiles-153.html",
     feedHint: "Listados de categoría. Vacío = los 8 listados por defecto.",
   },
+  pccomponentes: {
+    title: "PcComponentes",
+    schedule:
+      "Job del Mac con Google Chrome con ventana (09:45 y 17:45); el tachado es el PVPR del fabricante.",
+    feedPlaceholder: "https://www.pccomponentes.com/categorias/portatiles",
+    feedHint: "Listados de categoría. Vacío = los 6 listados por defecto.",
+  },
 };
 
 function retailerDealsToForm(
@@ -707,7 +714,7 @@ export function SettingsAdminClient({ embedded = false }: { embedded?: boolean }
               />
               Job de ofertas {copy.title} activo
             </label>
-            {job === "mediamarkt" ? (
+            {job === "mediamarkt" || job === "pccomponentes" ? (
               <label className="mt-3 flex items-center gap-2 text-sm text-stone-700">
                 <input
                   type="checkbox"

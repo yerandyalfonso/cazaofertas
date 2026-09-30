@@ -1,5 +1,6 @@
 /**
- * Ajustes de los jobs de ofertas de las tiendas nuevas (Carrefour, MediaMarkt),
+ * Ajustes de los jobs de ofertas de las tiendas nuevas (Carrefour, MediaMarkt,
+ * PcComponentes),
  * en `app_settings.retailer_deal_settings` (JSON por tienda, migración 0055).
  * Lo guardado desde el admin tiene prioridad; lo que falte sale del .env.local
  * de la máquina que corre el job (hoy el Mac). Sin la columna, solo entorno.
@@ -19,7 +20,7 @@ export interface RetailerDealSettings {
   pagesPerFeed: number;
   /** Vacío = listados por defecto del job. */
   feedUrls: string[];
-  /** Solo MediaMarkt: incluir ofertas de vendedores externos. */
+  /** MediaMarkt y PcComponentes: incluir ofertas de vendedores externos. */
   includeMarketplace: boolean;
 }
 
@@ -31,17 +32,20 @@ export type RetailerDealSettingsPatch = Partial<
 const ENV_PREFIX: Record<RetailerDealJob, string> = {
   carrefour: "CARREFOUR",
   mediamarkt: "MEDIAMARKT",
+  pccomponentes: "PCCOMPONENTES",
 };
 
 /** Variable de entorno con los listados que recorre cada job. */
 const ENV_FEED_VAR: Record<RetailerDealJob, string> = {
   carrefour: "CARREFOUR_BROWSER_FEED_URLS",
   mediamarkt: "MEDIAMARKT_FEED_URLS",
+  pccomponentes: "PCCOMPONENTES_FEED_URLS",
 };
 
 const DEFAULT_PAGES_PER_FEED: Record<RetailerDealJob, number> = {
   carrefour: 5,
   mediamarkt: 3,
+  pccomponentes: 2,
 };
 
 const MAX_PAGES_PER_FEED = 10;
@@ -124,6 +128,7 @@ export async function getRetailerDealSettingsMap(): Promise<RetailerDealSettings
   return {
     carrefour: mergeStored("carrefour", stored.carrefour),
     mediamarkt: mergeStored("mediamarkt", stored.mediamarkt),
+    pccomponentes: mergeStored("pccomponentes", stored.pccomponentes),
   };
 }
 
