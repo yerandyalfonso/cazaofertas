@@ -57,7 +57,7 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 ## Admin
 
-- [ ] Carruseles: con «Modo automático» activo, lo que editas a mano en una diapositiva se pierde al reabrir el carrusel (se regenera desde el artículo). Pasaba ya antes del 30-09. Decidir si editar a mano debe apagar el modo automático o si el guardado debe respetar las ediciones.
+- [x] 2026-09-30 Carruseles: editar a mano una diapositiva (texto, sección, restaurar, añadir, quitar o mover) apaga el «Modo automático», así lo guardado no se regenera desde el artículo al reabrir.
 - [x] 2026-09-30 Últimos 4 avisos `set-state-in-effect` (0 en todo el proyecto): proyecto nuevo/hidratación en los editores de tarjetas, carruseles y vídeos, y la regeneración de diapositivas, pasan al siguiente ciclo. Probado abrir, guardar, reabrir y autoguardar en los tres con proyectos de prueba (borrados después).
 - [x] 2026-09-30 7 avisos `set-state-in-effect` resueltos: reinicios de estado al cambiar la plantilla o la imagen (guía de estilo, importación rápida, `SocialCardPreview`, `SocialPulseTemplate`, editor de redes, vídeos) pasan a hacerse durante el render; comentarios del blog con carga diferida.
 - [x] 2026-09-30 Productos: formulario de alta/edición a `useProductForm` (estado y acciones) + `ProductFormPanel` (vista). La página pasa de 1 540 a 1 000 líneas.

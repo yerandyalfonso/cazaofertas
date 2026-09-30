@@ -374,13 +374,22 @@ export function CarouselEditorClient({
     [articles],
   );
 
+  // Editar a mano apaga el modo automático para que no se regenere al reabrir.
+  function stopAutoMode() {
+    if (!autoMode) return;
+    setAutoMode(false);
+    toast.success("Modo automático desactivado para conservar tus cambios.");
+  }
+
   function updateSlide(id: string, patch: Partial<CarouselSlide>) {
+    stopAutoMode();
     setSlides((prev) =>
       prev.map((slide) => (slide.id === id ? { ...slide, ...patch } : slide)),
     );
   }
 
   function applySourceToActiveSlide(sourceId: string) {
+    stopAutoMode();
     const source = sectionSources.find((item) => item.id === sourceId);
     const slide = slides[activeIndex];
     if (!source || !slide) return;
@@ -392,6 +401,7 @@ export function CarouselEditorClient({
   }
 
   function resetActiveSlideFromBaseline() {
+    stopAutoMode();
     const baseline = baselineSlidesRef.current[activeIndex];
     const slide = slides[activeIndex];
     if (!baseline || !slide) {
@@ -415,6 +425,7 @@ export function CarouselEditorClient({
   }
 
   function addSlide() {
+    stopAutoMode();
     const next: CarouselSlide = {
       id: `custom-${Date.now()}`,
       kind: "content",
@@ -432,6 +443,7 @@ export function CarouselEditorClient({
       toast.error("El carrusel necesita al menos una slide.");
       return;
     }
+    stopAutoMode();
     setSlides((prev) => {
       const next = renumberCarouselSlides(
         prev.filter((_, index) => index !== activeIndex),
@@ -447,6 +459,7 @@ export function CarouselEditorClient({
   function moveActiveSlide(direction: -1 | 1) {
     const target = activeIndex + direction;
     if (target < 0 || target >= slides.length) return;
+    stopAutoMode();
     setSlides((prev) => {
       const next = [...prev];
       const [moved] = next.splice(activeIndex, 1);
