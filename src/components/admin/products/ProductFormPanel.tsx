@@ -10,9 +10,14 @@ import { PRODUCT_RETAILERS, retailerLabel } from "@/lib/retailers";
 export function ProductFormPanel({
   productForm,
   categories,
+  error,
+  message,
 }: {
   productForm: ReturnType<typeof useProductForm>;
   categories: CategoryOption[];
+  /** Avisos de la página (extracción, categoría, guardado): se repiten aquí para verlos sin cerrar el panel. */
+  error: string | null;
+  message: string | null;
 }) {
   const {
     createCategory,
@@ -68,7 +73,19 @@ export function ProductFormPanel({
         </>
       }
     >
-<form
+      {error ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-[var(--radius-sm)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+        >
+          {error}
+        </p>
+      ) : message ? (
+        <p className="mb-4 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--primary-soft)] px-4 py-3 text-sm text-[var(--primary)]">
+          {message}
+        </p>
+      ) : null}
+      <form
           id="admin-product-form"
           onSubmit={(event) => void onSave(event)}
           className="grid gap-4 md:grid-cols-2"

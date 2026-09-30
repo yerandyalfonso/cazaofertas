@@ -647,7 +647,12 @@ export default function ProductsAdminClient() {
         onEdit={openEdit}
       />
 
-      <ProductFormPanel productForm={productForm} categories={categories} />
+      <ProductFormPanel
+        productForm={productForm}
+        categories={categories}
+        error={error}
+        message={message}
+      />
 
       <div
         ref={tableScrollRef}
