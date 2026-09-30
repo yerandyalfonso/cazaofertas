@@ -268,10 +268,14 @@ export function VideosAdminClient({
     [orderedSlides],
   );
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  // `null` al montar para aplicarlo también en el primer render, como hacía el efecto.
+  const [prevSlides, setPrevSlides] = useState<CaptureSlide[] | null>(null);
+  if (orderedSlides !== prevSlides) {
+    setPrevSlides(orderedSlides);
     setPreviewProduct(orderedSlides[0]?.product ?? null);
     setCaptureStyle(null);
-  }, [orderedSlides]);
+  }
 
   const buildSnapshot = useCallback(
     () => ({

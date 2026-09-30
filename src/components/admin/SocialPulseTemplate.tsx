@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatEuro } from "@/lib/money";
 import type { SocialCardImageFit } from "@/lib/social-card-projects";
 import {
@@ -80,10 +80,14 @@ export function SocialPulseTemplate({
     null,
   );
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  const imageKey = `${imageUrl}|${imageFit}|${product.id}`;
+  const [prevImageKey, setPrevImageKey] = useState(imageKey);
+  if (imageKey !== prevImageKey) {
+    setPrevImageKey(imageKey);
     setReady(false);
     setNatural(null);
-  }, [imageUrl, imageFit, product.id]);
+  }
 
   const discount = resolveDiscount(product);
   const previous =

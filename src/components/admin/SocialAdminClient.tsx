@@ -895,10 +895,14 @@ export function SocialAdminClient({
     ? proxiedImageUrl(selected.imageUrl)
     : null;
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  const imageKey = `${displayImageUrl}|${formatId}|${styleId}|${layoutId}|${colorTone}`;
+  const [prevImageKey, setPrevImageKey] = useState(imageKey);
+  if (imageKey !== prevImageKey) {
+    setPrevImageKey(imageKey);
     setImageReady(false);
     setImageBgColor(null);
-  }, [displayImageUrl, formatId, styleId, layoutId, colorTone]);
+  }
 
   async function downloadPng() {
     if (!cardRef.current || !selected) {

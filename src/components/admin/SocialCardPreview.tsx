@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatEuro } from "@/lib/money";
 import type {
   SocialCardFormatId,
@@ -200,10 +200,14 @@ export function SocialCardPreview({
   const sealSize = isStory ? 168 : isLandscape ? 140 : 152;
   const sealFont = isStory ? 44 : 38;
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  const imageKey = `${imageUrl}|${style.imageFit}|${product.id}`;
+  const [prevImageKey, setPrevImageKey] = useState(imageKey);
+  if (imageKey !== prevImageKey) {
+    setPrevImageKey(imageKey);
     setReady(false);
     setBg(null);
-  }, [imageUrl, style.imageFit, product.id]);
+  }
 
   const objectFit =
     style.imageFit === "contain"

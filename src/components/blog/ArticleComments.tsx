@@ -51,8 +51,12 @@ export function ArticleComments({
     }
   }, [articleId]);
 
+  // Fuera del efecto (siguiente ciclo) para no encadenar renders.
   useEffect(() => {
-    void load();
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   async function onSubmit(event: FormEvent) {

@@ -57,7 +57,8 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 ## Admin
 
-- [ ] Avisos `react-hooks/set-state-in-effect` restantes (11 a 30-09): ya no son de carga de datos sino de estado derivado en editores (tarjetas, vídeos, carruseles, `SocialCardPreview`/`SocialPulseTemplate`, que generan imágenes publicadas), `AdminRowMenu`, `RemoteImage`, `icon.tsx` y los comentarios del blog. Tocarlos con cuidado, uno por uno.
+- [ ] Quedan 4 avisos `set-state-in-effect`, todos al cargar un proyecto guardado en los editores (tarjetas, carruseles, vídeos) y al regenerar diapositivas del carrusel. Reescribirlos toca el guardado: hacerlo con pruebas de abrir/guardar/exportar.
+- [x] 2026-09-30 7 avisos `set-state-in-effect` resueltos: reinicios de estado al cambiar la plantilla o la imagen (guía de estilo, importación rápida, `SocialCardPreview`, `SocialPulseTemplate`, editor de redes, vídeos) pasan a hacerse durante el render; comentarios del blog con carga diferida.
 - [ ] Seguir partiendo Productos (hoy ≈1 540 líneas): el formulario de alta/edición y la fila de la tabla dependen de mucho estado; sacarlos con un hook `useProductForm` antes de moverlos.
 - [x] 2026-09-30 Productos y Cupones partidos sin cambiar lógica: tipos y utilidades a `components/admin/products/productsAdmin.ts` y `coupons/couponsAdmin.ts`, panel «Consulta BD» a `ProductDetailPanel` y formulario de cupón a `CouponFormPanel`. Productos 1 950 → 1 540 líneas; Cupones 680 → 510.
 - [x] 2026-09-30 Carga de datos del admin unificada en `useAdminLoad` (15 pantallas: listas, Operaciones, Ajustes, editores): 26 → 11 avisos `set-state-in-effect`.

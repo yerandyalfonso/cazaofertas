@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronDown, ClipboardPaste, Copy, Wand2 } from "lucide-react";
 import {
   getQuickImportTemplate,
@@ -35,9 +35,12 @@ export function ArticleQuickImport({
   const [filling, setFilling] = useState(false);
   const toast = useAdminToast();
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  const [prevBlogTemplate, setPrevBlogTemplate] = useState(activeBlogTemplate);
+  if (activeBlogTemplate !== prevBlogTemplate) {
+    setPrevBlogTemplate(activeBlogTemplate);
     setImportTemplate(quickImportIdForBlogTemplate(activeBlogTemplate));
-  }, [activeBlogTemplate]);
+  }
 
   const preset = useMemo(
     () => getQuickImportTemplate(importTemplate),

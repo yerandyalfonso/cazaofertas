@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   ARTICLE_TEMPLATE_OPTIONS,
@@ -21,9 +21,12 @@ export function ArticleStyleGuide({
   const [focusTemplate, setFocusTemplate] =
     useState<BlogTemplate>(activeTemplate);
 
-  useEffect(() => {
+  // Reinicio al cambiar la clave, durante el render (patrón de React en vez de un efecto).
+  const [prevActiveTemplate, setPrevActiveTemplate] = useState(activeTemplate);
+  if (activeTemplate !== prevActiveTemplate) {
+    setPrevActiveTemplate(activeTemplate);
     setFocusTemplate(activeTemplate);
-  }, [activeTemplate]);
+  }
 
   const outline = getTemplateStyleOutline(focusTemplate);
 
