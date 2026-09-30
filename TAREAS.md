@@ -79,8 +79,8 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 ## Canales (Telegram, Facebook, Instagram)
 
 - [ ] Facebook/Instagram: la cola nunca se vaciaba (nadie llamaba a `maybeFlushMetaBatch` desde que existen los lotes, 22-09) y un lote fallido se perdía. Corregido y desplegado 26-09: interruptor «Publicar en Facebook/Instagram» en admin → Ajustes (arranca apagado), vaciado desde `check-prices` del VPS (`CAZAOFERTAS_META_FLUSH=1`), el lote vuelve a la cola si falla, se apaga solo ante un bloqueo 368 y los pendientes de más de 48 h se descartan. **Cuando Meta desbloquee:** activar el interruptor.
-- [ ] Facebook/Instagram: mejorar el texto de las publicaciones. En Instagram no hay salto de línea entre productos del lote; revisar también la redacción en ambas redes.
 - [ ] Decidir si se quiere canal/bot de WhatsApp (estudio en `docs/estudio-whatsapp.md`).
+- [x] 2026-09-30 Facebook/Instagram: texto de los lotes reescrito. Línea en blanco entre productos (Instagram los juntaba), titular «N chollos de hoy, hasta −X%», precio con tienda y aviso «con Prime», y cierre con enlace a la web (Facebook) o a la bio (Instagram).
 - [x] 2026-09-28 Canal/grupo de Telegram: las ofertas se publican en el momento de detectarlas (antes, lotes cada 2 h con el precio de la detección) y se comprueba el precio justo antes de publicar (Amazon se relee si el precio tiene >10 min; no se publica si subió >2 % o está agotado).
 
 ## Tiendas

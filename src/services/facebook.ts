@@ -8,6 +8,7 @@ import {
 import { formatEuro } from "@/lib/money";
 import { renderSocialPulsePng } from "@/lib/render-social-pulse-card";
 import { pulseThemeForCategory } from "@/lib/pulse-category-theme";
+import { retailerLabel } from "@/lib/retailers";
 import { marketplaceAbsoluteUrl } from "@/lib/site";
 import type { DealCandidate } from "@/services/alertMatching";
 import { DealLevel } from "@/types";
@@ -432,12 +433,27 @@ export async function postDealToFacebookPage(
   }
 }
 
+/** Titular del lote: «🔥 5 chollos de hoy, hasta −72%». */
+export function batchHeadline(deals: DealCandidate[]): string {
+  const best = Math.max(...deals.map((deal) => Math.round(deal.discountPercentage)));
+  if (deals.length === 1) return `🔥 Chollo de hoy: −${best}%`;
+  return `🔥 ${deals.length} chollos de hoy, hasta −${best}%`;
+}
+
+/** «29,99 € (antes 59,99 €, −50%) en Amazon», con aviso si el precio es solo para Prime. */
+export function batchPriceLine(deal: DealCandidate): string {
+  const store = deal.retailer ? ` en ${retailerLabel(deal.retailer)}` : "";
+  const prime = deal.primeOnly ? " con Prime" : "";
+  return `${formatEuro(deal.currentPrice)}${prime} (antes ${formatEuro(deal.previousPrice)}, −${Math.round(deal.discountPercentage)}%)${store}`;
+}
+
 /**
  * Texto del post por lote: uno o varios chollos en un solo post
  * (fotos adjuntas vía `attached_media`), con enlace propio por producto.
+ * Una línea en blanco entre productos para que se lean por separado.
  */
 export function buildFacebookBatchMessage(deals: DealCandidate[]): string {
-  const lines = [`🔥 ${deals.length} chollos seleccionados`, ""];
+  const lines = [batchHeadline(deals), ""];
 
   deals.forEach((deal, index) => {
     const offerUrl = buildTrackedAffiliateUrl({
@@ -446,11 +462,16 @@ export function buildFacebookBatchMessage(deals: DealCandidate[]): string {
     });
     lines.push(
       `${index + 1}. ${truncatePlain(deal.title, 90)}`,
-      `💰 ${formatEuro(deal.currentPrice)} (antes ${formatEuro(deal.previousPrice)}, −${Math.round(deal.discountPercentage)}%)`,
+      `💰 ${batchPriceLine(deal)}`,
       `🛒 ${offerUrl}`,
       "",
     );
   });
+
+  lines.push(
+    "Los precios pueden cambiar en cualquier momento.",
+    `Más chollos: ${marketplaceAbsoluteUrl("/")}`,
+  );
 
   return lines.join("\n").trim();
 }

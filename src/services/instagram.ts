@@ -13,7 +13,11 @@ import {
 } from "@/lib/render-social-pulse-card";
 import { createSupabaseServiceClient, getPublicStorageUrl } from "@/lib/supabase";
 import type { DealCandidate } from "@/services/alertMatching";
-import { buildInstagramDealCaption } from "@/services/facebook";
+import {
+  batchHeadline,
+  batchPriceLine,
+  buildInstagramDealCaption,
+} from "@/services/facebook";
 
 const GRAPH_TIMEOUT_MS = 25_000;
 const AUTH_ERROR_CODES = new Set([190, 102, 463, 467, 458]);
@@ -259,15 +263,18 @@ function truncatePlain(value: string, maxChars: number): string {
   return `${trimmed.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
 
-/** Caption del carrusel: sin URLs (ni caption ni comentarios son clicables en IG). */
+/**
+ * Caption del carrusel: sin URLs (ni caption ni comentarios son clicables en
+ * IG). Un bloque por producto, en el orden de las fotos, separados por una
+ * línea en blanco.
+ */
 export function buildInstagramBatchCaption(deals: DealCandidate[]): string {
-  const lines = [`🔥 ${deals.length} chollos seleccionados`, ""];
+  const lines = [batchHeadline(deals), ""];
   deals.forEach((deal, index) => {
-    lines.push(
-      `${index + 1}. ${truncatePlain(deal.title, 90)} — ${Math.round(deal.discountPercentage)}%`,
-    );
+    lines.push(`${index + 1}. ${truncatePlain(deal.title, 90)}`, `💰 ${batchPriceLine(deal)}`, "");
   });
-  lines.push("", "🔗 Todos los enlaces en Facebook / bio");
+  if (deals.length > 1) lines.push("👉 Desliza para ver todas las fotos.");
+  lines.push("🔗 Los enlaces para comprar están en nuestro Facebook (enlace en la bio).");
   return lines.join("\n").trim().slice(0, 2200);
 }
 
