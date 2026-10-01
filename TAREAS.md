@@ -19,14 +19,14 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 - [ ] Elegir el seudónimo del autor y escribir su bio (`BLOG_AUTHOR` en `src/lib/legal.ts`).
 - [ ] Datos del titular para el aviso legal (LSSI, art. 10): nombre, NIF y domicilio (`LEGAL_OWNER` en `src/lib/legal.ts`). Obligatorio al tener ingresos por afiliación.
 - [ ] Email de contacto del blog (derechos de privacidad y contacto): `LEGAL_OWNER.email` en `src/lib/legal.ts`.
-- [ ] SEO del blog en Google: dar de alta `blog.chollosdhoy.com` en Google Search Console (si se crea la propiedad de dominio `chollosdhoy.com` del marketplace, ya cubre el subdominio) y enviar `https://blog.chollosdhoy.com/sitemap.xml`.
+- [ ] SEO del blog en Google: dar de alta `unamicadetot.com` en Google Search Console (propiedad de dominio) y enviar `https://unamicadetot.com/sitemap.xml` (ver la subtarea SEO del cambio de dominio).
 - [ ] SEO del blog en Bing: dar de alta en Bing Webmaster (importar desde Google) y enviar el sitemap del blog.
 - [ ] IndexNow en el blog: avisar a Bing al publicar o actualizar un artículo.
 - [ ] Cambio de dominio del blog: `blog.chollosdhoy.com` → **`unamicadetot.com`** (registrado en Cloudflare el 2026-10-01; `www` redirige a la raíz).
   - [x] 2026-10-01 DNS en Cloudflare: `A @` y `A www` → `13.140.166.186` (VPS), `AAAA @` → `2a02:c207:2359:4709::1`, solo DNS (nube gris) para que Caddy saque el certificado.
-  - [ ] Caddy del VPS: bloque `unamicadetot.com` (copia del de `blog.chollosdhoy.com`), `www` → raíz, y `blog.chollosdhoy.com` → 301 al nuevo conservando la ruta, salvo `/storage/v1/object/public/*`, que se sigue sirviendo (fotos de Carrefour ya publicadas en Telegram/Facebook).
-  - [ ] `.env.local` del VPS: `NEXT_PUBLIC_SITE_URL=https://unamicadetot.com` (blog) y `NEXT_PUBLIC_BLOG_URL=https://unamicadetot.com` (marketplace); reconstruir y reiniciar las dos webs.
-  - [x] 2026-10-01 Código (sin desplegar): dominios de reserva en `src/lib/site.ts`, `src/services/carrefourDeals.ts`, `apps/chollosdehoy/src/lib/guides.ts`; `api/admin/image-proxy` admite los dos dominios.
+  - [x] 2026-10-01 Caddy del VPS (copia en `/etc/caddy/Caddyfile.bak-202610011159`): bloque `unamicadetot.com` (copia del de `blog.chollosdhoy.com`), `www` → raíz, y `blog.chollosdhoy.com` → 301 al nuevo conservando la ruta, salvo `/storage/v1/object/public/*`, que se sigue sirviendo (fotos de Carrefour ya publicadas en Telegram/Facebook).
+  - [x] 2026-10-01 `.env.local` del VPS (copias `.env.local.bak-<fecha>`): `NEXT_PUBLIC_SITE_URL=https://unamicadetot.com` (blog) y `NEXT_PUBLIC_BLOG_URL=https://unamicadetot.com` (marketplace); reconstruir y reiniciar las dos webs.
+  - [x] 2026-10-01 Código (desplegado): dominios de reserva en `src/lib/site.ts`, `src/services/carrefourDeals.ts`, `apps/chollosdehoy/src/lib/guides.ts`; `api/admin/image-proxy` admite los dos dominios.
   - [ ] Base de datos: contar y, si hay, reescribir los enlaces guardados a `blog.chollosdhoy.com` (imágenes de artículos/productos). Necesita permiso para consultar la BD de producción.
   - [ ] SEO (titular): Search Console con propiedad de dominio `unamicadetot.com` (TXT), enviar `/sitemap.xml` y «Cambio de dirección» desde la propiedad vieja; lo mismo en Bing Webmaster.
 - [ ] Gráfico de historial de precios en la ficha (datos ya disponibles en `getPriceHistory`). *Ojo: en «Descartadas» figura «Historial de precio en la ficha» (26-09, por egress de Supabase); decidir cuál vale.*
