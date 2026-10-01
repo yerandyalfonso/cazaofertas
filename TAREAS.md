@@ -21,7 +21,7 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 - [ ] Email de contacto del blog (derechos de privacidad y contacto): `LEGAL_OWNER.email` en `src/lib/legal.ts`.
 - [x] 2026-10-01 SEO del blog en Google: dar de alta `unamicadetot.com` en Google Search Console (propiedad de dominio) y enviar `https://unamicadetot.com/sitemap.xml` (ver la subtarea SEO del cambio de dominio).
 - [x] 2026-10-01 SEO del blog en Bing: dar de alta en Bing Webmaster (importar desde Google) y enviar el sitemap del blog.
-- [ ] IndexNow en el blog: avisar a Bing al publicar o actualizar un artículo.
+- [x] 2026-10-01 IndexNow en el blog: al publicar, editar o archivar un artículo se avisa a Bing (`src/services/indexNow.ts`, clave `INDEXNOW_KEY` en el `.env.local` del VPS, publicada en `/indexnow-key.txt`). Enviadas además las 43 URL del sitemap (202). En Google: indexación pedida a mano para `/blog` y 7 artículos (la portada ya estaba indexada).
 - [x] 2026-10-01 Cambio de dominio del blog: `blog.chollosdhoy.com` → **`unamicadetot.com`** (registrado en Cloudflare el 2026-10-01; `www` redirige a la raíz).
   - [x] 2026-10-01 DNS en Cloudflare: `A @` y `A www` → `13.140.166.186` (VPS), `AAAA @` → `2a02:c207:2359:4709::1`, solo DNS (nube gris) para que Caddy saque el certificado.
   - [x] 2026-10-01 Caddy del VPS (copia en `/etc/caddy/Caddyfile.bak-202610011159`): bloque `unamicadetot.com` (copia del de `blog.chollosdhoy.com`), `www` → raíz, y `blog.chollosdhoy.com` → 301 al nuevo conservando la ruta, salvo `/storage/v1/object/public/*`, que se sigue sirviendo (fotos de Carrefour ya publicadas en Telegram/Facebook).
