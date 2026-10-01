@@ -36,7 +36,7 @@ function isAllowedImageUrl(raw: string): boolean {
       // Fotos de Carrefour: su bucket público y las que subimos a nuestro Storage.
       (host === "storage.googleapis.com" &&
         url.pathname.startsWith("/catalog-pictures-carrefour-es/")) ||
-      (host === "blog.chollosdhoy.com" &&
+      ((host === "unamicadetot.com" || host === "blog.chollosdhoy.com") &&
         url.pathname.startsWith("/storage/v1/object/public/"))
     );
   } catch {

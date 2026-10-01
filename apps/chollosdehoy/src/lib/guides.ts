@@ -3,7 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase";
 
 /** Blog de CazaOfertas (guías y comparativas). */
 const BLOG_URL = (
-  process.env.NEXT_PUBLIC_BLOG_URL ?? "https://blog.chollosdhoy.com"
+  process.env.NEXT_PUBLIC_BLOG_URL ?? "https://unamicadetot.com"
 ).replace(/\/$/, "");
 
 export interface GuideLink {

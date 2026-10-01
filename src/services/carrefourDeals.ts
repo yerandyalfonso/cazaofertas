@@ -116,7 +116,7 @@ function publicImageUrl(path: string): string {
   const base = (
     process.env.CARREFOUR_IMAGE_PUBLIC_BASE?.trim() ||
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    "https://blog.chollosdhoy.com"
+    "https://unamicadetot.com"
   ).replace(/\/$/, "");
   return `${base}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`;
 }

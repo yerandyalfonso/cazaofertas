@@ -25,7 +25,7 @@ export function getSiteUrl(): string {
     return normalizeSiteBase(explicit);
   }
 
-  return vercelProductionSiteUrl() ?? "https://blog.chollosdhoy.com";
+  return vercelProductionSiteUrl() ?? "https://unamicadetot.com";
 }
 
 export function absoluteUrl(path: string): string {
