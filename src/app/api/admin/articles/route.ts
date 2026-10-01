@@ -8,6 +8,7 @@ import {
 import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
+import { notifyArticleChanged } from "@/services/indexNow";
 import { parseContent } from "@/services/blog";
 import type { Json } from "@/types/database";
 
@@ -245,6 +246,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw new Error(error.message);
+    if (status === "published") notifyArticleChanged(article.slug);
 
     const productIds = [...new Set((body.productIds ?? []).filter(Boolean))];
     if (productIds.length > 0) {

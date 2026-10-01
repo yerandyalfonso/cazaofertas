@@ -9,6 +9,7 @@ import { requireAdminApi } from "@/lib/admin-auth";
 import { formatEnvError } from "@/lib/env";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { parseContent } from "@/services/blog";
+import { notifyArticleChanged } from "@/services/indexNow";
 import type { Json } from "@/types/database";
 
 function slugify(value: string): string {
@@ -222,6 +223,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       .single();
 
     if (error) throw new Error(error.message);
+    if (status === "published") notifyArticleChanged(article.slug);
 
     if (Array.isArray(body.productIds)) {
       const { error: deleteError } = await client
@@ -275,6 +277,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .select("id, slug, status")
       .single();
     if (error) throw new Error(error.message);
+    // Al archivar también: Bing ve el 404 y la retira antes.
+    if (body.status !== "draft") notifyArticleChanged(article.slug);
     return NextResponse.json({ ok: true, article });
   } catch (error) {
     return NextResponse.json(
