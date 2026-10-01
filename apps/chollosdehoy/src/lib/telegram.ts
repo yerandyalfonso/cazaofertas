@@ -4,7 +4,7 @@
  * el producto o la categoría ya puestos — ver `parseTelegramStartPayload`.
  */
 const TELEGRAM_BOT_URL = (
-  process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "https://t.me/cazandor_de_ofertas_bot"
+  process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ?? "https://t.me/cazando_ofertas_bot"
 ).replace(/\/$/, "");
 
 /** Grupo público con temas por categoría (@chollosdhoy). */

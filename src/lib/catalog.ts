@@ -414,7 +414,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
 
 export const TELEGRAM_BOT_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL ??
-  "https://t.me/cazandor_de_ofertas_bot";
+  "https://t.me/cazando_ofertas_bot";
 
 export interface CategoryShowcase {
   /** Nº de productos activos en la categoría (incluye subcategorías). */
