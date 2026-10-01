@@ -22,12 +22,12 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 - [x] 2026-10-01 SEO del blog en Google: dar de alta `unamicadetot.com` en Google Search Console (propiedad de dominio) y enviar `https://unamicadetot.com/sitemap.xml` (ver la subtarea SEO del cambio de dominio).
 - [x] 2026-10-01 SEO del blog en Bing: dar de alta en Bing Webmaster (importar desde Google) y enviar el sitemap del blog.
 - [ ] IndexNow en el blog: avisar a Bing al publicar o actualizar un artículo.
-- [ ] Cambio de dominio del blog: `blog.chollosdhoy.com` → **`unamicadetot.com`** (registrado en Cloudflare el 2026-10-01; `www` redirige a la raíz).
+- [x] 2026-10-01 Cambio de dominio del blog: `blog.chollosdhoy.com` → **`unamicadetot.com`** (registrado en Cloudflare el 2026-10-01; `www` redirige a la raíz).
   - [x] 2026-10-01 DNS en Cloudflare: `A @` y `A www` → `13.140.166.186` (VPS), `AAAA @` → `2a02:c207:2359:4709::1`, solo DNS (nube gris) para que Caddy saque el certificado.
   - [x] 2026-10-01 Caddy del VPS (copia en `/etc/caddy/Caddyfile.bak-202610011159`): bloque `unamicadetot.com` (copia del de `blog.chollosdhoy.com`), `www` → raíz, y `blog.chollosdhoy.com` → 301 al nuevo conservando la ruta, salvo `/storage/v1/object/public/*`, que se sigue sirviendo (fotos de Carrefour ya publicadas en Telegram/Facebook).
   - [x] 2026-10-01 `.env.local` del VPS (copias `.env.local.bak-<fecha>`): `NEXT_PUBLIC_SITE_URL=https://unamicadetot.com` (blog) y `NEXT_PUBLIC_BLOG_URL=https://unamicadetot.com` (marketplace); reconstruir y reiniciar las dos webs.
   - [x] 2026-10-01 Código (desplegado): dominios de reserva en `src/lib/site.ts`, `src/services/carrefourDeals.ts`, `apps/chollosdehoy/src/lib/guides.ts`; `api/admin/image-proxy` admite los dos dominios.
-  - [ ] Base de datos: contar y, si hay, reescribir los enlaces guardados a `blog.chollosdhoy.com` (imágenes de artículos/productos). Necesita permiso para consultar la BD de producción.
+  - [x] 2026-10-01 Base de datos: 39 `products.image_url` (fotos de Carrefour en nuestro Storage) reescritas a `unamicadetot.com`; copia en `public._bak_image_url_20261001`. No había más enlaces al dominio viejo.
   - [x] 2026-10-01 Google Search Console: propiedad de dominio `unamicadetot.com` verificada (TXT `google-site-verification` en Cloudflare: no borrarlo) y `sitemap.xml` enviado. No había propiedad vieja, así que no hay «Cambio de dirección»: basta el 301.
   - [x] 2026-10-01 Bing Webmaster: sitio `https://unamicadetot.com/` verificado con CNAME `eb33279fed148ee02d306fca8ee97c12` → `verify.bing.com` en Cloudflare (no borrarlo) y `sitemap.xml` enviado.
 - [ ] Gráfico de historial de precios en la ficha (datos ya disponibles en `getPriceHistory`). *Ojo: en «Descartadas» figura «Historial de precio en la ficha» (26-09, por egress de Supabase); decidir cuál vale.*
