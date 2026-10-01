@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.kiabi.es" },
       { protocol: "https", hostname: "img2.miravia.es" },
       { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "storage.googleapis.com", pathname: "/catalog-pictures-carrefour-es/**" },
+      { protocol: "https", hostname: "**.carrefour.es" },
     ],
   },
 };
