@@ -8,7 +8,7 @@ Requisitos: ~/.oci/config + clave API; venv con `oci`; .env.local con
 TELEGRAM_BOT_TOKEN y TELEGRAM_ADMIN_CHAT_ID. Clave SSH pública en
 ~/.oci/oracle_madrid_ed25519.pub.
 """
-import json, os, sys, urllib.parse, urllib.request
+import json, os, sys, time, urllib.parse, urllib.request
 from pathlib import Path
 import oci
 
@@ -42,7 +42,9 @@ ad = idn.list_availability_domains(tid).data[0].name
 subnet = next(s for s in net.list_subnets(tid).data if s.display_name == "subred-publica")
 ssh_key = Path("~/.oci/oracle_madrid_ed25519.pub").expanduser().read_text().strip()
 
-for shape, shape_cfg in SHAPES:
+for n, (shape, shape_cfg) in enumerate(SHAPES):
+    if n:
+        time.sleep(20)  # pedir la segunda forma sin pausa da TooManyRequests
     image = next(
         i for i in compute.list_images(tid, operating_system="Canonical Ubuntu", operating_system_version="24.04",
                                        shape=shape, sort_by="TIMECREATED", sort_order="DESC").data
