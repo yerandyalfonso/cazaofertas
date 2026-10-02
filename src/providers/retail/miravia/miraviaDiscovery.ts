@@ -16,14 +16,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Miravia mezcla formatos: «1.101,45 €» y «1,101.45». El último separador es el
+ * decimal salvo que lleve justo 3 cifras detrás («1.099», «1,099» = miles).
+ * Antes «1,101.45» se leía como 1,10 €.
+ */
+function normalizeMoneyNumber(raw: string): number {
+  const digits = raw.trim().replace(/[^\d.,]/g, "");
+  const lastSep = Math.max(digits.lastIndexOf("."), digits.lastIndexOf(","));
+  if (lastSep < 0) return Number(digits);
+  const decimals = digits.slice(lastSep + 1);
+  const hasBoth = digits.includes(".") && digits.includes(",");
+  const isDecimal = hasBoth || decimals.length !== 3;
+  const intPart = (isDecimal ? digits.slice(0, lastSep) : digits).replace(/[.,]/g, "");
+  return Number(isDecimal ? `${intPart}.${decimals}` : intPart);
+}
+
 function parseEuroLabel(raw: string | null | undefined): number | null {
   if (!raw?.trim()) return null;
-  const cleaned = raw
-    .trim()
-    .replace(/[^\d.,]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const value = Number(cleaned);
+  const value = normalizeMoneyNumber(raw);
   return Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
 }
 
@@ -34,11 +45,13 @@ function parseEuroLabel(raw: string | null | undefined): number | null {
  */
 function trackPriceToEuro(raw: string | null | undefined): number | null {
   if (!raw?.trim()) return null;
-  const trimmed = raw.trim().replace(",", ".");
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  if (trimmed.includes(".")) return roundMoney(value);
-  return roundMoney(value / 100);
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const cents = Number(trimmed);
+    return cents > 0 ? roundMoney(cents / 100) : null;
+  }
+  const value = normalizeMoneyNumber(trimmed);
+  return Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
 }
 
 function parseDiscountPercent(raw: string | null | undefined): number | null {

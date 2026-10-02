@@ -14,6 +14,23 @@ import {
   pulseScale,
 } from "@/lib/social-pulse-metrics";
 
+/**
+ * Satori no decodifica webp/avif (Miravia sirve .webp): la tarjeta salía en
+ * blanco. Se convierten a PNG en data URL; el resto pasa tal cual.
+ */
+async function satoriImageSrc(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !/webp|avif/i.test(type)) return url;
+    const { default: sharp } = await import("sharp");
+    const png = await sharp(Buffer.from(await res.arrayBuffer())).png().toBuffer();
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } catch {
+    return url;
+  }
+}
+
 export interface SocialPulseRenderInput {
   title?: string | null;
   imageUrl?: string | null;
@@ -84,8 +101,9 @@ export async function renderSocialPulsePng(
   const frameInsetTop = Math.round(height * 0.09);
   const frameInsetBottom = Math.round(height * 0.1);
   const frameRadius = Math.round(width * 0.045);
-  const imageUrl = input.imageUrl?.trim() || null;
-  const canUseImage = Boolean(imageUrl && /^https?:\/\//i.test(imageUrl));
+  const rawImageUrl = input.imageUrl?.trim() || null;
+  const canUseImage = Boolean(rawImageUrl && /^https?:\/\//i.test(rawImageUrl));
+  const imageUrl = canUseImage && rawImageUrl ? await satoriImageSrc(rawImageUrl) : null;
   const bgDataUrl = pulseBackgroundDataUrl(theme.id);
 
   const response = new ImageResponse(
