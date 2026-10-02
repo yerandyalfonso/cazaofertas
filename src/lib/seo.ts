@@ -121,6 +121,13 @@ export function breadcrumbJsonLd(
   };
 }
 
+/** Google avisa de «Invalid string length» en `name` por encima de 150 caracteres. */
+function schemaProductName(title: string): string {
+  if (title.length <= 150) return title;
+  const cut = title.slice(0, 150);
+  return cut.slice(0, cut.lastIndexOf(" ") > 100 ? cut.lastIndexOf(" ") : 150).trim();
+}
+
 export function productJsonLd(product: CatalogProduct) {
   const url = absoluteUrl(`/producto/${product.slug}`);
   const description =
@@ -130,7 +137,7 @@ export function productJsonLd(product: CatalogProduct) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: product.title,
+    name: schemaProductName(product.title),
     description,
     sku: product.asin,
     mpn: product.asin,
