@@ -234,6 +234,7 @@ export function buildFacebookDealMessage(deal: DealCandidate): string {
   const emoji = categoryEmoji(deal.parentCategorySlug ?? deal.categorySlug);
   const offerUrl = buildTrackedAffiliateUrl({
     productId: deal.productId,
+    code: deal.asin,
     source: "facebook",
   });
 
@@ -458,6 +459,7 @@ export function buildFacebookBatchMessage(deals: DealCandidate[]): string {
   deals.forEach((deal, index) => {
     const offerUrl = buildTrackedAffiliateUrl({
       productId: deal.productId,
+      code: deal.asin,
       source: "facebook",
     });
     lines.push(

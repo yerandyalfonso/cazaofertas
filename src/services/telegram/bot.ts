@@ -401,6 +401,7 @@ export function buildDealAlertText(
   if (options?.includeCopyLinks) {
     const offerUrl = buildTrackedAffiliateUrl({
       productId: deal.productId,
+      code: deal.asin,
       source: "telegram",
     });
     lines.push("", "🔗 Enlaces:", `🛒 Ver oferta: ${escapeHtml(offerUrl)}`);
@@ -613,6 +614,7 @@ export async function sendDealAlertMessage(options: {
       ? buildOfferActionMarkup({
           affiliateUrl: buildTrackedAffiliateUrl({
             productId: options.deal.productId,
+            code: options.deal.asin,
             source: "telegram",
           }),
           productSlug: options.deal.productSlug,
@@ -1432,6 +1434,7 @@ async function fetchTopDealsText(): Promise<string> {
         scoring,
         affiliateUrl: buildTrackedAffiliateUrl({
           productId: product.id,
+          code: product.asin as string,
           source: "telegram",
         }),
       };
