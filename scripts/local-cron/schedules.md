@@ -14,6 +14,7 @@ Mac: LaunchAgents `com.cazaofertas.cron.<job>` → `run.sh`.
 | `flash-deals` | cada 3 min | cada 10 min | VPS sin Miravia (`CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=0`) |
 | `check-prices` | cada 10 min | cada 10 min | VPS: Miravia por WARP y `CAZAOFERTAS_META_FLUSH=1` (solo el VPS publica en Facebook/Instagram) |
 | `user-alerts` | cada 20 min (35 alertas, 30 s entre cada una) | cada 30 min (40 alertas, 40 s) | Todas las tiendas menos PcComponentes, Carrefour y MediaMarkt. VPS: drop-ins `/etc/systemd/system/cazaofertas-cron@user-alerts.service.d/pace.conf` (ritmo y `TimeoutStartSec=30min`; el servicio base mata a los 10 min) y `cazaofertas-cron-user-alerts.timer.d/pace.conf` |
+| `indexnow-marketplace` | 06:30 | — | Avisa a Bing (IndexNow) de las fichas `/oferta/<slug>` nuevas o con cambio de precio en las últimas 25 h. Timer `cazaofertas-cron-indexnow-marketplace.timer`; clave `INDEXNOW_KEY` también en `apps/chollosdehoy/.env.local` |
 | `kiabi-deals` | 09:30, 18:30 | 09:30, 18:30 | |
 | `coupons-discover` | 10:00, 18:00 | 10:00, 18:00 | |
 | `miravia-deals` | timer desactivado | cada 30 min | Miravia da captcha a la IP del VPS |
