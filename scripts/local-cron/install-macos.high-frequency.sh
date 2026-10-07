@@ -133,7 +133,7 @@ write_plist "com.cazaofertas.cron.check-prices" "check-prices" "" "*:0 *:10 *:20
 # Config anterior: flash cada 180 s e incluye Miravia en la misma pasada.
 write_plist "com.cazaofertas.cron.flash-deals" "flash-deals" "180" "" \
   "CAZAOFERTAS_FLASH_INCLUDE_MIRAVIA=1"
-write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "1800" ""
+write_plist "com.cazaofertas.cron.user-alerts" "user-alerts" "" "8:15 20:15"
 write_plist "com.cazaofertas.cron.kiabi-deals" "kiabi-deals" "" "9:30 18:30"
 write_plist "com.cazaofertas.cron.coupons-discover" "coupons-discover" "" "10:00 18:00"
 
@@ -152,7 +152,7 @@ echo
 echo "Listo. Horarios (perfil alta frecuencia):"
 echo "  • flash-deals:  cada 3 min · Amazon + Miravia en la misma pasada"
 echo "  • check-prices: cada 10 min · precios + lote Telegram si toca"
-echo "  • user-alerts:  cada 30 min (40 alertas, 40 s entre cada una)"
+echo "  • user-alerts:  08:15 y 20:15 (40 alertas, 40 s entre cada una)"
 echo "  • kiabi-deals:  09:30 y 18:30"
 echo "  • coupons:      10:00 y 18:00"
 echo "  • miravia-deals: desactivado (va dentro de flash)"
