@@ -15,6 +15,7 @@ import {
   discoverPcComponentesDeals,
   type PcComponentesListingItem,
 } from "@/providers/browser/pccomponentesDiscovery";
+import { scrapePcComponentesProductPage } from "@/providers/browser/pccomponentesProductPage";
 import { resolveTelegramMinDiscountPercent } from "@/services/appSettings";
 import { getRetailerDealSettings } from "@/services/retailerDealSettings";
 import type { DealCandidate } from "@/services/alertMatching";
@@ -293,6 +294,28 @@ export async function runPcComponentesDealsCheck(options?: {
     result.processed += 1;
 
     try {
+      // El listado solo trae el PVPR tachado; la ficha da el precio más bajo de
+      // los últimos 30 días, que es la referencia real (como Amazon). Si la
+      // ficha no carga, se sigue con el listado.
+      let rrpPrice: number | null = null;
+      if (!dryRun) {
+        const quote = await scrapePcComponentesProductPage(item.productUrl, {
+          timeoutMs: 30_000,
+        }).catch(() => null);
+        if (quote?.price != null) {
+          item.price = quote.price;
+          item.listPrice = quote.listPrice;
+          item.discountPercentage =
+            quote.listPrice != null
+              ? roundMoney(((quote.listPrice - quote.price) / quote.listPrice) * 100)
+              : 0;
+          rrpPrice = quote.rrpPrice;
+          if (item.listPrice == null || item.discountPercentage < minDiscount) {
+            result.skippedNoDiscount += 1;
+            continue;
+          }
+        }
+      }
       const price = roundMoney(item.price);
       const reference = item.listPrice ?? price;
       const discount = item.discountPercentage;
@@ -347,6 +370,7 @@ export async function runPcComponentesDealsCheck(options?: {
           lowest_price: price,
           highest_price: Math.max(price, reference),
           discount_percentage: discount,
+          rrp_price: rrpPrice,
           currency: "EUR",
           availability: ProductAvailability.IN_STOCK,
           is_active: true,
@@ -391,6 +415,7 @@ export async function runPcComponentesDealsCheck(options?: {
             previousLowest == null ? price : roundMoney(Math.min(previousLowest, price)),
           highest_price: roundMoney(Math.max(previousHighest ?? price, price, reference)),
           discount_percentage: discount,
+          rrp_price: rrpPrice,
           availability: ProductAvailability.IN_STOCK,
           is_active: true,
           last_checked_at: now,

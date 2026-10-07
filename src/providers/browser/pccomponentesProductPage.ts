@@ -14,7 +14,10 @@ export interface PcComponentesProductQuote {
   brand: string | null;
   imageUrl: string | null;
   price: number | null;
+  /** Precio «antes»: el más bajo de los últimos 30 días si la ficha lo muestra; si no, el PVPR. */
   listPrice: number | null;
+  /** «PVPR» cuando la referencia es el mínimo de 30 días (como Amazon, directiva Ómnibus). */
+  rrpPrice: number | null;
   availability: "IN_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
 }
 
@@ -34,6 +37,22 @@ function parseEuroText(raw: string | null | undefined): number | null {
   if (!match?.[1]) return null;
   const value = Number(match[1].replace(/\./g, "").replace(",", "."));
   return Number.isFinite(value) && value > 0 ? roundMoney(value) : null;
+}
+
+/** Referencia del descuento: mínimo de 30 días si lo hay (el PVPR queda como dato). */
+export function referencePrices(
+  price: number | null,
+  rrp: number | null,
+  lowest30: number | null,
+): { listPrice: number | null; rrpPrice: number | null } {
+  if (price == null) return { listPrice: null, rrpPrice: null };
+  if (lowest30 != null) {
+    return {
+      listPrice: lowest30 > price ? lowest30 : null,
+      rrpPrice: rrp != null && rrp > lowest30 ? rrp : null,
+    };
+  }
+  return { listPrice: rrp != null && rrp > price ? rrp : null, rrpPrice: null };
 }
 
 /**
@@ -76,6 +95,13 @@ export async function scrapePcComponentesProductPage(
       .textContent({ timeout: 2_000 })
       .catch(() => null);
     const reference = parseEuroText(referenceText);
+    // «Precio más bajo en los últimos 30 días: 349€» bajo el precio.
+    const bodyText = await page
+      .evaluate(() => document.body.innerText)
+      .catch(() => "");
+    const lowest30 = parseEuroText(
+      bodyText.match(/precio m[aá]s bajo en los [uú]ltimos 30 d[ií]as:?\s*([\d.,]+\s*€)/i)?.[1],
+    );
     const brand =
       typeof product.brand === "string" ? product.brand : product.brand?.name ?? null;
     const imageUrl = Array.isArray(product.image)
@@ -89,7 +115,7 @@ export async function scrapePcComponentesProductPage(
       brand,
       imageUrl,
       price: price != null ? roundMoney(price) : null,
-      listPrice: price != null && reference != null && reference > price ? reference : null,
+      ...referencePrices(price, reference, lowest30),
       availability,
     };
   });

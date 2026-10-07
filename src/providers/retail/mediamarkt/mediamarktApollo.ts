@@ -57,7 +57,8 @@ export function listApolloProductIds(html: string): string[] {
 
 export interface ApolloPriceFeature {
   price?: { amount?: number; discount?: number | null } | null;
-  strikePrice?: { amount?: number; shouldBeStruck?: boolean } | null;
+  /** `type`: «XOP» = precio anterior (rebaja real); «RRP» = PVPR del fabricante. */
+  strikePrice?: { amount?: number; shouldBeStruck?: boolean; type?: string | null } | null;
   marketplaceSeller?: { sellerName?: string } | null;
 }
 
@@ -91,6 +92,10 @@ export function pricesFromFeature(feature: ApolloPriceFeature | null): {
   listPrice: number | null;
 } {
   const price = toPrice(feature?.price?.amount);
+  // Un PVPR tachado no es una rebaja (como en Amazon y PcComponentes): sin referencia.
+  if (feature?.strikePrice?.type?.toUpperCase() === "RRP") {
+    return { price, listPrice: null };
+  }
   const strike = feature?.strikePrice?.shouldBeStruck
     ? toPrice(feature.strikePrice.amount)
     : null;
