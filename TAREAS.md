@@ -49,8 +49,8 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 - [ ] Dar de alta en Google Search Console (propiedad de dominio, TXT en el DNS) y enviar `sitemap.xml`.
 - [ ] Dar de alta en Bing Webmaster (importar desde Google).
-- [ ] Implementar IndexNow para avisar a Bing de productos nuevos/cambiados.
-- [ ] Opcional: ensanchar el contenido de ficha y listados para que quede alineado con la barra superior (hoy la barra usa el ancho de la portada, 1600 px).
+- [x] 2026-10-07 IndexNow en el marketplace: job diario `indexnow-marketplace` en el VPS (06:30) con las fichas nuevas o con cambio de precio de las últimas 25 h; clave publicada en `chollosdhoy.com/indexnow-key.txt`. Primer envío aceptado (249 URL, 200).
+- [x] 2026-10-07 Ficha y listados del marketplace al ancho de la barra (1600 px): listados con 5 columnas en pantallas grandes; en la ficha la imagen se limita a 640 px.
 - [x] 2026-09-30 Etiqueta de nivel máximo «Mínimo histórico» → «Chollazo» en la web (blog y marketplace), igual que en Telegram y Facebook.
 - [x] 2026-09-30 MediaMarkt en la lista de tiendas del marketplace (nombre, color `--retailer-mediamarkt` y filtro por tienda).
 - [x] 2026-09-27 Rediseño UI/UX del marketplace (desplegado 27-09, ver «Diseño» en `apps/chollosdehoy/README.md`): tarjetas con precio grande, anterior tachado y botón «Ver» de borde naranja (a todo el ancho si queda solo en su fila); portada con las dos mejores ofertas en horizontal; listados con cabecera compacta y una tarjeta por fila en móvil; ficha con el descuento sobre la foto, precio grande y sin avisos redundantes; barra de navegación fija en todas las páginas; filtro de precio con slider; acento naranja vivo `#f97316`; altura única de 44 px en botones y buscador.
@@ -87,13 +87,16 @@ Organizada por producto: cada tarea va en la sección de lo que cambia (Blog, Ma
 
 ## Alertas de usuario y bot de Telegram
 
-- [ ] Test de carga de alertas (desde 2026-09-27): 100 usuarios de prueba (`users.is_test`) con 500 alertas de URL: 70 usuarios (`test_nuevos_*`) sobre 175 productos de Amazon en oferta/más vendidos que no estaban en el catálogo (se crean públicos en su primera revisión y se quedan al limpiar) y 30 (`test_catalogo_*`) sobre 76 del catálogo. Avisos «🧪 Prueba» y estadísticas cada 2 h al chat privado del bot (timer `cazaofertas-cron-alert-load-report` en el VPS; cada ejecución de user-alerts queda en `user_alert_runs`). Informe manual: `npx tsx scripts/alert-load-test/report.mts`. **Al terminar:** `npx tsx scripts/alert-load-test/cleanup.mts`, desactivar el timer del informe (`sudo systemctl disable --now cazaofertas-cron-alert-load-report.timer`) y decidir si se mantiene el ritmo nuevo de user-alerts (VPS cada 20 min, Mac cada 30 min).
+- [x] 2026-10-07 Test de carga de alertas (27-09 → 07-10): 100 usuarios de prueba y 500 alertas; 31.791 revisiones, 0,5 % de fallos (≈0 % desde el 29-09), 515 bajadas avisadas, vuelta completa cada ~4,9 h. Terminado: usuarios de prueba borrados (`cleanup.mts`; los productos creados se quedan), timer del informe desactivado. El ritmo del test se mantiene de forma permanente: VPS cada 20 min (35 alertas, 30 s) y Mac cada 30 min (40 alertas, 40 s).
+- [x] 2026-10-07 Bot `@cazando_ofertas_bot`: «Iniciar» lo pone Telegram al abrir el chat y lanza `/start` (bienvenida + menú). Faltaban los comandos (el botón «Menú» salía vacío) y la descripción previa a «Iniciar»: registrados con `scripts/telegram/setup-bot-profile.ts` (solo chats privados; relanzar si cambian los comandos).
 - [x] 2026-10-01 Bot de Telegram nuevo: `@cazandor_de_ofertas_bot` (usuario con errata, BotFather no deja cambiarlo) → **`@cazando_ofertas_bot`**. Token nuevo en `.env.local` del Mac, del VPS (copia `.env.local.bak-<fecha>`) y en Vercel (los tres entornos); webhook del bot nuevo → `https://chollosdhoy.com/api/telegram/webhook` con el mismo `TELEGRAM_WEBHOOK_SECRET`; administrador del grupo con temas y del canal público; enlace de reserva en `src/lib/catalog.ts`, `apps/chollosdehoy/src/lib/telegram.ts` y `.env.example` (desplegado, `9a4faa3`). Quien usaba el bot viejo tiene que hacer `/start` en el nuevo para recibir alertas.
 - [x] 2026-09-26 Asistente de alertas de Telegram: «Sin mínimo (−15%)» en alertas de categoría/marca (desplegado 26-09).
 
 ## Canales (Telegram, Facebook, Instagram)
 
 - [ ] Facebook/Instagram: la cola nunca se vaciaba (nadie llamaba a `maybeFlushMetaBatch` desde que existen los lotes, 22-09) y un lote fallido se perdía. Corregido y desplegado 26-09: interruptor «Publicar en Facebook/Instagram» en admin → Ajustes (arranca apagado), vaciado desde `check-prices` del VPS (`CAZAOFERTAS_META_FLUSH=1`), el lote vuelve a la cola si falla, se apaga solo ante un bloqueo 368 y los pendientes de más de 48 h se descartan. **Cuando Meta desbloquee:** activar el interruptor.
+- [ ] Mejorar la página de Facebook y el perfil de Instagram.
+- [ ] Mejorar el diseño de las publicaciones de productos que se envían a Facebook e Instagram.
 - [ ] Decidir si se quiere canal/bot de WhatsApp (estudio en `docs/estudio-whatsapp.md`).
 - [x] 2026-09-30 Facebook/Instagram: texto de los lotes reescrito. Línea en blanco entre productos (Instagram los juntaba), titular «N chollos de hoy, hasta −X%», precio con tienda y aviso «con Prime», y cierre con enlace a la web (Facebook) o a la bio (Instagram).
 - [x] 2026-09-28 Canal/grupo de Telegram: las ofertas se publican en el momento de detectarlas (antes, lotes cada 2 h con el precio de la detección) y se comprueba el precio justo antes de publicar (Amazon se relee si el precio tiene >10 min; no se publica si subió >2 % o está agotado).
@@ -106,7 +109,7 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 - [ ] Salida española para Amazon desde el VPS **sin depender del Mac** (hoy: relé del Mac, 27-09): fijar el CP 28001 no funciona sin iniciar sesión (Amazon responde «Sign in to update your location») y WARP también sale por Francia. Opciones: relé del Mac ampliado a amazon.es (solo con el Mac encendido), proxy residencial español de pago (Bright Data ya está soportado por `BRIGHTDATA_PROXY_*`) o dejar Amazon solo al Mac.
 - [ ] Oracle Cloud «Always Free» en Madrid como segunda salida española para Amazon (detrás del relé del Mac). Cuenta creada (región eu-madrid-1), red `red-proxy` con SSH solo desde el VPS y casa. Sin capacidad: el timer `oracle-proxy-launch` del VPS reintenta cada 5 min (`scripts/oracle-proxy/launch_free_instance.py`) y avisa por Telegram con la IP. **Cuando llegue el aviso:** instalar el proxy limitado a amazon.es, conectarlo por SSH desde el VPS, añadirlo a `AMAZON_EGRESS` y desactivar el timer.
-- [ ] Revisar desde el Mac los ~338 productos de Amazon marcados agotados (muchos eran falsos «agotado»); se corrigen solos en su siguiente revisión.
+- [x] 2026-10-07 Revisados desde el Mac los 347 productos de Amazon marcados agotados (sin avisos): 93 vuelven a tener stock y 1 en preventa; 237 siguen agotados y 16 se desactivaron.
 - [ ] Router Digi (TP-Link EX520v ESDIGI): el firmware trae OpenVPN pero lo oculta; no sirve como salida española. Conexión Plus (1 €/mes) activada el 27-09: cancelarla si no se usa.
 - [x] 2026-09-28 «Oferta Prime»: se lee el precio de oferta Prime que Amazon muestra por defecto (antes el «Precio sin oferta») y se etiqueta «Prime» en web y Telegram, con el precio sin Prime (`products.prime_only`, `regular_price`, migración 0054). Alertas de URL: solo bajadas ≥2 % y ≥0,10 €, sin repetir la misma (migración 0053).
 - [x] 2026-09-27 Lector de Amazon: (1) el VPS está en Francia y Amazon.es quita el precio de lo que no envía allí; lo leíamos como agotado. Ahora se detecta «Enviar a Francia» y esas fichas se omiten (no se marcan agotadas); las revisa el Mac. (2) «Temporalmente sin stock. Realiza tu pedido» y fichas con botón de compra cuentan como disponibles. (3) Productos padre con variantes: precio mínimo del rango, sin «antes». (4) Caja de compra vacía = sin oferta.
@@ -114,8 +117,8 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### Miravia
 
-- [ ] Productos de Miravia con título «Producto Miravia <id>»: importador corregido (2026-09-26). El 26-09 se lanzó la corrección de los 196 desde el VPS por WARP (`systemd-run --unit=fix-miravia-titles`, una ficha cada 45 s); comprobar con `journalctl -u fix-miravia-titles`.
-- [ ] Descripciones de Miravia: el scraper ya lee el bloque «Descripción del artículo»; `check-prices` las va rellenando al revisar cada producto (26-09: 0 de 663).
+- [x] 2026-10-07 Productos de Miravia con título «Producto Miravia <id>»: de 196 quedan 6, todos inactivos (el último activo daba 404 en Miravia y se desactivó).
+- [x] 2026-10-07 Descripciones de Miravia: `check-prices` las va rellenando (751 de 1.334 activos el 07-10; 0 de 663 el 26-09).
 - [x] 2026-09-30 `RETAIL_PRICE_CHECK_SKIP_RETAILERS` había desaparecido del `.env.local` del VPS (reescrito el 27-09 23:22; solo quedaba en `.env.local.bak-202609262317`), así que el VPS volvía a revisar Miravia. Restaurada como `miravia,mediamarkt` (copia previa en `.env.local.bak-<fecha>`).
 - [x] 2026-09-26 Miravia: `check-prices` del VPS recibe captcha al revisar fichas de Miravia y esas fichas acaparaban el lote retail. Corregido y desplegado 26-09: con captcha el producto rota, y el VPS se salta Miravia con `RETAIL_PRICE_CHECK_SKIP_RETAILERS=miravia` (la revisa el Mac).
 - [x] 2026-09-26 Salida no bloqueada desde el VPS para Miravia, gratis: Cloudflare WARP en **modo proxy** (`127.0.0.1:40000`, no toca rutas ni DNS) y `MIRAVIA_PROXY_URL` en el VPS. Directo da captcha; por WARP carga. `check-prices` del VPS vuelve a revisar Miravia.
@@ -126,7 +129,7 @@ Qué tiendas corren dónde: `scripts/local-cron/schedules.md`. Registro de tiend
 
 ### Kiabi
 
-- [ ] Descripciones de Kiabi (26-09: 0 de 81): falta que `check-prices` las rellene, como ya hace con Miravia.
+- [ ] Descripciones de Kiabi (07-10: 0 de 81). `check-prices` ya las guardaría, pero la ficha de Kiabi da 403 (DataDome) también desde el Mac, y el GraphQL de `static.kiabi.es` que usa `kiabi-deals` solo trae listados (sin descripción). Opciones: Chrome con ventana en el Mac como Carrefour, o aceptar fichas de Kiabi sin descripción.
 
 ### Carrefour
 
@@ -140,7 +143,8 @@ Alertas de usuario por URL (`user-alerts-residential`) y job de ofertas `pccompo
 - [ ] Vigilar la calidad de los avisos: el «descuento» es sobre el PVPR del fabricante, que suele estar inflado (Galaxy Tab A11 a 148 € «−63 %» sobre 399 €). Si el canal se llena de falsos chollos, subir el mínimo o bajar de nivel las ofertas de PcComponentes.
 - [x] 2026-09-30 Avisos del job activados (`PCCOMPONENTES_DEALS_NOTIFY=1` en el Mac) con descuento mínimo del 30 % (admin → Ajustes). Prueba real con 2 productos (auriculares Soundcore Space Q45 −60 % y Galaxy Tab A11 −63 %): creados, avisados en el canal y con la ficha del marketplace bien. Con el 30 %, 74 de 236 productos pasan el filtro.
 - [x] 2026-09-30 Slug de las fichas: repetía el título dos veces (el id de PcComponentes es el slug de su URL). Ahora título + hash corto (`…-pcc-1bc81ca0`); los 2 productos ya avisados conservan el slug viejo para no romper los enlaces publicados.
-- [ ] Revisar tras las primeras corridas reales (log `~/Library/Logs/cazaofertas/pccomponentes-deals.log`) cuántos productos entran y si las categorías se asignan bien fuera de Tecnología/Informática.
+- [x] 2026-10-07 PcComponentes revisado: 15 corridas sin errores (~470 ofertas leídas, ~140 válidas, tope de 20 nuevas por corrida); 207 productos activos, todos en Tecnología/Informática. Portátiles y monitores caen en «Informática › General» y tablets en «Electrónica» porque no hay subcategorías para ellos.
+- [x] 2026-10-07 Subcategorías **Portátiles** y **Monitores** (Informática) y **Tablets** (Tecnología), migración `0056`: keywords y patrones de migas movidos desde General / Periféricos / Electrónica y 292 productos reclasificados por título (169 portátiles, 56 monitores, 67 tablets; accesorios excluidos). Copia de la categoría anterior en `public._backup_0056_product_categories` (borrar cuando se dé por bueno).
 - [ ] Afiliación: darse de alta en el programa de PcComponentes (si está en Awin) y poner `AWIN_MID_PCCOMPONENTES` en el `.env.local` del VPS (ver MediaMarkt: el código ya está listo).
 - [x] 2026-09-30 Ficha con Google Chrome con ventana (antes Chromium headless, que Cloudflare bloquea en la ficha y que además no estaba instalado en el Mac: toda alerta fallaba al arrancar). Espera a que Cloudflare resuelva el reto («Un momento…», hasta 15 s); ~2–4 s por ficha. Probado con 3 fichas reales, incluida una con variantes (`ProductGroup`) y una inexistente («no encontrado»).
 - [x] 2026-09-30 Precio tachado: el PVPR que muestra la ficha (`#pdp-price-original`, «PVPR 749,99€»); el JSON-LD solo trae el precio actual.
