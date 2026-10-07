@@ -1,4 +1,4 @@
-import { primePriceFields } from "@/lib/primePrice";
+import { amazonPriceFields } from "@/lib/primePrice";
 import {
   extractAsin,
   generateAffiliateUrl,
@@ -345,7 +345,7 @@ export async function runFlashDealsCheck(options?: {
       let variantInfo: ProductVariantInfo | null = null;
 
       const needsLiveEnrichment = item.origin !== "simulated" || price == null;
-      let primeFields = primePriceFields({});
+      let primeFields = amazonPriceFields({});
 
       if (needsLiveEnrichment) {
         try {
@@ -353,7 +353,7 @@ export async function runFlashDealsCheck(options?: {
             timeoutMs: 18_000,
           });
           if (preview.price != null) price = preview.price;
-          primeFields = primePriceFields(preview);
+          primeFields = amazonPriceFields(preview);
           if (preview.listPrice != null) listPrice = preview.listPrice;
           if (preview.title?.trim()) title = preview.title.trim();
           amazonUrl = preview.amazonUrl || amazonUrl;

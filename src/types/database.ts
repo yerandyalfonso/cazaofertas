@@ -70,6 +70,7 @@ export type Database = {
           previous_price: number | null;
           prime_only: boolean;
           regular_price: number | null;
+          rrp_price: number | null;
           previous_price_observed_at: string | null;
           lowest_price: number | null;
           highest_price: number | null;
@@ -109,6 +110,7 @@ export type Database = {
           previous_price?: number | null;
           prime_only?: boolean;
           regular_price?: number | null;
+          rrp_price?: number | null;
           previous_price_observed_at?: string | null;
           lowest_price?: number | null;
           highest_price?: number | null;
@@ -148,6 +150,7 @@ export type Database = {
           previous_price?: number | null;
           prime_only?: boolean;
           regular_price?: number | null;
+          rrp_price?: number | null;
           previous_price_observed_at?: string | null;
           lowest_price?: number | null;
           highest_price?: number | null;

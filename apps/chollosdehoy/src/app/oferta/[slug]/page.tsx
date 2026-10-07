@@ -335,6 +335,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   Ahorras {formatEuro(savings)}
                 </p>
               )}
+              {!unavailable && product.rrpPrice !== null && product.rrpPrice > product.currentPrice && (
+                <p className="price mt-1.5 text-sm text-muted">
+                  {product.previousPrice && product.previousPrice > product.currentPrice
+                    ? "Tachado: precio más bajo de los últimos 30 días · "
+                    : ""}
+                  Precio recomendado: {formatEuro(product.rrpPrice)}
+                </p>
+              )}
               {!unavailable && product.primeOnly && (
                 <p className="price mt-1.5 text-sm text-muted">
                   Precio de oferta para clientes Prime

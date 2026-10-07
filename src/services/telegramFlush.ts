@@ -15,7 +15,7 @@ import {
 import { dealScoringService } from "@/services/deal-scoring";
 import { sendChannelDealAlert } from "@/services/telegram/bot";
 import { scrapeAmazonProductPage } from "@/providers/price/AmazonHtmlPriceProvider";
-import { primePriceFields } from "@/lib/primePrice";
+import { amazonPriceFields } from "@/lib/primePrice";
 import { DealLevel, ProductAvailability } from "@/types";
 
 const SEND_DELAY_MS = 1_200;
@@ -89,7 +89,7 @@ async function verifyPriceBeforePublish(
         .from("products")
         .update({
           current_price: quote.price,
-          ...primePriceFields(quote),
+          ...amazonPriceFields(quote),
           last_checked_at: now,
           updated_at: now,
         })

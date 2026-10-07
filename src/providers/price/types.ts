@@ -21,6 +21,8 @@ export interface ProductPriceData {
   /** El precio es una «Oferta Prime» (sin Prime: `regularPrice`). */
   primeOnly?: boolean;
   regularPrice?: number;
+  /** «Precio recomendado» (PVPR) si el descuento va sobre el mínimo de 30 días. */
+  rrpPrice?: number;
 }
 
 export interface PriceProvider {

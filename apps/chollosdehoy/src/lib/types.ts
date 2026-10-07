@@ -30,6 +30,8 @@ export interface MarketplaceProduct {
   /** El precio es una «Oferta Prime» de Amazon (sin Prime: `regularPrice`). */
   primeOnly: boolean;
   regularPrice: number | null;
+  /** «Precio recomendado» (PVPR) de Amazon; si lo hay, `previousPrice` es el mínimo de 30 días. */
+  rrpPrice: number | null;
   discountPercentage: number;
   affiliateUrl: string;
   productUrl: string;

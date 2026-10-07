@@ -51,6 +51,7 @@ type ProductRow = {
   lowest_price: number | string | null;
   prime_only?: boolean | null;
   regular_price?: number | string | null;
+  rrp_price?: number | string | null;
   discount_percentage: number | string | null;
   affiliate_url: string | null;
   amazon_url: string | null;
@@ -195,6 +196,7 @@ export function mapProduct(row: ProductRow): MarketplaceProduct {
     lowestPrice,
     primeOnly: Boolean(row.prime_only),
     regularPrice: row.prime_only ? toNumber(row.regular_price ?? null) : null,
+    rrpPrice: toNumber(row.rrp_price ?? null),
     discountPercentage,
     affiliateUrl,
     productUrl,

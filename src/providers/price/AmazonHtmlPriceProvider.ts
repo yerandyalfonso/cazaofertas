@@ -786,6 +786,20 @@ export function extractDealExpiresAt(html: string): string | null {
   return new Date(Math.min(...timestamps)).toISOString();
 }
 
+const LOWEST_30D_RE =
+  /precio m[aá]s bajo de los [uú]ltimos 30 d[ií]as:?\s*([\d.]+,\d{2})\s*€/i;
+
+/**
+ * «El precio más bajo de los últimos 30 días» del bloque de precio (directiva
+ * Ómnibus). Es la referencia que usamos para el descuento cuando Amazon la
+ * muestra; el «Precio recomendado» (PVPR) suele estar inflado.
+ */
+function lowestPrice30Days($: cheerio.CheerioAPI): number | null {
+  const text = $("#apex_desktop").first().text().replace(/\s+/g, " ");
+  const match = text.match(LOWEST_30D_RE);
+  return match?.[1] ? parseAmazonPriceText(match[1]) : null;
+}
+
 /**
  * Precio actual (a pagar) vs referencia (precio recomendado / lista).
  * Evita tomar el «mínimo 30 días» como lista y precios de widgets secundarios.
@@ -806,6 +820,8 @@ export function extractPriceFromAmazonHtml(html: string): {
   /** El precio es una «Oferta Prime» (sin Prime cuesta `regularPrice`). */
   primeOnly?: boolean;
   regularPrice?: number | null;
+  /** «Precio recomendado» (PVPR) cuando el descuento se calcula sobre el mínimo de 30 días. */
+  rrpPrice?: number | null;
 } {
   const $ = cheerio.load(html);
 
@@ -905,11 +921,20 @@ export function extractPriceFromAmazonHtml(html: string): {
   // precio tachado: no hay referencia real.
   if (rangePrice !== null) listPrice = null;
 
+  // Como Amazon: el descuento real es sobre el precio más bajo de los últimos
+  // 30 días; el PVPR queda solo como dato («Precio recomendado»).
+  const lowest30 = rangePrice === null ? lowestPrice30Days($) : null;
+  let rrpPrice: number | null = null;
+  if (lowest30 !== null && price !== null) {
+    rrpPrice = listPrice !== null && listPrice > lowest30 ? listPrice : null;
+    listPrice = lowest30 > price ? Math.round(lowest30 * 100) / 100 : null;
+  }
+
   let discountPercentage: number | null = null;
   if (price !== null && listPrice !== null && listPrice > price) {
     discountPercentage =
       Math.round(((listPrice - price) / listPrice) * 10000) / 100;
-  } else if (badgeDiscount !== null && rangePrice === null) {
+  } else if (badgeDiscount !== null && rangePrice === null && lowest30 === null) {
     discountPercentage = badgeDiscount;
   }
 
@@ -1059,6 +1084,7 @@ export function extractPriceFromAmazonHtml(html: string): {
     dealExpiresAt,
     primeOnly: usePrime,
     regularPrice,
+    rrpPrice,
   };
 }
 
@@ -1301,6 +1327,7 @@ export async function previewAmazonProductPage(
   variantInfo: ProductVariantInfo | null;
   primeOnly?: boolean;
   regularPrice?: number | null;
+  rrpPrice?: number | null;
 }> {
   const asin =
     extractAsin(urlOrAsin)?.toUpperCase() ||
@@ -1337,6 +1364,7 @@ export async function previewAmazonProductPage(
     variantInfo: extractAmazonVariantInfo(html, asin),
     primeOnly: extracted.primeOnly,
     regularPrice: extracted.regularPrice ?? null,
+    rrpPrice: extracted.rrpPrice ?? null,
   };
 }
 
@@ -1399,6 +1427,7 @@ export async function scrapeAmazonProductPage(
     variantInfo,
     primeOnly: extracted.primeOnly,
     regularPrice: extracted.regularPrice ?? undefined,
+    rrpPrice: extracted.rrpPrice ?? undefined,
   };
 }
 
