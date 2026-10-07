@@ -21,7 +21,8 @@ type LocalCronJob =
   | "telegram-flush"
   | "coupons-discover"
   | "admin-digest"
-  | "alert-load-report";
+  | "alert-load-report"
+  | "indexnow-marketplace";
 
 const JOBS: LocalCronJob[] = [
   "check-prices",
@@ -37,6 +38,7 @@ const JOBS: LocalCronJob[] = [
   "coupons-discover",
   "admin-digest",
   "alert-load-report",
+  "indexnow-marketplace",
 ];
 
 function parseJob(raw: string | undefined): LocalCronJob {
@@ -331,6 +333,12 @@ async function runAdminDigest(): Promise<void> {
   await sendAdminDigest();
 }
 
+/** IndexNow: avisa a Bing de las fichas del marketplace nuevas o con cambio de precio. */
+async function runIndexNowMarketplace(): Promise<void> {
+  const { submitMarketplaceChanges } = await import("@/services/indexNow");
+  console.log(JSON.stringify(await submitMarketplaceChanges()));
+}
+
 /** Estadísticas del test de carga de alertas al chat del admin (si hay test). */
 async function runAlertLoadReport(): Promise<void> {
   const { sendAlertLoadReport } = await import("@/services/alertLoadTest");
@@ -388,6 +396,9 @@ async function main(): Promise<void> {
       break;
     case "admin-digest":
       await runAdminDigest();
+      break;
+    case "indexnow-marketplace":
+      await runIndexNowMarketplace();
       break;
   }
 
