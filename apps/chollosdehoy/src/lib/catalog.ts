@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { awinDeeplink } from "@/lib/awin";
 import { MARKETPLACE_RETAILERS } from "@/lib/retailers";
@@ -401,8 +402,20 @@ export async function queryMarketplaceProducts(
   };
 }
 
+/**
+ * Recuentos del marketplace cacheados 5 min entre peticiones: sin esto, cada
+ * visita (y cada bot) recalculaba la vista entera y era la mayor carga del VPS.
+ */
+const CATALOG_COUNTS_REVALIDATE_S = 300;
+
 /** category_id de todos los productos activos (paginado: PostgREST corta en 1000). */
-async function fetchActiveCategoryIds(): Promise<string[]> {
+const fetchActiveCategoryIds = unstable_cache(
+  fetchActiveCategoryIdsUncached,
+  ["marketplace-active-category-ids"],
+  { revalidate: CATALOG_COUNTS_REVALIDATE_S },
+);
+
+async function fetchActiveCategoryIdsUncached(): Promise<string[]> {
   const client = getSupabaseServer();
   const pageSize = 1000;
   const ids: string[] = [];
@@ -657,22 +670,26 @@ export const getCategoryNodes = cache(fetchCategoryNodes);
 
 /** Productos activos por tienda (solo tiendas con al menos uno). */
 export const getRetailerCounts = cache(
-  async (): Promise<Array<{ id: string; count: number }>> => {
-    const client = getSupabaseServer();
-    const results = await Promise.all(
-      MARKETPLACE_RETAILERS.map(async (id) => {
-        const { count } = await client
-          .from(LISTING_TABLE)
-          .select("id", { count: "exact", head: true })
-          .eq("is_active", true)
-          .eq("retailer", id);
-        return { id, count: count ?? 0 };
-      }),
-    );
-    return results
-      .filter((item) => item.count > 0)
-      .sort((a, b) => b.count - a.count);
-  },
+  unstable_cache(
+    async (): Promise<Array<{ id: string; count: number }>> => {
+      const client = getSupabaseServer();
+      const results = await Promise.all(
+        MARKETPLACE_RETAILERS.map(async (id) => {
+          const { count } = await client
+            .from(LISTING_TABLE)
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true)
+            .eq("retailer", id);
+          return { id, count: count ?? 0 };
+        }),
+      );
+      return results
+        .filter((item) => item.count > 0)
+        .sort((a, b) => b.count - a.count);
+    },
+    ["marketplace-retailer-counts"],
+    { revalidate: CATALOG_COUNTS_REVALIDATE_S },
+  ),
 );
 
 /** Slugs de productos activos para el sitemap (paginado: PostgREST corta en 1000). */
