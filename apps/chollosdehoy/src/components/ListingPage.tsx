@@ -62,7 +62,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
         }}
       />
       <div>
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 pt-5">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 pt-5">
           <nav
             className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted"
             aria-label="Migas de pan"
@@ -86,7 +86,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      <main id="contenido" className="mx-auto max-w-6xl space-y-6 px-4 pb-8 pt-3 md:pb-10">
+      <main id="contenido" className="mx-auto max-w-[1600px] space-y-6 px-4 pb-8 pt-3 md:pb-10">
         <header className="border-b border-line pb-5">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="text-3xl font-bold tracking-tight text-ink md:text-[2.5rem] md:leading-tight">
@@ -135,7 +135,7 @@ export function ListingPage({ listing }: { listing: Listing }) {
           )}
         </header>
 
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {data.items.map((product) => (
             <ProductCard key={product.id} product={product} view="grid" layout="responsive" />
           ))}

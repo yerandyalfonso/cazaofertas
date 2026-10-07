@@ -244,7 +244,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       <nav
         aria-label="Migas de pan"
-        className="mx-auto flex max-w-5xl items-center gap-1.5 px-4 pt-5 text-xs text-muted"
+        className="mx-auto flex max-w-[1600px] items-center gap-1.5 px-4 pt-5 text-xs text-muted"
       >
         <Link href="/" className="tap-link hover:text-ink">
           Inicio
@@ -263,8 +263,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
         ))}
       </nav>
 
-      <main id="contenido" className="mx-auto max-w-5xl px-4 pb-10 pt-4">
-        <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10">
+      <main id="contenido" className="mx-auto max-w-[1600px] px-4 pb-10 pt-4">
+        <article className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
           {/* Imagen */}
           <div className="md:sticky md:top-24 md:self-start">
             <div className="relative aspect-square overflow-hidden rounded-card border border-line bg-white">
@@ -471,7 +471,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       {!unavailable && (
         <>
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 py-3 md:hidden">
-            <div className="mx-auto flex max-w-5xl items-center gap-3">
+            <div className="mx-auto flex max-w-[1600px] items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="price text-xl font-extrabold leading-tight text-ink">
                   {formatEuro(product.currentPrice)}
