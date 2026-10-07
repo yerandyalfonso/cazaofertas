@@ -24,6 +24,11 @@ export interface DealCandidate {
   /** Tienda de compra (`amazon`, `kiabi`, `miravia`, …) para hashtag #tienda. */
   retailer?: string | null;
   currentPrice: number;
+  /**
+   * El precio anterior es uno que hemos visto nosotros (el guardado era mayor),
+   * no el «original» que pone la tienda. Miravia solo publica en canales así.
+   */
+  referenceObserved?: boolean;
   previousPrice: number;
   discountPercentage: number;
   /** Precio de «Oferta Prime» (sin Prime: `regularPrice`). */

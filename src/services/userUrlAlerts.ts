@@ -688,6 +688,8 @@ export async function runUserUrlAlerts(options?: {
           retailer,
           currentPrice,
           previousPrice: reference,
+          // Último precio avisado o guardado: una bajada vista por nosotros.
+          referenceObserved: true,
           discountPercentage: discountPct,
           dealLevel: scoring.level,
           score: scoring.score,

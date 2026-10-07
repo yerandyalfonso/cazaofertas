@@ -64,6 +64,19 @@ export async function notifyChannelDealIfEligible(
     };
   }
 
+  // Miravia: el «precio original» lo pone cada vendedor (muchos al doble del
+  // precio) y no hay mínimo de 30 días. Solo bajadas que hemos visto nosotros.
+  if (deal.retailer === "miravia" && !deal.referenceObserved) {
+    return {
+      attempted: false,
+      sent: false,
+      queued: false,
+      skipped: true,
+      reason: "Miravia: solo se publican bajadas observadas por nosotros.",
+      ...base,
+    };
+  }
+
   if (discountPercentage < minDiscountPercent) {
     return {
       attempted: false,

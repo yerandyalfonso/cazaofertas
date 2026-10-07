@@ -504,6 +504,7 @@ export async function runPriceDetection(
             primeOnly: quote.primeOnly,
             regularPrice: quote.regularPrice ?? null,
             previousPrice: referencePrice ?? storedPrice,
+            referenceObserved: reference.observedAt !== null,
             discountPercentage,
             dealLevel: scoring.level,
             score: scoring.score,

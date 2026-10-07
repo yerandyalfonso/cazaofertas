@@ -166,6 +166,8 @@ async function maybeNotifyMiraviaDeal(
     parentCategorySlug?: string | null;
     parentCategoryName?: string | null;
     telegramMinScore?: number;
+    /** Bajada vista por nosotros (precio guardado mayor que el nuevo). */
+    referenceObserved?: boolean;
   },
 ): Promise<"sent" | "skipped" | "failed" | "queued"> {
   const deal: DealCandidate = {
@@ -190,6 +192,7 @@ async function maybeNotifyMiraviaDeal(
     summary: "Miravia · oferta flash",
     affiliateUrl: options.affiliateUrl,
     nearHistoricalLow: options.dealLevel === DealLevel.HISTORICAL_LOW,
+    referenceObserved: options.referenceObserved ?? false,
   };
 
   try {
@@ -715,6 +718,7 @@ export async function runMiraviaDealsCheck(options?: {
           subcategorySlug,
         );
         const notifyResult = await maybeNotifyMiraviaDeal(client, {
+          referenceObserved: storedCurrent != null && storedCurrent > price,
           productId: row.id,
           syntheticAsin: row.asin,
           title: item.titleHint?.trim() || row.title,
