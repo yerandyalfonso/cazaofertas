@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Logo «chollos d'hoy» — v8. A1 grotescas · B1 con línea y apóstrofo superpuesto ·
+  B4 círculo con apóstrofo superpuesto · C1 original con otras monoespaciadas.
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — variantes 3</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Space+Grotesk:wght@700&family=Schibsted+Grotesk:wght@800;900&family=Hanken+Grotesk:wght@800;900&family=Sora:wght@800&family=Geist:wght@700&family=Manrope:wght@800&family=Inter+Tight:wght@800&family=Outfit:wght@800&family=JetBrains+Mono:wght@800&family=IBM+Plex+Mono:wght@700&family=Geist+Mono:wght@700&family=Martian+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0B0B0C; --or:#FF5A0A; --or2:#FF8A1F; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:#F4F4F2; color:var(--ink); padding:100px 120px 120px; font-family:Geist; }
+  .top { display:flex; justify-content:space-between; font-size:24px; color:#86868B; margin-bottom:40px; }
+  .row { margin-bottom:46px; }
+  .rt { font-size:26px; font-weight:700; margin:0 0 18px 6px; }
+  .rt span { color:#86868B; font-weight:400; font-size:22px; margin-left:12px; }
+  .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:22px; }
+  .t { overflow:hidden; background:#fff; border-radius:22px; height:360px; position:relative; display:flex; align-items:center; justify-content:center; gap:26px; }
+  .t.k { background:var(--ink); color:#fff; }
+  .n { position:absolute; left:24px; top:18px; font-size:18px; color:#9A9AA0; letter-spacing:2px; }
+  .o { color:var(--or); }
+  .g { background:linear-gradient(135deg,var(--or2),var(--or) 60%,#F2380A); }
+  .stk { line-height:.86; }
+  .dot { display:inline-block; width:.2em; height:.2em; border-radius:50%; margin-left:.05em; }
+  .ic { width:150px; height:150px; border-radius:36px; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; flex:none; position:relative; }
+  .ic.r { border-radius:50%; }
+  /* «ch» con el apóstrofo superpuesto en la unión, sin separar las letras */
+  .ch { position:relative; display:inline-block; }
+  .ch .ap { position:absolute; left:var(--ap,53%); top:-.1em; color:var(--or); transform:translateX(-50%); }
+  .bar { position:absolute; left:36px; right:36px; bottom:28px; height:9px; border-radius:5px; }
+</style>
+</head>
+<body>
+<div class="top"><span>chollos d’hoy — variantes 3</span><span>v8 · A1 · B1 · B4 · C1 × 4</span></div>
+
+<!-- A1 -->
+<div class="row"><div class="rt">A1 · Apilado, «hoy» en naranja <span>4 grotescas</span></div><div class="grid">
+  <div class="t"><span class="n">A1·1 · BRICOLAGE GROTESQUE</span><div class="stk" style="font-family:'Bricolage Grotesque';font-weight:800;font-size:108px;letter-spacing:-5px">chollos<br>d’<span class="o">hoy</span></div></div>
+  <div class="t"><span class="n">A1·2 · SPACE GROTESK</span><div class="stk" style="font-family:'Space Grotesk';font-weight:700;font-size:100px;letter-spacing:-5px">chollos<br>d’<span class="o">hoy</span></div></div>
+  <div class="t"><span class="n">A1·3 · SCHIBSTED GROTESK</span><div class="stk" style="font-family:'Schibsted Grotesk';font-weight:900;font-size:104px;letter-spacing:-5px">chollos<br>d’<span class="o">hoy</span></div></div>
+  <div class="t"><span class="n">A1·4 · HANKEN GROTESK</span><div class="stk" style="font-family:'Hanken Grotesk';font-weight:900;font-size:106px;letter-spacing:-5px">chollos<br>d’<span class="o">hoy</span></div></div>
+</div></div>
+
+<!-- B1 -->
+<div class="row"><div class="rt">B1 · Icono «ch» con línea <span>apóstrofo naranja superpuesto entre la c y la h · nombre con ’ y punto naranjas</span></div><div class="grid">
+  <div class="t"><span class="n">B1·1 · SORA</span><span class="ic" style="font-family:Sora;font-weight:800;font-size:82px;letter-spacing:-6px"><span class="ch">ch<span class="ap">’</span></span><i class="bar g"></i></span><div class="stk" style="font-family:Sora;font-weight:800;font-size:58px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<i class="dot g"></i></div></div>
+  <div class="t"><span class="n">B1·2 · GEIST</span><span class="ic" style="font-family:Geist;font-weight:700;font-size:86px;letter-spacing:-6px"><span class="ch">ch<span class="ap">’</span></span><i class="bar g"></i></span><div class="stk" style="font-family:Geist;font-weight:700;font-size:62px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<i class="dot g"></i></div></div>
+  <div class="t"><span class="n">B1·3 · BRICOLAGE</span><span class="ic" style="font-family:'Bricolage Grotesque';font-weight:800;font-size:90px;letter-spacing:-6px"><span class="ch">ch<span class="ap">’</span></span><i class="bar g"></i></span><div class="stk" style="font-family:'Bricolage Grotesque';font-weight:800;font-size:64px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<i class="dot g"></i></div></div>
+  <div class="t"><span class="n">B1·4 · MANROPE</span><span class="ic" style="font-family:Manrope;font-weight:800;font-size:84px;letter-spacing:-6px"><span class="ch">ch<span class="ap">’</span></span><i class="bar g"></i></span><div class="stk" style="font-family:Manrope;font-weight:800;font-size:60px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<i class="dot g"></i></div></div>
+</div></div>
+
+<!-- B4 -->
+<div class="row"><div class="rt">B4 · Círculo «ch.» <span>apóstrofo naranja superpuesto entre la c y la h · nombre con ’ y punto naranjas</span></div><div class="grid">
+  <div class="t"><span class="n">B4·1 · INTER TIGHT</span><span class="ic r" style="font-family:'Inter Tight';font-weight:800;font-size:76px;letter-spacing:-5px"><span class="ch" style="--ap:46%">ch<span class="ap">’</span><span class="o">.</span></span></span><div class="stk" style="font-family:'Inter Tight';font-weight:800;font-size:62px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<span class="o">.</span></div></div>
+  <div class="t"><span class="n">B4·2 · SORA</span><span class="ic r" style="font-family:Sora;font-weight:800;font-size:70px;letter-spacing:-5px"><span class="ch" style="--ap:46%">ch<span class="ap">’</span><span class="o">.</span></span></span><div class="stk" style="font-family:Sora;font-weight:800;font-size:58px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<span class="o">.</span></div></div>
+  <div class="t"><span class="n">B4·3 · SCHIBSTED GROTESK</span><span class="ic r" style="font-family:'Schibsted Grotesk';font-weight:900;font-size:76px;letter-spacing:-5px"><span class="ch" style="--ap:46%">ch<span class="ap">’</span><span class="o">.</span></span></span><div class="stk" style="font-family:'Schibsted Grotesk';font-weight:900;font-size:62px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<span class="o">.</span></div></div>
+  <div class="t"><span class="n">B4·4 · OUTFIT</span><span class="ic r" style="font-family:Outfit;font-weight:800;font-size:76px;letter-spacing:-4px"><span class="ch" style="--ap:46%">ch<span class="ap">’</span><span class="o">.</span></span></span><div class="stk" style="font-family:Outfit;font-weight:800;font-size:64px;letter-spacing:-3px">chollos<br>d<span class="o">’</span>hoy<span class="o">.</span></div></div>
+</div></div>
+
+<!-- C1 -->
+<div class="row"><div class="rt">C1 · Tech original <span>misma composición y cursor naranja al final · otras monoespaciadas</span></div><div class="grid">
+  <div class="t k"><span class="n">C1·1 · JETBRAINS MONO</span><div style="font-family:'JetBrains Mono';font-weight:800;font-size:76px;letter-spacing:-4px;line-height:1">chollos_<br>d’hoy<i class="g" style="display:inline-block;width:40px;height:72px;margin-left:8px;vertical-align:-10px"></i></div></div>
+  <div class="t k"><span class="n">C1·2 · IBM PLEX MONO</span><div style="font-family:'IBM Plex Mono';font-weight:700;font-size:78px;letter-spacing:-4px;line-height:1">chollos_<br>d’hoy<i class="g" style="display:inline-block;width:40px;height:72px;margin-left:8px;vertical-align:-10px"></i></div></div>
+  <div class="t k"><span class="n">C1·3 · GEIST MONO</span><div style="font-family:'Geist Mono';font-weight:700;font-size:78px;letter-spacing:-4px;line-height:1">chollos_<br>d’hoy<i class="g" style="display:inline-block;width:40px;height:72px;margin-left:8px;vertical-align:-10px"></i></div></div>
+  <div class="t k"><span class="n">C1·4 · MARTIAN MONO</span><div style="font-family:'Martian Mono';font-weight:700;font-size:62px;letter-spacing:-4px;line-height:1.05">chollos_<br>d’hoy<i class="g" style="display:inline-block;width:34px;height:60px;margin-left:8px;vertical-align:-8px"></i></div></div>
+</div></div>
+</body>
+</html>
