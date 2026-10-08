@@ -1,139 +1,110 @@
 <!doctype html>
 <!--
-  Propuestas de logo para «chollos d'hoy». Tres conceptos, cada uno con:
-  icono grande, logotipo horizontal sobre blanco y pruebas a 96 / 48 / 24 px.
-  Renderizar con Playwright a 3200×2760.
+  Logo «chollos d'hoy» — v2, dirección minimalista.
+  Cuatro direcciones; cada tarjeta: símbolo, logotipo, icono de app y prueba a 32 px.
+  Renderizar con Playwright a 3200 px de ancho (página completa).
 -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Logo chollos d'hoy — propuestas</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,500;0,600;0,700;0,800;1,800;1,900&display=swap" rel="stylesheet">
+<title>chollos d'hoy — logo v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Fraunces:ital,opsz,wght@1,9..144,500;1,9..144,600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --ink:#1C1917; --or:#F26B0A; --cream:#FFF7E8; }
-  * { box-sizing: border-box; }
-  body { margin:0; width:3200px; background:#F6EFE8; font-family:Poppins; color:var(--ink); }
-  header { padding:90px 120px 30px; }
-  header h1 { margin:0; font-size:84px; font-weight:800; letter-spacing:-2px; }
-  header p { margin:10px 0 0; font-size:34px; color:#6F6259; }
-  .row { display:grid; grid-template-columns:760px 1640px 560px; gap:40px; padding:40px 120px; align-items:stretch; }
-  .panel { border-radius:40px; display:flex; align-items:center; justify-content:center; height:760px; position:relative; }
-  .or { background:linear-gradient(135deg,#FFAE1F,#F26B0A); }
-  .wh { background:#fff; flex-direction:column; gap:60px; }
-  .tag { position:absolute; top:30px; left:40px; font-size:30px; font-weight:700; letter-spacing:3px; text-transform:uppercase; opacity:.75; }
-  .or .tag { color:#fff; }
-  .sizes { background:#fff; flex-direction:column; gap:40px; }
-  .sizes .line { display:flex; align-items:center; gap:40px; }
-  .sizes .lab { font-size:26px; color:#6F6259; width:90px; }
-  .desc { font-size:30px; color:#4A403A; max-width:1300px; text-align:center; line-height:1.4; }
-  .wm { font-weight:900; font-style:italic; letter-spacing:-4px; line-height:1; }
-  .wm b { color:var(--or); font-weight:900; }
-  .lock { display:flex; align-items:center; gap:46px; }
-  .dark { background:#1C1917; }
+  :root { --ink:#141414; --paper:#F4EFE8; --accent:#E8590C; --muted:#8C8278; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:var(--paper); font-family:"Inter Tight"; color:var(--ink); padding:140px 160px 160px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:110px; }
+  header h1 { font-family:Manrope; font-weight:700; font-size:40px; letter-spacing:-.5px; }
+  header p { font-size:28px; color:var(--muted); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; }
+  .card { background:#FBF8F4; border:1.5px solid #E6DED4; border-radius:28px; padding:64px 72px 56px; }
+  .meta { display:flex; justify-content:space-between; font-size:24px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:110px; }
+  .hero { height:330px; display:flex; align-items:center; justify-content:center; }
+  .foot { margin-top:110px; display:flex; align-items:center; gap:36px; border-top:1.5px solid #E6DED4; padding-top:44px; }
+  .app { width:132px; height:132px; border-radius:30px; display:flex; align-items:center; justify-content:center; }
+  .small { display:flex; align-items:center; gap:14px; font-size:22px; color:var(--muted); }
+  .note { margin-left:auto; font-size:24px; color:#5C544D; max-width:640px; line-height:1.45; text-align:right; }
+  .wm-a { font-family:Manrope; font-weight:700; font-size:132px; letter-spacing:-7px; line-height:1; display:flex; align-items:baseline; }
+  .wm-b { font-family:Manrope; font-weight:600; font-size:112px; letter-spacing:-5px; line-height:1; }
+  .wm-c { font-family:Fraunces; font-style:italic; font-weight:500; font-size:150px; letter-spacing:-4px; line-height:1; }
+  .wm-d { font-family:"Inter Tight"; font-weight:600; font-size:116px; letter-spacing:-5px; line-height:1; }
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute">
-  <defs>
-    <linearGradient id="og" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFAE1F"/><stop offset="1" stop-color="#F25C05"/></linearGradient>
-    <!-- A: etiqueta cuyo agujero es un sol («hoy») -->
-    <symbol id="iconA" viewBox="0 0 512 512">
-      <rect width="512" height="512" rx="118" fill="url(#og)"/>
-      <g transform="translate(270 262) rotate(-38)">
-        <path d="M-120 -96 H136 a34 34 0 0 1 34 34 V62 a34 34 0 0 1 -34 34 H-120 L-206 0 Z" fill="#7A2E05" opacity=".22" transform="translate(10 14)"/>
-        <path d="M-120 -96 H136 a34 34 0 0 1 34 34 V62 a34 34 0 0 1 -34 34 H-120 L-206 0 Z" fill="#FFF7E8"/>
-        <g transform="translate(-128 0)">
-          <circle r="25" fill="#F26B0A"/>
-          <g stroke="#F26B0A" stroke-width="9" stroke-linecap="round">
-            <path d="M0-38V-50M0 38V50M-38 0H-50M38 0H50M-27-27l-8-8M27 27l8 8M-27 27l-8 8M27-27l8-8"/>
-          </g>
-        </g>
-        <text x="55" y="40" text-anchor="middle" font-family="Poppins" font-weight="900" font-style="italic" font-size="122" fill="#F26B0A" letter-spacing="-4">%</text>
-      </g>
-    </symbol>
-    <!-- B: «%» cuyo círculo de arriba es un sol y la barra baja como una flecha -->
-    <symbol id="iconB" viewBox="0 0 512 512">
-      <rect width="512" height="512" rx="256" fill="url(#og)"/>
-      <g transform="translate(256 256)">
-        <g transform="translate(-92 -92)">
-          <circle r="54" fill="#FFF7E8"/>
-          <g stroke="#FFF7E8" stroke-width="16" stroke-linecap="round">
-            <path d="M0-78V-96M-78 0H-96M-55-55l-13-13M55-55l13-13M-55 55l-13 13"/>
-          </g>
-        </g>
-        <path d="M-118 150 L92 -60" stroke="#FFF7E8" stroke-width="44" stroke-linecap="round" transform="rotate(90) scale(1 -1)"/>
-        <circle cx="96" cy="96" r="54" fill="none" stroke="#FFF7E8" stroke-width="30"/>
-      </g>
-    </symbol>
-    <!-- C: sello de descuento con «ch» -->
-    <symbol id="iconC" viewBox="0 0 512 512">
-      <path id="burst" fill="url(#og)"/>
-      <circle cx="256" cy="256" r="168" fill="none" stroke="#FFF7E8" stroke-width="8" stroke-dasharray="2 18" stroke-linecap="round"/>
-      <text x="246" y="310" text-anchor="middle" font-family="Poppins" font-weight="900" font-style="italic" font-size="190" fill="#7A2E05" opacity=".35" letter-spacing="-10">ch</text>
-      <text x="240" y="302" text-anchor="middle" font-family="Poppins" font-weight="900" font-style="italic" font-size="190" fill="#FFF7E8" letter-spacing="-10">ch</text>
-    </symbol>
-  </defs>
-</svg>
-
 <header>
-  <h1>chollos d’hoy · propuestas de logo</h1>
-  <p>Tres conceptos. Cada uno: icono (avatar, app, favicon), logotipo horizontal y pruebas a tamaño pequeño.</p>
+  <h1>chollos d’hoy — identidad · v2</h1>
+  <p>Dirección minimalista · tinta, papel y un único acento</p>
 </header>
 
-<!-- A -->
-<section class="row">
-  <div class="panel or"><span class="tag">A · Etiqueta del día</span>
-    <svg width="480" height="480"><use href="#iconA"/></svg></div>
-  <div class="panel wh">
-    <div class="lock"><svg width="190" height="190"><use href="#iconA"/></svg><div class="wm" style="font-size:150px">chollos <b>d’hoy</b></div></div>
-    <p class="desc">Una etiqueta de precio cuyo agujero es un <b>sol</b>: «el chollo de hoy». Lectura inmediata del sector (precio, descuento) con un detalle propio que la hace reconocible.</p>
-  </div>
-  <div class="panel sizes">
-    <div class="line"><span class="lab">96 px</span><svg width="96" height="96"><use href="#iconA"/></svg></div>
-    <div class="line"><span class="lab">48 px</span><svg width="48" height="48"><use href="#iconA"/></svg></div>
-    <div class="line"><span class="lab">24 px</span><svg width="24" height="24"><use href="#iconA"/></svg></div>
-  </div>
-</section>
+<div class="grid">
 
-<!-- B -->
-<section class="row">
-  <div class="panel dark"><span class="tag" style="color:#fff">B · Porcentaje al amanecer</span>
-    <svg width="480" height="480"><use href="#iconB"/></svg></div>
-  <div class="panel wh">
-    <div class="lock"><svg width="190" height="190"><use href="#iconB"/></svg><div class="wm" style="font-size:150px">chollos <b>d’hoy</b></div></div>
-    <p class="desc">El símbolo <b>%</b> reinterpretado: el círculo de arriba es un sol que sale (hoy) y el de abajo, el precio que baja. Muy limpio y geométrico; funciona en un solo color.</p>
-  </div>
-  <div class="panel sizes">
-    <div class="line"><span class="lab">96 px</span><svg width="96" height="96"><use href="#iconB"/></svg></div>
-    <div class="line"><span class="lab">48 px</span><svg width="48" height="48"><use href="#iconB"/></svg></div>
-    <div class="line"><span class="lab">24 px</span><svg width="24" height="24"><use href="#iconB"/></svg></div>
-  </div>
-</section>
+  <!-- A · El punto -->
+  <section class="card">
+    <div class="meta"><span>A · El punto</span><span>Logotipo</span></div>
+    <div class="hero">
+      <div class="wm-a">chollos d<svg width="44" height="96" viewBox="0 0 44 96" style="margin:4px 4px 0 2px;align-self:flex-start"><circle cx="22" cy="22" r="20" fill="#E8590C"/></svg>hoy</div>
+    </div>
+    <div class="foot">
+      <div class="app" style="background:#141414"><svg width="44" height="44"><circle cx="22" cy="22" r="20" fill="#E8590C"/></svg></div>
+      <div class="small"><span>32 px</span><svg width="32" height="32" viewBox="0 0 132 132"><rect width="132" height="132" rx="30" fill="#141414"/><circle cx="66" cy="66" r="22" fill="#E8590C"/></svg></div>
+      <p class="note">El apóstrofo se convierte en un punto naranja: el «hoy». Todo el sistema cabe en un círculo. Tipo: Manrope.</p>
+    </div>
+  </section>
 
-<!-- C -->
-<section class="row">
-  <div class="panel or" style="background:#FFF7E8"><span class="tag" style="color:#B45309">C · Sello de chollo</span>
-    <svg width="480" height="480"><use href="#iconC"/></svg></div>
-  <div class="panel wh">
-    <div class="lock"><svg width="190" height="190"><use href="#iconC"/></svg><div class="wm" style="font-size:150px">chollos <b>d’hoy</b></div></div>
-    <p class="desc">La pegatina de oferta de toda la vida con el monograma <b>ch</b> en la misma cursiva del banner. Es la que más conecta con el estilo que ya usas en redes.</p>
-  </div>
-  <div class="panel sizes">
-    <div class="line"><span class="lab">96 px</span><svg width="96" height="96"><use href="#iconC"/></svg></div>
-    <div class="line"><span class="lab">48 px</span><svg width="48" height="48"><use href="#iconC"/></svg></div>
-    <div class="line"><span class="lab">24 px</span><svg width="24" height="24"><use href="#iconC"/></svg></div>
-  </div>
-</section>
+  <!-- B · Horizonte -->
+  <section class="card">
+    <div class="meta"><span>B · Horizonte</span><span>Símbolo + logotipo</span></div>
+    <div class="hero" style="gap:56px">
+      <svg width="190" height="190" viewBox="0 0 100 100">
+        <defs><clipPath id="hb"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+        <g clip-path="url(#hb)">
+          <rect width="100" height="100" fill="#E8590C"/>
+          <rect y="54" width="100" height="5" fill="#FBF8F4"/>
+          <rect y="66" width="100" height="7" fill="#FBF8F4"/>
+          <rect y="80" width="100" height="10" fill="#FBF8F4"/>
+        </g>
+      </svg>
+      <div class="wm-b">chollos d’hoy</div>
+    </div>
+    <div class="foot">
+      <div class="app" style="background:#E8590C"><svg width="84" height="84" viewBox="0 0 100 100"><defs><clipPath id="hb2"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#hb2)"><rect width="100" height="100" fill="#FBF8F4"/><rect y="54" width="100" height="5" fill="#E8590C"/><rect y="66" width="100" height="7" fill="#E8590C"/><rect y="80" width="100" height="10" fill="#E8590C"/></g></svg></div>
+      <div class="small"><span>32 px</span><svg width="32" height="32" viewBox="0 0 100 100"><defs><clipPath id="hb3"><circle cx="50" cy="50" r="46"/></clipPath></defs><g clip-path="url(#hb3)"><rect width="100" height="100" fill="#E8590C"/><rect y="56" width="100" height="8" fill="#FBF8F4"/><rect y="74" width="100" height="12" fill="#FBF8F4"/></g></svg></div>
+      <p class="note">Un sol que se pone en franjas: el precio que baja, cada día. Geométrico y reconocible en un vistazo.</p>
+    </div>
+  </section>
 
-<script>
-  // Sello: estrella de 22 puntas redondeada.
-  const n = 22, R = 248, r = 222, cx = 256, cy = 256;
-  let d = "";
-  for (let i = 0; i < n * 2; i++) {
-    const a = (Math.PI * i) / n - Math.PI / 2, rad = i % 2 ? r : R;
-    d += (i ? "L" : "M") + (cx + rad * Math.cos(a)).toFixed(1) + " " + (cy + rad * Math.sin(a)).toFixed(1);
-  }
-  document.getElementById("burst").setAttribute("d", d + "Z");
-</script>
+  <!-- C · Editorial -->
+  <section class="card">
+    <div class="meta"><span>C · Editorial</span><span>Logotipo + monograma</span></div>
+    <div class="hero">
+      <div class="wm-c">chollos <span style="color:#E8590C">d’hoy</span></div>
+    </div>
+    <div class="foot">
+      <div class="app" style="background:#141414"><span style="font-family:Fraunces;font-style:italic;font-weight:600;font-size:84px;color:#F4EFE8;letter-spacing:-3px;line-height:1;margin-top:-8px">c<span style="color:#E8590C">h</span></span></div>
+      <div class="small"><span>32 px</span><svg width="32" height="32" viewBox="0 0 132 132"><rect width="132" height="132" rx="30" fill="#141414"/><text x="64" y="90" text-anchor="middle" font-family="Fraunces" font-style="italic" font-weight="600" font-size="84" fill="#F4EFE8" letter-spacing="-3">c<tspan fill="#E8590C">h</tspan></text></svg></div>
+      <p class="note">Serif cursiva de revista: más cálida y con criterio, como una selección cuidada. Tipo: Fraunces.</p>
+    </div>
+  </section>
+
+  <!-- D · Porcentaje -->
+  <section class="card">
+    <div class="meta"><span>D · Porcentaje</span><span>Símbolo + logotipo</span></div>
+    <div class="hero" style="gap:56px">
+      <svg width="180" height="180" viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="24" fill="#141414"/>
+        <circle cx="33" cy="33" r="9" fill="#E8590C"/>
+        <path d="M71 25 L29 75" stroke="#F4EFE8" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="67" cy="67" r="9" fill="none" stroke="#F4EFE8" stroke-width="6"/>
+      </svg>
+      <div class="wm-d">chollos d’hoy</div>
+    </div>
+    <div class="foot">
+      <div class="app" style="background:#141414"><svg width="96" height="96" viewBox="0 0 100 100"><circle cx="33" cy="33" r="9" fill="#E8590C"/><path d="M71 25 L29 75" stroke="#F4EFE8" stroke-width="7" stroke-linecap="round"/><circle cx="67" cy="67" r="9" fill="none" stroke="#F4EFE8" stroke-width="6"/></svg></div>
+      <div class="small"><span>32 px</span><svg width="32" height="32" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#141414"/><circle cx="33" cy="33" r="11" fill="#E8590C"/><path d="M71 25 L29 75" stroke="#F4EFE8" stroke-width="9" stroke-linecap="round"/><circle cx="67" cy="67" r="10" fill="none" stroke="#F4EFE8" stroke-width="8"/></svg></div>
+      <p class="note">Un % reducido a lo esencial: el punto naranja lleno (hoy) frente al círculo vacío (el precio de antes).</p>
+    </div>
+  </section>
+
+</div>
 </body>
 </html>
