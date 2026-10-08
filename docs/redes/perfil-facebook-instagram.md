@@ -18,6 +18,8 @@ página de Facebook: estos cambios se hacen a mano desde las apps.
 | `perfil-1080.png` | Foto de perfil de Facebook **e** Instagram (se ve en círculo; el contenido está centrado). |
 | `portada-facebook-1640x624.png` | Portada de Facebook. Todo el texto cabe en la franja central que se ve en móvil. |
 
+`banner-4400x1739.svg` / `.png`: versión mejorada del banner naranja (nombre «Chollos de Hoy», texto centrado en la franja que se ve en móvil, frase y web; el SVG usa la fuente DM Sans, así que para subirlo usa el PNG).
+
 Fuentes editables: `perfil.html` y `portada.html` (renderizar con Playwright a 1080×1080 y 1640×624).
 
 ## Facebook
