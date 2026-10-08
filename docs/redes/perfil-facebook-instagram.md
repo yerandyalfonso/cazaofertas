@@ -20,6 +20,8 @@ página de Facebook: estos cambios se hacen a mano desde las apps.
 
 `banner-4400x1739.svg` / `.png`: versión mejorada del banner naranja (nombre «Chollos de Hoy», texto centrado en la franja que se ve en móvil, frase y web; el SVG usa la fuente DM Sans, así que para subirlo usa el PNG).
 
+`banner-estilo.html` / `banner-estilo-4400x1739.png`: banner «chollos d'hoy» con el estilo propio (título 3D en cursiva, adornos de línea de la hoja de iconos, etiqueta −32 %, mensaje y web). Todo el texto cabe en la franja que se ve en móvil. Para subirlo, el PNG.
+
 Fuentes editables: `perfil.html` y `portada.html` (renderizar con Playwright a 1080×1080 y 1640×624).
 
 ## Facebook
