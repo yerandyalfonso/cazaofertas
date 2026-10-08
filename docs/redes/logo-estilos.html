@@ -1,0 +1,103 @@
+<!doctype html>
+<!--
+  Logo «chollos d'hoy» — v5, diez estilos con la paleta elegida (tinta, naranja, blanco).
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — 10 estilos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;800;900&family=Geist:wght@600;700&family=Urbanist:wght@300;400&family=Instrument+Serif:ital@0;1&family=Space+Mono:wght@700&family=Unbounded:wght@800&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Syne:wght@800&family=Nunito:wght@900&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0B0B0C; --or:#FF5A0A; --or2:#FF8A1F; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:#F4F4F2; color:var(--ink); padding:110px 130px 130px; font-family:Geist; }
+  .top { display:flex; justify-content:space-between; font-size:24px; color:#86868B; margin-bottom:56px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:30px; }
+  .t { background:#fff; border-radius:26px; height:440px; position:relative; display:flex; align-items:center; justify-content:center; gap:34px; }
+  .t.k { background:var(--ink); color:#fff; }
+  .n { position:absolute; left:36px; top:30px; font-size:20px; color:#86868B; letter-spacing:2.5px; text-transform:uppercase; }
+  .d { position:absolute; left:36px; bottom:28px; font-size:21px; color:#86868B; }
+  .o { color:var(--or); }
+  .grad { background:linear-gradient(135deg,var(--or2),var(--or) 60%,#F2380A); }
+</style>
+</head>
+<body>
+<div class="top"><span>chollos d’hoy — logo · 10 estilos</span><span>v5 · paleta: tinta #0B0B0C · naranja #FF5A0A→#FF8A1F · blanco</span></div>
+<div class="grid">
+
+  <!-- 01 Suizo -->
+  <div class="t">
+    <span class="n">01 · Suizo</span>
+    <span style="font-family:'Inter Tight';font-weight:900;font-size:132px;letter-spacing:-6px;word-spacing:28px">CHOLLOS D<span class="o">’</span>HOY</span>
+    <span class="d">Mayúsculas compactas, contundente y atemporal. Personalidad: seria, de referencia.</span>
+  </div>
+
+  <!-- 02 Apilado editorial -->
+  <div class="t">
+    <span class="n">02 · Apilado</span>
+    <div style="font-family:Geist;font-weight:700;font-size:118px;letter-spacing:-6px;line-height:.86">chollos<br>d’hoy<span class="o">.</span></div>
+    <span class="d">Dos líneas con punto final naranja: tono de titular, firme y directo.</span>
+  </div>
+
+  <!-- 03 Ligero -->
+  <div class="t">
+    <span class="n">03 · Ligero</span>
+    <span style="font-family:Urbanist;font-weight:300;font-size:132px;letter-spacing:-3px">chollos d<span class="o" style="font-weight:400">’</span>hoy</span>
+    <span class="d">Fino y aireado, estilo moda o diseño. Personalidad: elegante, premium.</span>
+  </div>
+
+  <!-- 04 Serif -->
+  <div class="t">
+    <span class="n">04 · Serif clásica</span>
+    <span style="font-family:'Instrument Serif';font-size:160px;letter-spacing:-3px;line-height:1">Chollos <i class="o">d’Hoy</i></span>
+    <span class="d">Serif de revista con cursiva naranja: curado, con criterio, como una guía.</span>
+  </div>
+
+  <!-- 05 Píldora -->
+  <div class="t">
+    <span class="n">05 · Píldora</span>
+    <span style="background:var(--ink);color:#fff;border-radius:999px;padding:30px 64px 38px;font-family:Geist;font-weight:700;font-size:96px;letter-spacing:-4px;display:inline-flex;align-items:center;gap:22px">
+      <i class="grad" style="width:38px;height:38px;border-radius:50%;display:inline-block;margin-top:8px"></i>chollos d’hoy</span>
+    <span class="d">El nombre dentro de un botón: app, etiqueta de producto, muy reconocible.</span>
+  </div>
+
+  <!-- 06 Monograma ch -->
+  <div class="t">
+    <span class="n">06 · Monograma</span>
+    <span style="width:200px;height:200px;border-radius:48px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Geist;font-weight:700;font-size:120px;letter-spacing:-8px;position:relative">ch<i class="grad" style="position:absolute;left:46px;right:46px;bottom:36px;height:12px;border-radius:6px"></i></span>
+    <span style="font-family:Geist;font-weight:600;font-size:92px;letter-spacing:-4px">chollos d’hoy</span>
+    <span class="d">Monograma «ch» subrayado en naranja + nombre. Sólido como marca de app.</span>
+  </div>
+
+  <!-- 07 Tech / mono -->
+  <div class="t k">
+    <span class="n">07 · Tech</span>
+    <span style="font-family:'Space Mono';font-weight:700;font-size:96px;letter-spacing:-4px">chollos_d’hoy<i style="display:inline-block;width:52px;height:96px;margin-left:10px;vertical-align:-14px" class="grad"></i></span>
+    <span class="d">Tipografía de código con cursor naranja: tecnológico, rastreador de precios.</span>
+  </div>
+
+  <!-- 08 Expandida -->
+  <div class="t">
+    <span class="n">08 · Expandida</span>
+    <span style="font-family:Unbounded;font-weight:800;font-size:100px;letter-spacing:-3px">CHOLLOS<span class="o">/</span>DHOY</span>
+    <span class="d">Letra ancha con barra naranja: urbana, joven, de streetwear y tendencia.</span>
+  </div>
+
+  <!-- 09 Con carácter -->
+  <div class="t">
+    <span class="n">09 · Con carácter</span>
+    <span style="font-family:'Bricolage Grotesque';font-weight:800;font-size:146px;letter-spacing:-6px">chollos d’h<span style="display:inline-block;width:.5em;height:.5em;border-radius:50%;vertical-align:-.01em;margin:0 .04em 0 .03em" class="grad"></span>y</span>
+    <span class="d">Grotesca con personalidad y la «o» como disco naranja: cercana, divertida, actual.</span>
+  </div>
+
+  <!-- 10 Redonda amable -->
+  <div class="t grad" style="color:#fff">
+    <span class="n" style="color:#fff;opacity:.8">10 · Redonda</span>
+    <span style="font-family:Nunito;font-weight:900;font-size:136px;letter-spacing:-4px">chollos d’hoy</span>
+    <span class="d" style="color:#fff;opacity:.85">Redondeada y gruesa sobre naranja: amable y de consumo, tipo Glovo o Duolingo.</span>
+  </div>
+
+</div>
+</body>
+</html>
