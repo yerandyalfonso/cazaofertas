@@ -1,0 +1,124 @@
+<!doctype html>
+<!--
+  Logo «chollos d'hoy» — v3, símbolos abstractos con degradados naranjas vivos.
+  Seis exploraciones. Cada tarjeta: símbolo grande sobre oscuro, logotipo sobre claro y prueba a 32 px.
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — símbolos abstractos</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:#0E0D0C; color:#F4EFE8; font-family:"Inter Tight"; padding:130px 150px 150px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:90px; }
+  h1 { font-family:Manrope; font-weight:700; font-size:42px; letter-spacing:-.5px; }
+  header p { font-size:28px; color:#8C8278; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:40px; }
+  .card { border-radius:32px; overflow:hidden; background:#171513; border:1px solid #2A2622; }
+  .stage { height:620px; display:flex; align-items:center; justify-content:center; position:relative;
+           background:radial-gradient(120% 90% at 50% 40%, #1F1B18 0%, #121110 70%); }
+  .label { position:absolute; top:34px; left:40px; font-size:22px; letter-spacing:3px; text-transform:uppercase; color:#8C8278; }
+  .lock { background:#F6F1EA; color:#141414; height:230px; display:flex; align-items:center; justify-content:center; gap:28px; }
+  .wm { font-family:Manrope; font-weight:700; font-size:68px; letter-spacing:-3.2px; }
+  .foot { padding:28px 40px 34px; display:flex; align-items:center; gap:22px; color:#A39A90; font-size:22px; line-height:1.45; }
+  .foot svg { flex:none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- paleta: ámbar → naranja → rojo vivo; y una variante con un toque magenta -->
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC21A"/><stop offset=".5" stop-color="#FF7A00"/><stop offset="1" stop-color="#F2300A"/></linearGradient>
+    <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD04A"/><stop offset="1" stop-color="#FF5A0A"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF2E4D"/><stop offset=".55" stop-color="#FF6A00"/><stop offset="1" stop-color="#FFB21A"/></linearGradient>
+    <radialGradient id="orb" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#FFE7A0"/><stop offset=".25" stop-color="#FFB21A"/><stop offset=".6" stop-color="#FF6A00"/><stop offset="1" stop-color="#E0240A"/></radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+
+    <!-- 1 · Órbita: anillo abierto + punto (una «c» abstracta en movimiento) -->
+    <symbol id="m1" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="64" fill="none" stroke="url(#g1)" stroke-width="34" stroke-linecap="round" stroke-dasharray="300 402" transform="rotate(35 100 100)"/>
+      <circle cx="152" cy="138" r="17" fill="#FFC21A"/>
+    </symbol>
+
+    <!-- 2 · Prisma: tres planos superpuestos que giran -->
+    <symbol id="m2" viewBox="0 0 200 200">
+      <rect x="34" y="34" width="132" height="132" rx="34" fill="url(#g3)" transform="rotate(-12 100 100)"/>
+      <rect x="52" y="52" width="96" height="96" rx="26" fill="url(#g1)" transform="rotate(10 100 100)"/>
+      <rect x="70" y="70" width="60" height="60" rx="17" fill="url(#g2)" transform="rotate(32 100 100)"/>
+    </symbol>
+
+    <!-- 3 · Pétalos: cuatro cuartos de círculo que se abren -->
+    <symbol id="m3" viewBox="0 0 200 200">
+      <mask id="m3hole"><rect width="200" height="200" fill="#fff"/><circle cx="100" cy="100" r="16" fill="#000"/></mask>
+      <g mask="url(#m3hole)">
+      <path d="M100 100 V30 A70 70 0 0 1 170 100 Z" fill="url(#g2)"/>
+      <path d="M100 100 H170 A70 70 0 0 1 100 170 Z" fill="url(#g1)" opacity=".9"/>
+      <path d="M100 100 V170 A70 70 0 0 1 30 100 Z" fill="url(#g3)"/>
+      <path d="M100 100 H30 A70 70 0 0 1 100 30 Z" fill="#FFC21A" opacity=".95"/>
+      </g>
+    </symbol>
+
+    <!-- 4 · Aura: esfera luminosa (cálida, «hoy» como luz) -->
+    <symbol id="m4" viewBox="0 0 200 200">
+      <circle cx="100" cy="104" r="62" fill="#FF6A00" filter="url(#glow)" opacity=".7"/>
+      <circle cx="100" cy="100" r="62" fill="url(#orb)"/>
+      <ellipse cx="80" cy="74" rx="22" ry="13" fill="#fff" opacity=".35" filter="url(#soft)"/>
+    </symbol>
+
+    <!-- 5 · Pliegue: dos cápsulas que se cruzan como una cinta -->
+    <symbol id="m5" viewBox="0 0 200 200">
+      <rect x="28" y="72" width="144" height="56" rx="28" fill="url(#g1)" transform="rotate(-35 100 100)"/>
+      <rect x="28" y="72" width="144" height="56" rx="28" fill="url(#g3)" opacity=".88" transform="rotate(35 100 100)"/>
+    </symbol>
+
+    <!-- 6 · Cascada: tres cápsulas que descienden (ritmo, bajada) -->
+    <symbol id="m6" viewBox="0 0 200 200">
+      <rect x="36" y="40" width="34" height="120" rx="17" fill="url(#g2)"/>
+      <rect x="83" y="70" width="34" height="90" rx="17" fill="url(#g1)"/>
+      <rect x="130" y="100" width="34" height="60" rx="17" fill="url(#g3)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>chollos d’hoy — símbolos abstractos · v3</h1>
+  <p>Degradados naranjas vivos · formas geométricas · sin elementos literales</p>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <div class="stage"><span class="label">01 · Órbita</span><svg width="420" height="420"><use href="#m1"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m1"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m1"/></svg>Un anillo abierto que gira con un punto que escapa: movimiento, oportunidad, una «c» sin decirla.</div>
+  </section>
+  <section class="card">
+    <div class="stage"><span class="label">02 · Prisma</span><svg width="420" height="420"><use href="#m2"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m2"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m2"/></svg>Tres planos que se superponen al girar: cada día una capa nueva de ofertas. Muy actual.</div>
+  </section>
+  <section class="card">
+    <div class="stage"><span class="label">03 · Pétalos</span><svg width="420" height="420"><use href="#m3"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m3"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m3"/></svg>Cuatro cuartos que se abren desde el centro: algo que se descubre. Bauhaus con color vivo.</div>
+  </section>
+  <section class="card">
+    <div class="stage"><span class="label">04 · Aura</span><svg width="420" height="420"><use href="#m4"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m4"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m4"/></svg>Una esfera de luz cálida: «hoy» como momento. Estética de app moderna, muy limpia.</div>
+  </section>
+  <section class="card">
+    <div class="stage"><span class="label">05 · Pliegue</span><svg width="420" height="420"><use href="#m5"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m5"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m5"/></svg>Dos cintas que se cruzan y se funden: encuentro entre producto y precio. Dinámico.</div>
+  </section>
+  <section class="card">
+    <div class="stage"><span class="label">06 · Cascada</span><svg width="420" height="420"><use href="#m6"/></svg></div>
+    <div class="lock"><svg width="96" height="96"><use href="#m6"/></svg><span class="wm">chollos d’hoy</span></div>
+    <div class="foot"><svg width="32" height="32"><use href="#m6"/></svg>Tres cápsulas que bajan con ritmo: una bajada sugerida, no dibujada.</div>
+  </section>
+</div>
+</body>
+</html>
