@@ -1,0 +1,84 @@
+<!doctype html>
+<!--
+  Logo «chollos d'hoy» — v6. Cinco estilos elegidos × 4 variantes.
+  Filas: A Apilado · B Monograma apilado · C Tech apilado · D Expandida · E Con carácter (sol).
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — variantes</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=Archivo:wdth,wght@62..125,900&family=Plus+Jakarta+Sans:wght@800&family=Outfit:wght@700;800&family=Manrope:wght@800&family=Space+Grotesk:wght@700&family=Inter+Tight:wght@800&family=Space+Mono:wght@700&family=JetBrains+Mono:wght@800&family=IBM+Plex+Mono:wght@700&family=DM+Mono:wght@500&family=Syne:wght@800&family=Krona+One&family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0B0B0C; --or:#FF5A0A; --or2:#FF8A1F; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:#F4F4F2; color:var(--ink); padding:100px 120px 120px; font-family:Sora; }
+  .top { display:flex; justify-content:space-between; font-size:24px; color:#86868B; margin-bottom:40px; }
+  .row { margin-bottom:46px; }
+  .rt { font-size:26px; font-weight:700; margin:0 0 18px 6px; }
+  .rt span { color:#86868B; font-weight:400; font-size:22px; margin-left:12px; }
+  .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:22px; }
+  .t { overflow:hidden; background:#fff; border-radius:22px; height:360px; position:relative; display:flex; align-items:center; justify-content:center; gap:26px; }
+  .t.k { background:var(--ink); color:#fff; }
+  .n { position:absolute; left:24px; top:18px; font-size:18px; color:#9A9AA0; letter-spacing:2px; }
+  .o { color:var(--or); }
+  .g { background:linear-gradient(135deg,var(--or2),var(--or) 60%,#F2380A); }
+  .gt { background:linear-gradient(90deg,var(--or2),#F2380A); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .stk { line-height:.86; }
+  .ic { width:150px; height:150px; border-radius:36px; display:flex; align-items:center; justify-content:center; position:relative; flex:none; }
+  .sun { display:inline-block; width:.62em; height:.62em; vertical-align:-.06em; margin:0 .02em; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="og" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A1F"/><stop offset="1" stop-color="#F2380A"/></linearGradient>
+  <!-- soles minimalistas (cuadrícula 100) -->
+  <symbol id="s1" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="url(#og)"/><g stroke="#FF5A0A" stroke-width="7" stroke-linecap="round"><path d="M50 4v8M50 88v8M4 50h8M88 50h8M17 17l6 6M77 77l6 6M17 83l6-6M77 23l6-6"/></g></symbol>
+  <symbol id="s2" viewBox="0 0 100 100"><clipPath id="hz"><rect width="100" height="74"/></clipPath><circle cx="50" cy="74" r="40" fill="url(#og)" clip-path="url(#hz)"/><rect x="0" y="80" width="100" height="9" rx="4.5" fill="#FF5A0A"/></symbol>
+  <symbol id="s3" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="none" stroke="#FF8A1F" stroke-width="5" opacity=".55"/><circle cx="50" cy="50" r="32" fill="url(#og)"/></symbol>
+  <symbol id="s4" viewBox="0 0 100 100"><clipPath id="sc"><circle cx="50" cy="50" r="44"/></clipPath><g clip-path="url(#sc)"><rect width="100" height="100" fill="url(#og)"/><rect y="56" width="100" height="6" fill="#fff"/><rect y="70" width="100" height="8" fill="#fff"/><rect y="86" width="100" height="11" fill="#fff"/></g></symbol>
+</defs></svg>
+
+<div class="top"><span>chollos d’hoy — variantes de los estilos elegidos</span><span>v6 · 5 estilos × 4</span></div>
+
+<!-- A · Apilado -->
+<div class="row"><div class="rt">A · Apilado <span>color al final + otras tipografías</span></div><div class="grid">
+  <div class="t"><span class="n">A1 · SORA</span><div class="stk" style="font-family:Sora;font-weight:800;font-size:96px;letter-spacing:-5px">chollos<br>d’<span class="o">hoy</span></div></div>
+  <div class="t"><span class="n">A2 · ARCHIVO</span><div class="stk" style="font-family:Archivo;font-weight:900;font-stretch:90%;font-size:104px;letter-spacing:-4px">chollos<br>d’hoy<span style="display:inline-block;width:.22em;height:.22em;margin-left:.06em" class="g"></span></div></div>
+  <div class="t"><span class="n">A3 · JAKARTA</span><div class="stk" style="font-family:'Plus Jakarta Sans';font-weight:800;font-size:96px;letter-spacing:-5px">chollos<br><span class="gt">d’hoy</span></div></div>
+  <div class="t"><span class="n">A4 · OUTFIT</span><div class="stk" style="font-family:Outfit;font-weight:800;font-size:104px;letter-spacing:-4px">chollos<br>d<span class="o">’</span>hoy<span style="display:inline-block;width:.2em;height:.2em;border-radius:50%;margin-left:.05em" class="g"></span></div></div>
+</div></div>
+
+<!-- B · Monograma apilado -->
+<div class="row"><div class="rt">B · Monograma <span>icono «ch» + nombre apilado</span></div><div class="grid">
+  <div class="t"><span class="n">B1 · SORA</span><span class="ic" style="background:var(--ink);color:#fff;font-family:Sora;font-weight:800;font-size:82px;letter-spacing:-6px">ch<i class="g" style="position:absolute;left:36px;right:36px;bottom:28px;height:9px;border-radius:5px"></i></span><div class="stk" style="font-family:Sora;font-weight:800;font-size:58px;letter-spacing:-3px">chollos<br>d’hoy</div></div>
+  <div class="t"><span class="n">B2 · MANROPE</span><span class="ic g" style="color:#fff;font-family:Manrope;font-weight:800;font-size:84px;letter-spacing:-6px">ch</span><div class="stk" style="font-family:Manrope;font-weight:800;font-size:60px;letter-spacing:-3px">chollos<br>d’<span class="o">hoy</span></div></div>
+  <div class="t"><span class="n">B3 · SPACE GROTESK</span><span class="ic" style="background:var(--ink);color:#fff;font-family:'Space Grotesk';font-weight:700;font-size:84px;letter-spacing:-6px">ch<i class="g" style="position:absolute;right:26px;top:26px;width:20px;height:20px;border-radius:50%"></i></span><div class="stk" style="font-family:'Space Grotesk';font-weight:700;font-size:60px;letter-spacing:-3px">chollos<br>d’hoy</div></div>
+  <div class="t"><span class="n">B4 · INTER TIGHT</span><span class="ic" style="border-radius:50%;background:var(--ink);color:#fff;font-family:'Inter Tight';font-weight:800;font-size:76px;letter-spacing:-5px">ch<span class="o">.</span></span><div class="stk" style="font-family:'Inter Tight';font-weight:800;font-size:62px;letter-spacing:-3px">chollos<br>d’hoy<span class="o">.</span></div></div>
+</div></div>
+
+<!-- C · Tech apilado -->
+<div class="row"><div class="rt">C · Tech <span>monoespaciada y apilada</span></div><div class="grid">
+  <div class="t k"><span class="n">C1 · SPACE MONO</span><div class="stk" style="font-family:'Space Mono';font-weight:700;font-size:78px;letter-spacing:-4px;line-height:1">chollos_<br>d’hoy<i class="g" style="display:inline-block;width:40px;height:74px;margin-left:8px;vertical-align:-10px"></i></div></div>
+  <div class="t"><span class="n">C2 · JETBRAINS MONO</span><div style="font-family:'JetBrains Mono';font-weight:800;font-size:74px;letter-spacing:-4px;line-height:1"><span class="o">&gt;</span> chollos<br>&nbsp;&nbsp;d’hoy<span class="o">_</span></div></div>
+  <div class="t k"><span class="n">C3 · PLEX MONO</span><div style="font-family:'IBM Plex Mono';font-weight:700;font-size:74px;letter-spacing:-3px;line-height:1.02"><span class="o">[</span>chollos<br>&nbsp;d’hoy<span class="o">]</span></div></div>
+  <div class="t"><span class="n">C4 · DM MONO</span><div style="font-family:'DM Mono';font-weight:500;font-size:76px;letter-spacing:-3px;line-height:1.02"><span class="o">$</span> chollos<br>&nbsp;&nbsp;d’hoy<i class="g" style="display:inline-block;width:34px;height:8px;margin-left:8px;vertical-align:2px"></i></div></div>
+</div></div>
+
+<!-- D · Expandida -->
+<div class="row"><div class="rt">D · Expandida <span>otras tipografías · «/D» en naranja</span></div><div class="grid">
+  <div class="t"><span class="n">D1 · SYNE</span><span style="font-family:Syne;font-weight:800;font-size:50px;letter-spacing:-1px">CHOLLOS<span class="o">/D</span>HOY</span></div>
+  <div class="t"><span class="n">D2 · ARCHIVO EXPANDED</span><span style="font-family:Archivo;font-weight:900;font-stretch:125%;font-size:46px;letter-spacing:-1px">CHOLLOS <span class="o">D</span>HOY</span></div>
+  <div class="t"><span class="n">D3 · KRONA ONE</span><span style="font-family:'Krona One';font-size:40px;letter-spacing:-1px">CHOLLOS<span class="o">/D</span>HOY</span></div>
+  <div class="t"><span class="n">D4 · SYNE APILADA</span><div class="stk" style="font-family:Syne;font-weight:800;font-size:68px;letter-spacing:-2px;line-height:.9">CHOLLOS<br><span class="gt">D</span>HOY</div></div>
+</div></div>
+
+<!-- E · Con carácter + sol -->
+<div class="row"><div class="rt">E · Con carácter <span>Bricolage Grotesque · la «o» de hoy como sol</span></div><div class="grid">
+  <div class="t"><span class="n">E1 · SOL CON RAYOS</span><span style="font-family:'Bricolage Grotesque';font-weight:800;font-size:96px;letter-spacing:-4px">chollos d’h<svg class="sun"><use href="#s1"/></svg>y</span></div>
+  <div class="t"><span class="n">E2 · AMANECER</span><span style="font-family:'Bricolage Grotesque';font-weight:800;font-size:96px;letter-spacing:-4px">chollos d’h<svg class="sun"><use href="#s2"/></svg>y</span></div>
+  <div class="t"><span class="n">E3 · HALO</span><span style="font-family:'Bricolage Grotesque';font-weight:800;font-size:96px;letter-spacing:-4px">chollos d’h<svg class="sun"><use href="#s3"/></svg>y</span></div>
+  <div class="t"><span class="n">E4 · HORIZONTE</span><span style="font-family:'Bricolage Grotesque';font-weight:800;font-size:96px;letter-spacing:-4px">chollos d’h<svg class="sun"><use href="#s4"/></svg>y</span></div>
+</div></div>
+</body>
+</html>
