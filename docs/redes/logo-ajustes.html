@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Logo «chollos d'hoy» — v9, ajustes finos:
+  B1-3 (apóstrofo integrado, espaciado original de Bricolage) · B4 en Bricolage con naranja mejorado ·
+  C1-4 (Martian Mono) con icono, dos opciones.
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — ajustes</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Martian+Mono:wght@700&family=Geist:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0B0B0C; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:#F4F4F2; color:var(--ink); padding:100px 120px 120px; font-family:Geist; }
+  .top { display:flex; justify-content:space-between; font-size:24px; color:#86868B; margin-bottom:40px; }
+  .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:22px; margin-bottom:22px; }
+  .t { overflow:hidden; background:#fff; border-radius:22px; height:400px; position:relative; display:flex; align-items:center; justify-content:center; gap:28px; }
+  .t.k { background:var(--ink); color:#fff; }
+  .n { position:absolute; left:24px; top:18px; font-size:18px; color:#9A9AA0; letter-spacing:2px; }
+  /* naranja mejorado: degradado más luminoso y saturado, que no se apaga sobre negro */
+  .og { background:linear-gradient(160deg,#FFA23A 0%,#FF6A13 45%,#F23D0C 100%); }
+  .ot { background:linear-gradient(160deg,#FFA23A 0%,#FF6A13 45%,#F23D0C 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .o  { color:#FF6A13; }
+  .bri { font-family:'Bricolage Grotesque'; font-weight:800; }
+  .stk { line-height:.86; }
+  .dot { display:inline-block; width:.2em; height:.2em; border-radius:50%; margin-left:.05em; }
+  .ic { width:var(--s,150px); height:var(--s,150px); border-radius:calc(var(--s,150px) * .24); background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; flex:none; position:relative; }
+  .ic.r { border-radius:50%; }
+  /* «ch» con espaciado original de la fuente y el apóstrofo en la unión, más bajo */
+  .ch { position:relative; display:inline-block; letter-spacing:0; }
+  .ch .ap { position:absolute; left:var(--ap,45%); top:var(--apt,.06em); transform:translateX(-50%); }
+  .bar { position:absolute; left:24%; right:24%; bottom:18.5%; height:6%; border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="top"><span>chollos d’hoy — ajustes finos</span><span>v9 · B1-3 · B4 · C1-4 + icono</span></div>
+
+<div class="grid">
+  <!-- B1-3 ajustado -->
+  <div class="t"><span class="n">B1-3 · AJUSTADO</span>
+    <span class="ic bri" style="font-size:88px"><span class="ch">ch<span class="ap ot">’</span></span><i class="bar og"></i></span>
+    <div class="stk bri" style="font-size:64px;letter-spacing:-3px">chollos<br>d<span class="ot">’</span>hoy<i class="dot og"></i></div>
+  </div>
+  <!-- B4 en Bricolage -->
+  <div class="t"><span class="n">B4 · BRICOLAGE + NARANJA MEJORADO</span>
+    <span class="ic r bri" style="font-size:80px"><span class="ch" style="--ap:38%">ch<span class="ap ot">’</span><span class="ot">.</span></span></span>
+    <div class="stk bri" style="font-size:64px;letter-spacing:-3px">chollos<br>d<span class="ot">’</span>hoy<span class="ot">.</span></div>
+  </div>
+  <!-- C1-4 + icono A: cursor -->
+  <div class="t k"><span class="n">C1-4 · ICONO CURSOR</span>
+    <span class="ic" style="background:#1A1A1C;border:2px solid #2C2C30"><span style="font-family:'Martian Mono';font-weight:700;font-size:56px;color:#8E8E93;margin-right:10px;line-height:1">&gt;</span><i class="og" style="width:34px;height:64px;border-radius:4px"></i></span>
+    <div style="font-family:'Martian Mono';font-weight:700;font-size:52px;letter-spacing:-3px;line-height:1.05">chollos_<br>d’hoy<i class="og" style="display:inline-block;width:28px;height:50px;margin-left:6px;vertical-align:-7px"></i></div>
+  </div>
+  <!-- C1-4 + icono B: d’ + cursor -->
+  <div class="t k"><span class="n">C1-4 · ICONO «d’_»</span>
+    <span class="ic" style="background:#1A1A1C;border:2px solid #2C2C30;font-family:'Martian Mono';font-weight:700;font-size:60px;letter-spacing:-4px">d’<i class="og" style="display:inline-block;width:24px;height:46px;margin-left:4px"></i></span>
+    <div style="font-family:'Martian Mono';font-weight:700;font-size:52px;letter-spacing:-3px;line-height:1.05">chollos_<br>d’hoy<i class="og" style="display:inline-block;width:28px;height:50px;margin-left:6px;vertical-align:-7px"></i></div>
+  </div>
+</div>
+
+<!-- Iconos en grande para revisar el detalle -->
+<div class="grid">
+  <div class="t"><span class="n">B1-3 · ICONO GRANDE</span><span class="ic bri" style="--s:300px;font-size:176px"><span class="ch">ch<span class="ap ot">’</span></span><i class="bar og"></i></span></div>
+  <div class="t"><span class="n">B4 · ICONO GRANDE</span><span class="ic r bri" style="--s:300px;font-size:160px"><span class="ch" style="--ap:38%">ch<span class="ap ot">’</span><span class="ot">.</span></span></span></div>
+  <div class="t k"><span class="n">C1-4 · CURSOR GRANDE</span><span class="ic" style="--s:300px;background:#1A1A1C;border:3px solid #2C2C30"><span style="font-family:'Martian Mono';font-weight:700;font-size:112px;color:#8E8E93;margin-right:20px;line-height:1">&gt;</span><i class="og" style="width:68px;height:128px;border-radius:8px"></i></span></div>
+  <div class="t k"><span class="n">C1-4 · «d’_» GRANDE</span><span class="ic" style="--s:300px;background:#1A1A1C;border:3px solid #2C2C30;font-family:'Martian Mono';font-weight:700;font-size:120px;letter-spacing:-8px">d’<i class="og" style="display:inline-block;width:48px;height:92px;margin-left:8px"></i></span></div>
+</div>
+</body>
+</html>
