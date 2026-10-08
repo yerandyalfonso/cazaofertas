@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="936" height="300" viewBox="0 0 936 300">
+  <defs>
+    <linearGradient id="naranja" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#FFA23A"/><stop offset="0.45" stop-color="#FF6A13"/><stop offset="1" stop-color="#F23D0C"/>
+    </linearGradient>
+  </defs>
+  <g id="fondo"><rect width="936" height="300" fill="#0B0B0C"/></g>
+  <g id="icono"><rect x="1.5" y="1.5" width="297" height="297" rx="72" fill="#1A1A1C" stroke="#2C2C30" stroke-width="3"/></g>
+  <g id="prompt"><text x="66.8" y="190.3" font-family="Martian Mono" font-weight="700" font-size="112" letter-spacing="0" fill="#8E8E93">></text></g>
+  <g id="cursor"><rect x="165.2" y="86.0" width="68" height="128" rx="8" fill="url(#naranja)"/></g>
+  <g id="chollos"><text x="356.0" y="126.6" font-family="Martian Mono" font-weight="700" font-size="104" letter-spacing="-6" fill="#FFFFFF">chollos_</text></g>
+  <g id="dhoy"><text x="356.0" y="235.8" font-family="Martian Mono" font-weight="700" font-size="104" letter-spacing="-6" fill="#FFFFFF">d’hoy</text></g>
+  <g id="cursor-nombre"><rect x="708.0" y="154.7" width="56.2" height="99.8" fill="url(#naranja)"/></g>
+</svg>

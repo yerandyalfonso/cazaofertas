@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="300" viewBox="0 0 740 300">
+  <defs>
+    <linearGradient id="naranja" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#FFA23A"/><stop offset="0.45" stop-color="#FF6A13"/><stop offset="1" stop-color="#F23D0C"/>
+    </linearGradient>
+  </defs>
+  <g id="icono"><rect width="300" height="300" rx="72" fill="#0B0B0C"/></g>
+  <g id="ch"><text x="53.1" y="211.6" font-family="Bricolage Grotesque" font-weight="800" font-size="176" letter-spacing="0" fill="#FFFFFF">ch</text></g>
+  <g id="apostrofo"><text x="123.3" y="222.2" font-family="Bricolage Grotesque" font-weight="800" font-size="176" letter-spacing="0" fill="url(#naranja)">’</text></g>
+  <g id="linea"><rect x="72.0" y="226.5" width="156.0" height="18.0" rx="9.0" fill="url(#naranja)"/></g>
+  <g id="chollos"><text x="356.0" y="127.0" font-family="Bricolage Grotesque" font-weight="800" font-size="128" letter-spacing="-6" fill="#0B0B0C">chollos</text></g>
+  <g id="d"><text x="356.0" y="237.0" font-family="Bricolage Grotesque" font-weight="800" font-size="128" letter-spacing="-6" fill="#0B0B0C">d</text></g>
+  <g id="apostrofo-nombre"><text x="423.7" y="237.0" font-family="Bricolage Grotesque" font-weight="800" font-size="128" letter-spacing="-6" fill="url(#naranja)">’</text></g>
+  <g id="hoy"><text x="442.4" y="237.0" font-family="Bricolage Grotesque" font-weight="800" font-size="128" letter-spacing="-6" fill="#0B0B0C">hoy</text></g>
+  <g id="punto-final"><circle cx="663.1" cy="224.2" r="12.8" fill="url(#naranja)"/></g>
+</svg>
