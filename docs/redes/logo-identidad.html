@@ -1,0 +1,117 @@
+<!doctype html>
+<!--
+  Identidad «chollos d'hoy» — v4. Logotipo geométrico (Geist) + monograma «d'».
+  Lámina de marca: logotipo, símbolo, versiones, color, tipografía y aplicaciones.
+  Renderizar con Playwright a 3200 px de ancho (página completa).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>chollos d'hoy — identidad</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0B0B0C; --paper:#FFFFFF; --mist:#F4F4F2; --line:#E7E7E4; --accent:#FF5A0A; --muted:#86868B; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:3200px; background:var(--mist); font-family:Geist; color:var(--ink); padding:120px 140px 140px; }
+  .top { display:flex; justify-content:space-between; font-size:24px; color:var(--muted); letter-spacing:.5px; margin-bottom:60px; }
+  .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:32px; }
+  .tile { background:var(--paper); border-radius:28px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .cap { position:absolute; left:40px; bottom:32px; font-size:20px; color:var(--muted); letter-spacing:.4px; }
+  .cap.l { color:#8E8E93; }
+  .dark { background:var(--ink); }
+  .acc { background:linear-gradient(140deg,#FF8A1F 0%,#FF5A0A 55%,#F2380A 100%); }
+  .wm { font-family:Geist; font-weight:600; letter-spacing:-.045em; line-height:1; display:inline-flex; align-items:baseline; white-space:nowrap; }
+  .ap { display:inline-block; }
+  .sw { height:300px; border-radius:24px; padding:32px; display:flex; flex-direction:column; justify-content:flex-end; font-size:22px; }
+  .sw b { font-size:30px; font-weight:600; margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A1F"/><stop offset="1" stop-color="#F2380A"/></linearGradient>
+    <!-- apóstrofo: trazo inclinado con extremos redondeados -->
+    <symbol id="apos" viewBox="0 0 40 80"><path d="M27 8 L14 72" stroke="url(#acc)" stroke-width="19" stroke-linecap="round"/></symbol>
+    <!-- monograma d' (cuadrícula 200): cuenco circular + asta + apóstrofo -->
+    <symbol id="mono" viewBox="0 0 200 200">
+      <circle cx="84" cy="122" r="44" fill="none" stroke="currentColor" stroke-width="26"/>
+      <path d="M128 40 V166" stroke="currentColor" stroke-width="26" stroke-linecap="round"/>
+      <path d="M170 40 L158 86" stroke="url(#acc)" stroke-width="22" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="top"><span>chollos d’hoy — identidad de marca</span><span>v4 · logotipo + monograma</span></div>
+
+<div class="grid">
+
+  <!-- Logotipo principal -->
+  <div class="tile" style="grid-column:span 8;height:720px">
+    <span class="wm" style="font-size:230px">chollos d<svg class="ap" width="48" height="96" viewBox="0 0 40 80" style="align-self:flex-start;margin:6px -8px 0 12px"><use href="#apos"/></svg>hoy</span>
+    <span class="cap">Logotipo principal · Geist SemiBold, espaciado −4,5 %</span>
+  </div>
+
+  <!-- Símbolo -->
+  <div class="tile dark" style="grid-column:span 4;height:720px;color:#fff">
+    <svg width="360" height="360"><use href="#mono"/></svg>
+    <span class="cap l">Monograma «d’» · círculo + asta + apóstrofo</span>
+  </div>
+
+  <!-- Firma horizontal -->
+  <div class="tile" style="grid-column:span 6;height:400px;gap:40px;color:var(--ink)">
+    <svg width="150" height="150" style="color:var(--ink)"><use href="#mono"/></svg>
+    <span class="wm" style="font-size:118px">chollos d<svg class="ap" width="26" height="50" viewBox="0 0 40 80" style="align-self:flex-start;margin:3px -4px 0 6px"><use href="#apos"/></svg>hoy</span>
+    <span class="cap">Firma horizontal</span>
+  </div>
+
+  <!-- Negativo -->
+  <div class="tile dark" style="grid-column:span 6;height:400px;color:#fff">
+    <span class="wm" style="font-size:150px">chollos d<svg class="ap" width="32" height="64" viewBox="0 0 40 80" style="align-self:flex-start;margin:4px -5px 0 8px"><use href="#apos"/></svg>hoy</span>
+    <span class="cap l">Negativo</span>
+  </div>
+
+  <!-- Iconos de app -->
+  <div class="tile" style="grid-column:span 4;height:420px;gap:44px">
+    <div style="width:190px;height:190px;border-radius:44px;background:var(--ink);display:flex;align-items:center;justify-content:center;color:#fff"><svg width="128" height="128"><use href="#mono"/></svg></div>
+    <div class="acc" style="width:190px;height:190px;border-radius:44px;display:flex;align-items:center;justify-content:center;color:#fff"><svg width="128" height="128" viewBox="0 0 200 200"><circle cx="84" cy="122" r="44" fill="none" stroke="#fff" stroke-width="26"/><path d="M128 40 V166" stroke="#fff" stroke-width="26" stroke-linecap="round"/><path d="M170 40 L158 86" stroke="#fff" stroke-width="22" stroke-linecap="round"/></svg></div>
+    <span class="cap">Icono de app · oscuro / acento</span>
+  </div>
+
+  <!-- Tamaños pequeños -->
+  <div class="tile" style="grid-column:span 4;height:420px;gap:40px;color:var(--ink)">
+    <svg width="64" height="64"><use href="#mono"/></svg>
+    <svg width="32" height="32"><use href="#mono"/></svg>
+    <svg width="16" height="16"><use href="#mono"/></svg>
+    <span class="cap">Legibilidad · 64 / 32 / 16 px</span>
+  </div>
+
+  <!-- Avatar redes -->
+  <div class="tile" style="grid-column:span 4;height:420px;gap:30px;flex-direction:column">
+    <div class="acc" style="width:210px;height:210px;border-radius:50%;display:flex;align-items:center;justify-content:center"><svg width="130" height="130" viewBox="0 0 200 200"><circle cx="84" cy="122" r="44" fill="none" stroke="#fff" stroke-width="26"/><path d="M128 40 V166" stroke="#fff" stroke-width="26" stroke-linecap="round"/><path d="M170 40 L158 86" stroke="#0B0B0C" stroke-width="22" stroke-linecap="round"/></svg></div>
+    <div style="font-size:30px;font-weight:600">chollosdhoy</div>
+    <span class="cap">Avatar Instagram / Facebook / Telegram</span>
+  </div>
+
+  <!-- Navegador -->
+  <div class="tile" style="grid-column:span 7;height:520px;align-items:flex-start;justify-content:flex-start;padding:60px;flex-direction:column;gap:0;background:#ECECEA">
+    <div style="display:flex;gap:12px;margin-bottom:22px"><i style="width:22px;height:22px;border-radius:50%;background:#FF5F57"></i><i style="width:22px;height:22px;border-radius:50%;background:#FEBC2E"></i><i style="width:22px;height:22px;border-radius:50%;background:#28C840"></i></div>
+    <div style="background:#fff;border-radius:18px 18px 0 0;padding:20px 30px;display:flex;align-items:center;gap:16px;font-size:24px;color:#3A3A3C;width:620px"><svg width="30" height="30" style="color:#0B0B0C"><use href="#mono"/></svg>chollos d’hoy · Chollos reales</div>
+    <div style="background:#fff;width:100%;height:320px;border-radius:0 18px 18px 18px;padding:42px 48px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)">
+      <span style="display:flex;align-items:center;gap:22px"><svg width="64" height="64" style="color:#0B0B0C"><use href="#mono"/></svg><span class="wm" style="font-size:54px">chollos d<svg width="12" height="24" viewBox="0 0 40 80" style="align-self:flex-start;margin:2px -2px 0 4px"><use href="#apos"/></svg>hoy</span></span>
+      <span style="display:flex;gap:44px;font-size:28px;color:#3A3A3C;align-items:center">Ofertas<span>Tiendas</span><span>Cupones</span><span style="background:#0B0B0C;color:#fff;padding:18px 32px;border-radius:999px">Crear alerta</span></span>
+    </div>
+    <span class="cap">Web · pestaña y cabecera</span>
+  </div>
+
+  <!-- Paleta -->
+  <div style="grid-column:span 5;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="sw" style="background:#0B0B0C;color:#fff"><b>Tinta</b>#0B0B0C</div>
+    <div class="sw acc" style="color:#fff"><b>Naranja hoy</b>#FF5A0A → #FF8A1F</div>
+    <div class="sw" style="background:#fff;border:1px solid var(--line)"><b>Blanco</b>#FFFFFF</div>
+    <div class="sw" style="background:#F4F4F2;border:1px solid var(--line)"><b>Niebla</b>#F4F4F2</div>
+  </div>
+
+</div>
+</body>
+</html>
