@@ -51,6 +51,19 @@ class Font:
         self.gs[self.glyph(ch)].draw(bp)
         return bp.bounds[3] * size / self.upm
 
+    def ink(self, text, size, tracking=0):
+        """Caja real de dibujo (x0, y0, x1, y1) de `text` con la línea base en y=0 (y hacia arriba)."""
+        from fontTools.pens.boundsPen import BoundsPen
+        x, s, box = 0, size / self.upm, None
+        for c in text:
+            bp = BoundsPen(self.gs)
+            self.gs[self.glyph(c)].draw(bp)
+            if bp.bounds:
+                b = (x + bp.bounds[0] * s, bp.bounds[1] * s, x + bp.bounds[2] * s, bp.bounds[3] * s)
+                box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+            x += self.adv(c, size) + tracking
+        return box
+
     def path(self, text, size, x, y, tracking=0):
         """Contorno de `text` con la línea base en (x, y). Devuelve (d, x_final)."""
         pen = SVGPathPen(self.gs)
@@ -85,16 +98,19 @@ def word(font, text, size, x, y, tracking, fill, live, gid):
 
 # ---------- piezas comunes ----------
 
-def ch_monogram(font, size, cx, cy, ap_pos, with_dot, live):
-    """«ch» centrado en (cx, cy) con el apóstrofo superpuesto en la unión (y punto opcional)."""
-    w_ch = font.width("ch", size)
-    w = w_ch + (font.adv(".", size) if with_dot else 0)
-    x0 = cx - w / 2
-    base = cy + font.ymax("h", size) / 2
+def ch_monogram(font, size, cx, cy, ap_pos, with_dot, live, bar=None):
+    """«ch» centrado ópticamente en (cx, cy) por su caja real de dibujo, con el apóstrofo
+    superpuesto en la unión (y punto opcional). bar=(alto, separación): la línea de debajo
+    se centra junto con las letras."""
+    text = "ch." if with_dot else "ch"
+    x0i, _, x1i, y1i = font.ink(text, size)
+    block_h = y1i + (bar[1] + bar[0] if bar else 0)        # de la cima de la «h» al pie de la línea
+    base = cy - block_h / 2 + y1i
+    x0 = cx - (x0i + x1i) / 2
     parts = []
     g, xe = word(font, "ch", size, x0, base, 0, "#FFFFFF", live, "ch")
     parts.append(g)
-    # apóstrofo: centrado en ap_pos (fracción del ancho del bloque, como en el diseño) y bajado 0,06 em
+    w = font.width(text, size)
     ap_w = font.adv("’", size)
     ax = x0 + w * ap_pos - ap_w / 2
     g, _ = word(font, "’", size, ax, base + 0.06 * size, 0, "url(#naranja)", live, "apostrofo")
@@ -102,6 +118,10 @@ def ch_monogram(font, size, cx, cy, ap_pos, with_dot, live):
     if with_dot:
         g, _ = word(font, ".", size, xe, base, 0, "url(#naranja)", live, "punto")
         parts.append(g)
+    if bar:
+        bw = font.ink("ch", size)
+        bx0, bx1 = x0 + bw[0], x0 + bw[2]
+        parts.append(f'  <g id="linea"><rect x="{bx0:.1f}" y="{base + bar[1]:.1f}" width="{bx1 - bx0:.1f}" height="{bar[0]:.1f}" rx="{bar[0]/2:.1f}" fill="url(#naranja)"/></g>')
     return "\n".join(parts)
 
 
@@ -140,8 +160,7 @@ def stacked_name(font, size, x, cy, tracking, color, live, end):
 def b13(live, icon_only=False):
     S = 300
     icon = [f'  <g id="icono"><rect width="{S}" height="{S}" rx="72" fill="{INK}"/></g>',
-            ch_monogram(BRI, 176, S / 2, S / 2, 0.45, False, live),
-            f'  <g id="linea"><rect x="{S*0.24:.1f}" y="{S*(1-0.185-0.06):.1f}" width="{S*0.52:.1f}" height="{S*0.06:.1f}" rx="{S*0.03:.1f}" fill="url(#naranja)"/></g>']
+            ch_monogram(BRI, 176, S / 2, S / 2, 0.45, False, live, bar=(S * 0.06, S * 0.07))]
     if icon_only:
         return svg(S, S, "\n".join(icon))
     name, xe = stacked_name(BRI, 128, S + 56, S / 2, -6, INK, live, "circulo")
