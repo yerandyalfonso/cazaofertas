@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  Banner «chollos d'hoy» (4400×1739, portada de Facebook / cabeceras).
+  Estilo: naranja vivo, título 3D en cursiva y adornos de línea de la hoja de iconos.
+  El texto importante va entre x≈760 y x≈3640: es la franja que Facebook muestra en móvil.
+  Renderizar a PNG: abrir en Chrome a 4400×1739 o con Playwright (ver docs/redes/perfil-facebook-instagram.md).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Banner chollos d'hoy · logo b1-3</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,600;0,700;0,800;1,900&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Martian+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #1c1917; }
+  svg { display: block; }
+  .t { font-family: Poppins; font-style: italic; font-weight: 900; font-size: 560px; letter-spacing: -18px; }
+  .s { font-family: Poppins; }
+</style>
+</head>
+<body>
+<svg width="4400" height="1739" viewBox="0 0 4400 1739" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <radialGradient id="bg" cx="48%" cy="46%" r="72%">
+    <stop offset="0" stop-color="#FFB000"/><stop offset=".65" stop-color="#FDA015"/><stop offset="1" stop-color="#F7861A"/>
+  </radialGradient>
+  <linearGradient id="tileY" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE10A"/><stop offset="1" stop-color="#F9992B"/></linearGradient>
+  <linearGradient id="tileR" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF9A1F"/><stop offset="1" stop-color="#FF4D0A"/></linearGradient>
+  <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E4E4E4"/></linearGradient>
+  <pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="4.5" fill="#8A3A00" fill-opacity=".45"/></pattern>
+  <radialGradient id="fade"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  <mask id="dotmask"><circle cx="150" cy="820" r="210" fill="url(#fade)"/></mask>
+  <clipPath id="qc"><path d="M340 0 H0 A340 340 0 0 0 340 340 Z"/></clipPath>
+  <filter id="drop" x="-10%" y="-10%" width="130%" height="140%"><feDropShadow dx="22" dy="48" stdDeviation="34" flood-color="#9A3D00" flood-opacity=".45"/></filter>
+  <filter id="tileSh" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="70" stdDeviation="0" flood-color="#F48521"/></filter>
+  <path id="spark" d="M0-70C6-20 20-6 70 0C20 6 6 20 0 70C-6 20-20 6-70 0C-20-6-6-20 0-70Z"/>
+  <path id="cross" d="M-16-60h32v44h44v32h-44v44h-32v-44h-44v-32h44z"/>
+</defs>
+
+<rect width="4400" height="1739" fill="url(#bg)"/>
+
+<!-- Laterales (Facebook los recorta en móvil): solo decoración -->
+<g filter="url(#tileSh)"><rect x="-260" y="-60" width="560" height="560" rx="40" transform="rotate(-24 20 220)" fill="url(#tileY)"/></g>
+<g filter="url(#tileSh)"><rect x="4040" y="1250" width="560" height="560" rx="40" transform="rotate(-24 4320 1530)" fill="url(#tileR)"/></g>
+
+<g fill="none" stroke="#C85E00" stroke-opacity=".55" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+  <!-- escalera -->
+  <path d="M60 1180 v520 h520 v-80 h-90 v-90 h-90 v-90 h-90 v-90 h-90 v-90 h-90 v-80 z"/>
+  <!-- triángulos escalonados -->
+  <path d="M470 1050 l230 -230 v230 z M520 1100 l230 -230 v230 z M570 1150 l230 -230 v230 z"/>
+  <!-- zigzag -->
+  <path d="M90 1080 l40 30 40 -30 40 30 40 -30 40 30 40 -30 40 30 40 -30 M90 1130 l40 30 40 -30 40 30 40 -30 40 30 40 -30 40 30 40 -30"/>
+  <!-- círculos concéntricos -->
+  <g transform="translate(4170 860)"><circle r="150"/><circle r="110"/><circle r="70"/><circle r="30"/></g>
+  <!-- arco -->
+  <path d="M3800 1700 v-140 a150 150 0 0 1 300 0 v140 M3840 1700 v-140 a110 110 0 0 1 220 0 v140 M3880 1700 v-140 a70 70 0 0 1 140 0 v140"/>
+  <!-- rejilla en cuarto de círculo -->
+  <g transform="translate(3790 50)">
+    <path d="M340 0 H0 A340 340 0 0 0 340 340 Z"/>
+    <g clip-path="url(#qc)" stroke-width="5">
+      <path d="M0 57h340M0 113h340M0 170h340M0 227h340M0 283h340M57 0v340M113 0v340M170 0v340M227 0v340M283 0v340"/>
+    </g>
+  </g>
+</g>
+<!-- tramas de puntos -->
+<rect x="-60" y="610" width="420" height="420" fill="url(#dots)" mask="url(#dotmask)"/>
+<rect x="3950" y="440" width="300" height="270" fill="url(#dots)" opacity=".7"/>
+<!-- estallido -->
+<g transform="translate(4180 1180)" stroke="#FFF4E0" stroke-opacity=".8" stroke-width="7" stroke-linecap="round">
+  <path d="M0-120V-55M0 55V120M-120 0H-55M55 0H120M-85-85L-40-40M40 40L85 85M-85 85L-40 40M40-40L85-85M-46-111L-22-52M22 52L46 111M-111-46L-52-22M52 22L111 46M-111 46L-52 22M52-22L111-46M-46 111L-22 52M22-52L46-111"/>
+</g>
+<!-- cruces -->
+<g fill="#FFF4E0" fill-opacity=".55">
+  <use href="#cross" transform="translate(3640 170) rotate(45)"/>
+  <use href="#cross" transform="translate(3730 280) rotate(45) scale(.7)"/>
+</g>
+
+<!-- Franja central (x 760–3640) -->
+<g fill="#FFF4E0">
+  <use href="#spark" transform="translate(2040 330) scale(1.1)"/>
+  <use href="#spark" transform="translate(2160 450) scale(.55)" opacity=".8"/>
+  <use href="#spark" transform="translate(780 1460) scale(.7)" opacity=".75"/>
+</g>
+<g fill="none" stroke="#C85E00" stroke-opacity=".6" stroke-width="8">
+</g>
+
+<!-- Icono del logo -->
+<image href="svg/b1-3-icono.svg" x="800" y="640" width="460" height="460" filter="url(#drop)"/>
+<!-- Título: logo nuevo, mismos colores y extrusión que el banner anterior -->
+<style>.nt{font-family:'Bricolage Grotesque';font-weight:800;font-size:320px;letter-spacing:-13px} .ext .acc{fill:#FF7A00} .face .acc{fill:#0B0B0C;stroke:none}</style>
+<g class="nt" filter="url(#drop)">
+  <g class="ext" fill="#FF7A00"><g transform="translate(22 24)"><text x="1330" y="841">chollos</text><text x="1330" y="1116">d<tspan class="acc">’</tspan>hoy</text></g><g transform="translate(16 18)"><text x="1330" y="841">chollos</text><text x="1330" y="1116">d<tspan class="acc">’</tspan>hoy</text></g><g transform="translate(10 12)"><text x="1330" y="841">chollos</text><text x="1330" y="1116">d<tspan class="acc">’</tspan>hoy</text></g><g transform="translate(5 6)"><text x="1330" y="841">chollos</text><text x="1330" y="1116">d<tspan class="acc">’</tspan>hoy</text></g></g>
+  <g class="face" id="cara" fill="url(#face)" stroke="#FF8A1F" stroke-width="12" paint-order="stroke" stroke-linejoin="round"><text x="1330" y="841">chollos</text><text x="1330" y="1116">d<tspan class="acc">’</tspan>hoy</text></g>
+</g>
+<circle id="fin" r="32" fill="#0B0B0C"/>
+
+<!-- Mensaje -->
+<g class="s">
+  <text x="2560" y="1010" font-size="104" font-weight="800" fill="#5A1E06">Bajadas de precio</text>
+  <text x="2560" y="1130" font-size="104" font-weight="800" fill="#FFF7E8">reales, cada día</text>
+  <rect x="2560" y="1210" width="660" height="120" rx="60" fill="#FFF7E8"/>
+  <text x="2890" y="1290" text-anchor="middle" font-size="62" font-weight="800" fill="#C2410C">chollosdhoy.com</text>
+</g>
+
+</svg>
+<script>
+// Coloca el punto (o el cursor) justo al final de «d’hoy» cuando la fuente ya ha cargado.
+document.fonts.ready.then(() => {
+  const fin = document.getElementById("fin"); if (!fin) return;
+  const lines = document.querySelectorAll("#cara text"); const bb = lines[lines.length - 1].getBBox();
+  if (fin.tagName === "circle") { fin.setAttribute("cx", bb.x + bb.width + 34); fin.setAttribute("cy", bb.y + bb.height * 0.76); }
+  else { fin.setAttribute("x", bb.x + bb.width + 22); fin.setAttribute("y", bb.y + bb.height * 0.2); }
+  document.body.dataset.ready = "1";
+});
+</script>
+</body>
+</html>
