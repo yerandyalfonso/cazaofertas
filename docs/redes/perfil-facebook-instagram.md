@@ -8,13 +8,21 @@ token actual) los datos de la página de Facebook: estos cambios se hacen a mano
 
 | Dónde | Archivo |
 |---|---|
-| Facebook · foto de perfil | `perfil-b1-3-cuadrado-1080.png` |
-| Facebook · portada | `banner-logo-b1-3-4400x1739.png` |
-| Instagram · foto de perfil | `perfil-b1-3-cuadrado-1080.png` |
-| Telegram · bot y canal (opcional) | `perfil-b1-3-cuadrado-1080.png` |
+| Facebook · foto de perfil | `perfil/perfil-b1-3-1080.png` |
+| Facebook · portada | `facebook/portada-b1-3-4400x1739.png` |
+| Instagram · foto de perfil | `perfil/perfil-b1-3-1080.png` |
+| Instagram · portadas de destacadas | `instagram/destacada-{como-funciona,alertas,top,tecnologia,moda,hogar}.png` |
+| Telegram · canal @chollosdhoy | `telegram/telegram-canal-1080.png` (fondo naranja) |
+| Telegram · bot @cazando_ofertas_bot | `telegram/telegram-bot-1080.png` (icono negro con campana) |
 
 Las fotos de perfil se recortan en círculo: la imagen ya está pensada para ese recorte,
 no hace falta ajustarla. Maqueta de cómo queda: `maqueta-perfiles.png`.
+
+Carpetas: `svg/` (logos vectoriales y `generar_svg.py`), `facebook/`, `perfil/`,
+`instagram/`, `telegram/` (cada PNG con su HTML de origen) y `old/` (propuestas descartadas).
+
+Telegram: la foto del canal se cambia en el canal → Editar → foto; la del bot, en
+@BotFather → `/setuserpic` → elegir el bot → enviar la imagen.
 
 ## Facebook
 
@@ -51,12 +59,15 @@ no hace falta ajustarla. Maqueta de cómo queda: `maqueta-perfiles.png`.
    - `https://t.me/cazando_ofertas_bot` — «Alertas en Telegram»
    - `https://chollosdhoy.com` — «Todas las ofertas»
 4. **Categoría** (cuenta profesional): `Sitio web de compras`.
-5. **Historias destacadas** (opcional), con portadas negras y el icono naranja:
-   - «Cómo funciona»: qué es un chollo de verdad y cómo comprobamos los precios.
-   - «Alertas»: cómo crear una alerta en el bot.
-   - «Tecnología», «Moda», «Hogar»: los mejores chollos de cada categoría.
+5. **Historias destacadas**, con las portadas de `instagram/` (1080×1920; Instagram
+   recorta el círculo central, al añadir la portada solo hay que confirmar):
+   - «Cómo funciona» (`destacada-como-funciona.png`): qué es un chollo de verdad y cómo comprobamos los precios.
+   - «Alertas» (`destacada-alertas.png`): cómo crear una alerta en el bot.
+   - «Top» (`destacada-top.png`): los mejores chollos de la semana.
+   - «Tecnología», «Moda», «Hogar» (`destacada-tecnologia/moda/hogar.png`): los mejores chollos de cada categoría.
 
 ## Historial
 
 - 08-10: se detectó que no había foto de perfil, que el nombre era distinto en cada sitio y que los enlaces llevaban al bot antiguo (`@cazandor_de_ofertas_bot`, sustituido el 01-10 por `@cazando_ofertas_bot`).
-- Propuestas de logo y banners anteriores: `logo-*.png` y `banner-*.png` de esta carpeta.
+- 09-10: puestas la foto de perfil y la portada nuevas en Facebook e Instagram. Pendiente a mano: nombre, usuario, categoría y textos de Facebook; nombre y bio de Instagram.
+- Propuestas de logo y banners anteriores: `old/logos/`, `old/banners/`, `old/perfil/` y `old/svg/`.

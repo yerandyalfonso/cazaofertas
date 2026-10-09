@@ -277,13 +277,6 @@ FILES = {
     "b1-3-logo-trazos.svg": lambda: b13(False),
     "b1-3-logo-texto.svg": lambda: b13(True),
     "b1-3-icono.svg": lambda: b13(False, True),
-    "b4-logo-trazos.svg": lambda: b4(False),
-    "b4-logo-texto.svg": lambda: b4(True),
-    "b4-icono.svg": lambda: b4(False, True),
-    "c1-4-logo-cursor-trazos.svg": lambda: c14("cursor", False),
-    "c1-4-logo-cursor-texto.svg": lambda: c14("cursor", True),
-    "c1-4-icono-cursor.svg": lambda: c14("cursor", False, True),
-    "c1-4-icono-d.svg": lambda: c14("d", False, True),
 }
 
 if __name__ == "__main__":
