@@ -242,7 +242,37 @@ def b13_horizontal(live):
     return svg(x + 0.05 * size + 2 * r + 6, S, "\n".join(icon + parts))
 
 
+def b13_apilado_web(live):
+    """Icono + nombre en dos líneas con alineación óptica: el centro del icono cae en el
+    hueco entre «chollos» y «d’hoy» (como en el banner), para cabeceras web."""
+    S = 300
+    icon = [f'  <g id="icono"><rect width="{S}" height="{S}" rx="72" fill="{INK}"/></g>',
+            ch_monogram(BRI, 176, S / 2, S / 2, 0.45, False, live, bar=(S * 0.06, S * 0.07))]
+    size, tr = 150, -6
+    lead = 0.86 * size
+    xh = BRI.ymax("o", size)
+    # hueco entre líneas = entre la base de la línea 1 y la altura x de la línea 2
+    gap_mid = (lead - xh) / 2
+    b1 = S / 2 - gap_mid
+    b2 = b1 + lead
+    x = S + 48
+    parts = []
+    g, x1 = word(BRI, "chollos", size, x, b1, tr, INK, live, "chollos")
+    parts.append(g)
+    g, xe = word(BRI, "d", size, x, b2, tr, INK, live, "d")
+    parts.append(g)
+    g, xe = word(BRI, "’", size, xe + tr, b2, tr, "url(#naranja)", live, "apostrofo-nombre")
+    parts.append(g)
+    g, xe = word(BRI, "hoy", size, xe + tr, b2, tr, INK, live, "hoy")
+    parts.append(g)
+    r = 0.1 * size
+    parts.append(f'  <g id="punto-final"><circle cx="{xe + 0.05 * size + r:.1f}" cy="{b2 - r:.1f}" r="{r:.1f}" fill="url(#naranja)"/></g>')
+    w = max(x1, xe + 0.05 * size + 2 * r) + 6
+    return svg(w, S, "\n".join(icon + parts))
+
+
 FILES = {
+    "b1-3-apilado-web-trazos.svg": lambda: b13_apilado_web(False),
     "b1-3-horizontal-trazos.svg": lambda: b13_horizontal(False),
     "b1-3-logo-trazos.svg": lambda: b13(False),
     "b1-3-logo-texto.svg": lambda: b13(True),

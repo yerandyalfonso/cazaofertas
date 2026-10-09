@@ -1,58 +1,62 @@
-# Perfil de Facebook e Instagram (Chollos de Hoy)
+# Perfil de Facebook e Instagram — «chollos d’hoy»
 
-Revisión del 08-10-2026. La API de Meta no permite cambiar la bio de Instagram,
-las fotos de perfil ni (con los permisos del token actual) los datos de la
-página de Facebook: estos cambios se hacen a mano desde las apps.
+Actualizado el 09-10-2026 con la identidad B1-3 (icono «c’h» con línea naranja).
+La API de Meta no permite cambiar la bio de Instagram, las fotos de perfil ni (con el
+token actual) los datos de la página de Facebook: estos cambios se hacen a mano.
 
-## Qué estaba mal
+## Imágenes (carpeta `docs/redes/`)
 
-- **Sin foto de perfil** en Facebook ni en Instagram (silueta gris por defecto).
-- **Nombre distinto**: la página y la portada dicen «Chollos d' Hoy»; la web, «Chollos de Hoy».
-- **Enlaces al bot antiguo** `@cazandor_de_ofertas_bot` (sustituido el 01-10 por `@cazando_ofertas_bot`) en la bio y la web de Instagram y en la descripción de Facebook.
-- Facebook **sin web**, **sin nombre de usuario** (la URL es un número) y con la categoría genérica «Producto/servicio».
-
-## Imágenes
-
-| Archivo | Uso |
+| Dónde | Archivo |
 |---|---|
-| `perfil-1080.png` | Foto de perfil de Facebook **e** Instagram (se ve en círculo; el contenido está centrado). |
-| `portada-facebook-1640x624.png` | Portada de Facebook. Todo el texto cabe en la franja central que se ve en móvil. |
+| Facebook · foto de perfil | `perfil-b1-3-cuadrado-1080.png` |
+| Facebook · portada | `banner-logo-b1-3-4400x1739.png` |
+| Instagram · foto de perfil | `perfil-b1-3-cuadrado-1080.png` |
+| Telegram · bot y canal (opcional) | `perfil-b1-3-cuadrado-1080.png` |
 
-`banner-4400x1739.svg` / `.png`: versión mejorada del banner naranja (nombre «Chollos de Hoy», texto centrado en la franja que se ve en móvil, frase y web; el SVG usa la fuente DM Sans, así que para subirlo usa el PNG).
-
-`banner-estilo.html` / `banner-estilo-4400x1739.png`: banner «chollos d'hoy» con el estilo propio (título 3D en cursiva, adornos de línea de la hoja de iconos, etiqueta −32 %, mensaje y web). Todo el texto cabe en la franja que se ve en móvil. Para subirlo, el PNG.
-
-Fuentes editables: `perfil.html` y `portada.html` (renderizar con Playwright a 1080×1080 y 1640×624).
+Las fotos de perfil se recortan en círculo: la imagen ya está pensada para ese recorte,
+no hace falta ajustarla. Maqueta de cómo queda: `maqueta-perfiles.png`.
 
 ## Facebook
 
-1. **Nombre de la página**: `Chollos de Hoy` (Configuración → Información de la página). Meta puede tardar unos días en aprobarlo.
-2. **Nombre de usuario**: `chollosdhoy` → la página queda en `facebook.com/chollosdhoy`.
-3. **Categoría**: `Sitio web de compras` (o «Tienda de compras y venta minorista»).
+1. **Nombre de la página**: `Chollos d’hoy` (Configuración → Información de la página; Meta puede tardar unos días en aprobarlo).
+2. **Nombre de usuario**: `chollosdhoy` → `facebook.com/chollosdhoy`.
+3. **Categoría**: `Sitio web de compras`.
 4. **Sitio web**: `https://chollosdhoy.com`
-5. **Botón de acción**: «Enviar mensaje» → cambiar a **«Más información» / «Ver sitio web»** con `https://chollosdhoy.com`.
-6. **Descripción (Información / «Presentación», máx. 255 caracteres)**:
+5. **Botón de acción**: «Ver sitio web» → `https://chollosdhoy.com`.
+6. **Presentación** (máx. 101 caracteres, lo primero que se ve bajo el nombre):
 
    ```
-   Chollos reales de Amazon, MediaMarkt, PcComponentes, Miravia y más. Comprobamos los precios varias veces al día y solo publicamos bajadas de verdad. Alertas gratis en Telegram: t.me/cazando_ofertas_bot
+   Chollos de verdad en tecnología, moda, hogar y mucho más. Precios comprobados cada día.
    ```
 
-7. **Foto de perfil** y **portada**: las de arriba.
+7. **Descripción / Información** (máx. 255 caracteres):
+
+   ```
+   En chollos d’hoy cazamos las mejores ofertas en tecnología, moda, hogar, belleza, deporte y mucho más. Comprobamos los precios cada día y solo publicamos bajadas reales. 🔔 Alertas gratis en Telegram: t.me/cazando_ofertas_bot
+   ```
 
 ## Instagram
 
-1. **Nombre** (el que sale en negrita, se puede buscar): `Chollos de Hoy | Ofertas`
-2. **Bio (máx. 150 caracteres)**:
+1. **Nombre** (en negrita; también sirve para que te encuentren al buscar): `chollos d’hoy | Ofertas`
+2. **Bio** (máx. 150 caracteres):
 
    ```
-   🔥 Chollos reales de Amazon, MediaMarkt, PcComponentes y más
-   ✅ Precios comprobados cada día
+   🔥 Chollos de verdad cada día
+   💻 Tecnología · 👗 Moda · 🏠 Hogar y mucho más
+   ✅ Precios comprobados
    🔔 Alertas gratis en Telegram 👇
    ```
 
-3. **Enlaces** (Editar perfil → Enlaces; Instagram admite hasta 5):
-   - `https://t.me/cazando_ofertas_bot` — título «Alertas en Telegram»
-   - `https://chollosdhoy.com` — título «Todas las ofertas»
+3. **Enlaces** (Editar perfil → Enlaces; hasta 5):
+   - `https://t.me/cazando_ofertas_bot` — «Alertas en Telegram»
+   - `https://chollosdhoy.com` — «Todas las ofertas»
 4. **Categoría** (cuenta profesional): `Sitio web de compras`.
-5. **Foto de perfil**: `perfil-1080.png`.
-6. **Historias destacadas** (opcional): «Cómo funciona» (qué es un chollo real, el mínimo de 30 días) y «Alertas» (cómo crear una alerta en el bot).
+5. **Historias destacadas** (opcional), con portadas negras y el icono naranja:
+   - «Cómo funciona»: qué es un chollo de verdad y cómo comprobamos los precios.
+   - «Alertas»: cómo crear una alerta en el bot.
+   - «Tecnología», «Moda», «Hogar»: los mejores chollos de cada categoría.
+
+## Historial
+
+- 08-10: se detectó que no había foto de perfil, que el nombre era distinto en cada sitio y que los enlaces llevaban al bot antiguo (`@cazandor_de_ofertas_bot`, sustituido el 01-10 por `@cazando_ofertas_bot`).
+- Propuestas de logo y banners anteriores: `logo-*.png` y `banner-*.png` de esta carpeta.
