@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import {
@@ -64,9 +65,7 @@ export function MarketplaceHeader({
         {/* Marca + acciones secundarias */}
         <div className="mb-3 flex items-center justify-between gap-3">
           <Link href="/" className="flex min-h-11 min-w-0 items-center gap-3">
-            <span className="text-lg font-bold tracking-tight text-ink md:text-xl">
-              Chollos de Hoy
-            </span>
+            <BrandLogo priority />
             <span className="hidden truncate text-xs text-muted sm:inline">
               {isFiltered ? (
                 <>

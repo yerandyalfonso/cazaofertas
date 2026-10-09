@@ -1,6 +1,7 @@
 import Form from "next/form";
 import Link from "next/link";
 import { Search, Ticket } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 
 /**
  * Barra fija de las páginas interiores (ficha, listados, cupones, 404): marca,
@@ -12,9 +13,9 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 md:flex-nowrap">
         <Link
           href="/"
-          className="flex min-h-11 items-center text-lg font-bold tracking-tight text-ink md:text-xl"
+          className="flex min-h-11 items-center"
         >
-          Chollos de Hoy
+          <BrandLogo />
         </Link>
 
         <Form

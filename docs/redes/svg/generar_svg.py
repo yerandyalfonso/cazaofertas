@@ -218,7 +218,32 @@ def c14(kind, live, icon_only=False):
     return svg(w, S, "\n".join([bg] + icon + parts))
 
 
+def b13_horizontal(live):
+    """Icono + «chollos d’hoy.» en una línea, para cabeceras web (texto en tinta)."""
+    S = 300
+    icon = [f'  <g id="icono"><rect width="{S}" height="{S}" rx="72" fill="{INK}"/></g>',
+            ch_monogram(BRI, 176, S / 2, S / 2, 0.45, False, live, bar=(S * 0.06, S * 0.07))]
+    size, tr = 200, -8
+    # centro óptico: mitad entre la altura de la x y la línea base, en el centro del icono
+    xh = BRI.ymax("o", size)
+    base = S / 2 + xh / 2
+    x = S + 60
+    parts = []
+    g, x = word(BRI, "chollos ", size, x, base, tr, INK, live, "chollos")
+    parts.append(g)
+    g, x = word(BRI, "d", size, x + tr, base, tr, INK, live, "d")
+    parts.append(g)
+    g, x = word(BRI, "’", size, x + tr, base, tr, "url(#naranja)", live, "apostrofo-nombre")
+    parts.append(g)
+    g, x = word(BRI, "hoy", size, x + tr, base, tr, INK, live, "hoy")
+    parts.append(g)
+    r = 0.1 * size
+    parts.append(f'  <g id="punto-final"><circle cx="{x + 0.05 * size + r:.1f}" cy="{base - r:.1f}" r="{r:.1f}" fill="url(#naranja)"/></g>')
+    return svg(x + 0.05 * size + 2 * r + 6, S, "\n".join(icon + parts))
+
+
 FILES = {
+    "b1-3-horizontal-trazos.svg": lambda: b13_horizontal(False),
     "b1-3-logo-trazos.svg": lambda: b13(False),
     "b1-3-logo-texto.svg": lambda: b13(True),
     "b1-3-icono.svg": lambda: b13(False, True),
